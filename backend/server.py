@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-load_dotenv(override=True)
+load_dotenv()
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
 from starlette.middleware.cors import CORSMiddleware
