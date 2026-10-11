@@ -1,0 +1,153 @@
+{
+  "accessibility": {
+    "focus": "Focus rings are bright indigo-600 with 2px offset for all interactive controls and inputs.",
+    "hit_targets": "Minimum touch target of 44x44px across mobile and desktop interfaces.",
+    "min_text": "Minimum font size of 12px for badges and meta, 14px for body text, with high contrast ratios exceeding 4.5:1."
+  },
+  "colors": {
+    "mode": "light",
+    "semantic": {
+      "error": "#DC2626",
+      "info": "#0284C7",
+      "success": "#16A34A",
+      "warning": "#D97706"
+    },
+    "surfaces": [
+      {
+        "bg": "#F8FAFC",
+        "contrast_muted": 6.2,
+        "contrast_text": 14.5,
+        "muted_text": "#64748B",
+        "name": "page",
+        "text": "#0F172A"
+      },
+      {
+        "bg": "#FFFFFF",
+        "contrast_muted": 6.5,
+        "contrast_text": 15.2,
+        "muted_text": "#64748B",
+        "name": "card",
+        "text": "#0F172A"
+      },
+      {
+        "bg": "#0284C7",
+        "contrast_muted": 4.8,
+        "contrast_text": 16.8,
+        "muted_text": "#BAE6FD",
+        "name": "primary_button",
+        "text": "#FFFFFF"
+      }
+    ]
+  },
+  "components": {
+    "buttons": "Primary buttons use solid #0284C7 fill with text #FFFFFF, hover state #0369A1, and focus rings. Secondary buttons use #F1F5F9 background with #334155 text and border #CBD5E1.",
+    "cards": "Clean white cards with subtle 1px border #E2E8F0 and soft shadow shadow-sm, rounded-xl corner treatment.",
+    "radius": "0.75rem for cards and panels, 0.5rem for buttons and inputs."
+  },
+  "direction": {
+    "rationale": "We rejected a generic dark theme or heavy neon interface in favor of a crisp, professional educational navy-and-blue system that conveys institutional authority and pristine clarity for students, librarians, and administrators of SMA 1 Negeri Abung Tengah.",
+    "summary": "A modern, high-performance professional school library system featuring crisp navy and azure tones, digital ID card generation with QR codes, dual QR/manual borrowing \u0026 return kiosks, and real-time inventory and transaction reporting."
+  },
+  "entry_surfaces": {
+    "auth": "Clean role selection and quick login modal with demo credentials for Admin, Petugas, and Siswa.",
+    "hero": "Modern welcome header displaying SMA 1 Negeri Abung Tengah Library portal with live statistics ticker, quick QR scanner launch, and recent announcements."
+  },
+  "file_path": "/app/design_guidelines.json",
+  "imagery": {
+    "direction": "Clean architectural and interior photography of modern wood and glass libraries, paired with crisp vector illustrations for books and QR badges.",
+    "slots": [
+      {
+        "slot": "hero_library",
+        "treatment": "Subtle dark scrim with high contrast typography and live system counters.",
+        "url": "https://images.unsplash.com/photo-1544185310-0b3cf501672b?crop=entropy\u0026cs=srgb\u0026fm=jpg"
+      }
+    ]
+  },
+  "layout": {
+    "alignment": "left_rail",
+    "density": "comfortable and responsive grid system",
+    "grid": "grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "sections": [
+      {
+        "composition": "Top navigation with school branding SMA 1 NEGERI ABUNG TENGAH, active user switcher, quick search, and notification badge.",
+        "mobile": "Collapsible drawer navigation with instant touch targets.",
+        "name": "Header Navigation"
+      },
+      {
+        "composition": "Hero overview banner with live statistics (Total Books, Active Members, Borrowed Today, Missing/Incoming reports) and direct action shortcuts.",
+        "mobile": "Single column stacked cards with large touch buttons.",
+        "name": "Dashboard Overview"
+      },
+      {
+        "composition": "Interactive dual-mode borrowing \u0026 return kiosk with simulated QR camera scan and instant manual search fallback, zero fines notice, and real-time receipt generation.",
+        "mobile": "Vertical stacked camera viewfinder and search input.",
+        "name": "QR \u0026 Manual Circulation Kiosk"
+      },
+      {
+        "composition": "Book inventory manager with category filters, shelf location mapping, add/remove book modals, and stock status indicators.",
+        "mobile": "Scrollable card list with quick action menu.",
+        "name": "Book Inventory \u0026 Shelf Arrangement"
+      },
+      {
+        "composition": "Member directory and digital membership card generator with photo, student ID, and instant printable layout (with/without photo options).",
+        "mobile": "Single column member cards with download button.",
+        "name": "Member Management \u0026 Digital Cards"
+      },
+      {
+        "composition": "Comprehensive reporting suite for daily/monthly transactions and book arrival/missing logs with export capabilities.",
+        "mobile": "Scrollable data tables with tabbed views.",
+        "name": "Reports \u0026 Analytics"
+      }
+    ]
+  },
+  "motion": {
+    "entrance": "Smooth fade-in and slide-up using Tailwind transition classes (duration-200 ease-out).",
+    "hover": "Subtle scale and shadow elevation on cards and primary buttons.",
+    "principles": "Motion is used strictly to provide feedback for user actions like QR scan success, tab switching, and modal dialogs.",
+    "reduced_motion": "All transitions are disabled when prefers-reduced-motion is active."
+  },
+  "release_rules": [
+    "No step numerals: process or journey sections use icons or small markers, never a rendered 1 or 01 (functional counters like 2 of 3 are fine).",
+    "Numerals never in the display face; one numeral treatment per page.",
+    "No eyebrow or kicker text above the hero headline.",
+    "Text over imagery is guaranteed readable (scrim or solid panel); small text never sits directly on a busy photo.",
+    "No white wash over content and no gradient ramp behind hero copy.",
+    "The accent colour is never used for small text (labels, captions, meta); accent is for headings, display figures, graphics and filled controls.",
+    "One primary and one secondary button treatment per page; the primary is a solid fill that differs from the surface behind it.",
+    "CTA buttons are solid, never glass or blurred.",
+    "No decorative text marquee; a moving logo strip only for more than two real client logos, never next to the hero.",
+    "Never fabricate proof: no invented statistics, ratings, awards, press, client names or logos, founding years, or attributed testimonials. Keep the brief's own phrasing. A thin brief makes a shorter page, not an invented one.",
+    "The hero headline says what makes this business different; if it would work for a competitor, rewrite it.",
+    "Information is never styled as a button.",
+    "The lower third carries at least one visual, never three text-only sections in a row at the end.",
+    "Testimonials show a quote and an attributed person; more than three use a user-controlled carousel.",
+    "Where social proof exists, the first proof section sits near the top of the body, not near the footer.",
+    "Grids tile cleanly: no orphan last-row item, equal-height cards, bento only where one cell genuinely leads.",
+    "Not everything centred: at least one major section uses a left-aligned or asymmetric composition."
+  ],
+  "typography": {
+    "families": [
+      {
+        "family": "Inter",
+        "import_line": "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700\u0026display=swap');",
+        "role": "body",
+        "why": "Unrivaled clarity and readability for school records, tables, and dashboards."
+      },
+      {
+        "family": "Outfit",
+        "import_line": "@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800\u0026display=swap');",
+        "role": "display",
+        "why": "Clean modern geometric character for institutional headers and titles."
+      }
+    ],
+    "numerals": "Inter body face with tabular figures for statistics, IDs, and transaction counters.",
+    "scale": {
+      "body": "14px / 20px Inter",
+      "display": "32px / 40px Outfit",
+      "h1": "28px / 36px Outfit",
+      "h2": "22px / 28px Outfit",
+      "h3": "18px / 24px Outfit",
+      "small": "12px / 16px Inter"
+    }
+  }
+}
