@@ -30,6 +30,13 @@ Web perpustakaan sekolah dengan design modern & keren untuk SMA 1 NEGERI ABUNG T
 - Keputusan user: siswa hanya boleh melihat data buku (katalog & rak) — tab kartu/riwayat dihapus; endpoint anggota/riwayat/laporan/transaksi staff-only.
 - Refactor: komponen dipecah ke `src/components/*` (Login, Shared, MemberCard, CardDesigner, MemberHistory, IncomingForm, Shelves, StudentPortal, PortalChooser) + `src/lib.js`.
 
+### 11 Okt 2026 (sesi lanjutan 2) — "buat secara sederhana"
+- Pengingat Kembali: GET /api/overdue (loan Dipinjam > 7 hari, `days_out`), panel di Ringkasan + badge dashboard. Seed TRX-001 dimundurkan 10 hari sebagai contoh.
+- Ekspor Excel: GET /api/reports/export.xlsx (openpyxl, kop berlogo, header baris 7) + tombol "Excel" di Laporan.
+- Reservasi Buku (antrean saja, buku TIDAK dikunci; maks 3 aktif; tidak boleh duplikat; buku Hilang tidak bisa dipesan): siswa `POST/GET mine/DELETE /api/reservations`, tab "Pesanan saya" + tombol "Pesan buku" di katalog (menampilkan jumlah antre). Petugas: panel "Antrean pesanan siswa" di Ringkasan & Sirkulasi → Pinjamkan (buat transaksi pinjam, status Dipinjamkan) / Tolak.
+- Stok Opname: Rak buku → "Mulai stok opname": pilih rak, pindai QR / ketik kode, centang per buku, deteksi salah rak, Selesai → simpan POST /api/stocktake; buku tidak terpindai diputuskan satu per satu (tombol tandai hilang → modal). Badge "Opname terakhir".
+- QRScanner dipindah ke `components/QRScanner.js`.
+
 ## Tech stack
 Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind (preflight) + CSS kustom (App.css, Card.css, Portal.css). QR: html5-qrcode; QR gen: api.qrserver.com.
 
@@ -39,7 +46,6 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Tandai hilang pakai window.prompt/confirm (dialog browser).
 
 ## Backlog
-- P2: Export Excel (.xlsx) — user memilih PDF saja saat ini
 - P2: Reservasi buku online dari portal siswa
 - P2: Notifikasi pengingat kembali
 - P2: Pecah App.js lebih lanjut (Books/Members/Reports/Circulation ke components/)
