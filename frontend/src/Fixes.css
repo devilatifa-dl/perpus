@@ -1,0 +1,3 @@
+.scan-corners{pointer-events:none!important}
+.app-frame[data-user-role="siswa"] [data-testid="add-book-button"],.app-frame[data-user-role="siswa"] [data-testid="add-member-button"]{display:none!important}
+@media(max-width:640px){.sidebar{transition:left .2s}.sidebar.mobile-open{left:0}}

@@ -16,7 +16,7 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
 app = FastAPI(title="Perpustakaan SMA 1 Negeri Abung Tengah")
 api = APIRouter(prefix="/api")
-JWT_SECRET = os.environ.get("JWT_SECRET", "school-library-demo-secret")
+JWT_SECRET = os.environ["JWT_SECRET"]
 
 class LoginInput(BaseModel):
     email: str
@@ -101,8 +101,18 @@ async def root(): return {"message":"Perpustakaan SMA 1 Negeri Abung Tengah akti
 
 @api.post("/auth/login")
 async def login(data: LoginInput, response: Response):
-    user = await db.users.find_one({"email": data.email.lower()}, {"_id": 0})
-    if not user or not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()): raise HTTPException(401, "Email atau kata sandi salah")
+    identifier = data.email.lower()
+    attempt = await db.login_attempts.find_one({"identifier": identifier}, {"_id": 0})
+    if attempt and attempt.get("locked_until", "") > now_iso():
+        raise HTTPException(429, "Terlalu banyak percobaan. Coba lagi beberapa menit.")
+    user = await db.users.find_one({"email": identifier}, {"_id": 0})
+    if not user or not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()):
+        failures = (attempt or {}).get("failures", 0) + 1
+        payload = {"identifier": identifier, "failures": failures}
+        if failures >= 5: payload["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+        await db.login_attempts.update_one({"identifier": identifier}, {"$set": payload}, upsert=True)
+        raise HTTPException(401, "Email atau kata sandi salah")
+    await db.login_attempts.delete_one({"identifier": identifier})
     response.set_cookie("access_token", token_for(user), httponly=True, samesite="lax", max_age=28800)
     return public(user)
 
@@ -127,7 +137,9 @@ async def add_book(data: BookInput, user=Depends(current_user)):
 @api.delete("/books/{book_id}")
 async def delete_book(book_id: str, user=Depends(current_user)):
     if user["role"] not in ["admin","petugas"]: raise HTTPException(403,"Akses ditolak")
-    await db.books.delete_one({"id":book_id}); return {"ok":True}
+    result = await db.books.delete_one({"id":book_id})
+    if result.deleted_count == 0: raise HTTPException(404, "Buku tidak ditemukan")
+    return {"ok":True}
 
 @api.get("/members")
 async def members(user=Depends(current_user)): return await db.members.find({}, {"_id":0}).to_list(200)
