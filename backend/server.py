@@ -9,6 +9,7 @@ from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os, uuid, bcrypt, jwt
+from reports_pdf import WIB, build_loans, in_period, render_report_pdf
 
 ROOT_DIR = Path(__file__).parent
 mongo_url = os.environ["MONGO_URL"]
@@ -59,6 +60,7 @@ class IncomingInput(BaseModel):
 class StatusInput(BaseModel):
     status: str
     note: str = ""
+    reporter: str = ""
 
 class SettingsInput(BaseModel):
     school_logo: str = ""
@@ -200,7 +202,7 @@ async def book_status(book_id: str, data: StatusInput, user=Depends(current_user
     if data.status == "Hilang" and book["status"] == "Hilang": raise HTTPException(400, "Buku sudah berstatus hilang")
     await db.books.update_one({"id":book_id}, {"$set":{"status":data.status}})
     if data.status == "Hilang":
-        report = {"id":"LS-"+str(uuid.uuid4())[:8].upper(),"book_id":book_id,"title":book["title"],"code":book_id,"detail":data.note or book_id,"date":now_iso(),"status":"Hilang","reported_by":user["name"]}
+        report = {"id":"LS-"+str(uuid.uuid4())[:8].upper(),"book_id":book_id,"title":book["title"],"code":book_id,"detail":data.note or book_id,"date":now_iso(),"status":"Hilang","reported_by":data.reporter.strip() or user["name"]}
         await db.missing.insert_one(report); return public(report)
     await db.missing.update_many({"book_id":book_id,"status":"Hilang"}, {"$set":{"status":"Ditemukan","found_at":now_iso()}})
     return {"ok":True, "status":"Tersedia"}
@@ -267,10 +269,27 @@ async def transaction(data: TransactionInput, user=Depends(current_user)):
 @api.get("/reports")
 async def reports(user=Depends(current_user)):
     staff_only(user)
-    tx=await db.transactions.find({}, {"_id":0}).sort("date",-1).to_list(200)
+    tx=await db.transactions.find({}, {"_id":0}).sort("date",-1).to_list(500)
     incoming=await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(200)
     missing=await db.missing.find({}, {"_id":0}).sort("date",-1).to_list(200)
-    return {"transactions":tx,"incoming":incoming,"missing":missing}
+    return {"transactions":tx,"loans":build_loans(tx),"incoming":incoming,"missing":missing}
+
+@api.get("/reports/export.pdf")
+async def export_report(type: str = "transaksi", period: str = "semua", user=Depends(current_user)):
+    staff_only(user)
+    if type not in ("transaksi","masuk","hilang"): raise HTTPException(400, "Jenis laporan tidak valid")
+    now = datetime.now(WIB)
+    if type == "transaksi":
+        rows = build_loans(await db.transactions.find({}, {"_id":0}).to_list(2000))
+    elif type == "masuk":
+        rows = await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(2000)
+    else:
+        rows = await db.missing.find({}, {"_id":0}).sort("date",-1).to_list(2000)
+    rows = [r for r in rows if in_period(r.get("date"), period, now)]
+    settings = await db.settings.find_one({"id":"main"}, {"_id":0}) or {}
+    pdf = render_report_pdf(type, period, rows, settings, user["name"])
+    filename = f"laporan-{type}-{period}-{now.strftime('%Y%m%d')}.pdf"
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 app.include_router(api)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[os.environ["FRONTEND_URL"]], allow_methods=["*"], allow_headers=["*"])
