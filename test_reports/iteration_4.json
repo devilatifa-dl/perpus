@@ -1,0 +1,29 @@
+{
+  "summary": "Full iteration-4 regression on public URL. Backend: 25/25 pytest tests in /app/backend/tests/test_iteration4.py pass (portal gating, siswa scoping, incoming books flow, lost/found with reports, member history, settings CRUD, members without email/phone). Frontend: portal chooser renders; /admin login as petugas works; incoming form creates N books (verified 2 TEST_UI2_Buku rows); lost-book flow turns status 'Hilang', found-button appears and restores to 'Tersedia'; member form has only name/student_id/class_name (no email/phone), card shows school & library logos, history panel renders; CardDesigner theme-emerald + layout-portrait apply classes to preview, save persists (restored to navy/classic); Reports incoming/missing/transactions tabs work; siswa login on /admin shows exact error text 'Akun siswa hanya dapat masuk melalui portal /siswa'; /siswa portal: all 4 tabs work, 9 catalog cards, kartu shows card, riwayat shows history, no admin-only buttons visible, visiting /admin as siswa redirects to /siswa, student-logout works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "IncomingForm", "issues": ["'Sumber' is a <select> (Pembelian/Donasi/...) not a free-text input as request implied. Not a bug, just a note for test authors."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration4.py",
+    "/app/test_reports/pytest/iter5.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py uses in-memory lockout dict; survives per-process only, lost on restart — acceptable for school app but worth noting.",
+    "Lost/Found uses window.prompt/confirm (browser blocking dialogs) — hard to test headlessly and poor UX; consider a small modal.",
+    "Dashboard 'incoming' now derived from real incoming collection (was hardcoded in iter3) — fixed.",
+    "Portal gating is enforced server-side (good). Frontend also redirects siswa away from /admin."
+  ],
+  "updated_files": ["/app/backend/tests/test_iteration4.py"],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "100%"},
+  "test_credentials": "admin@smansa.sch.id/admin123, petugas@smansa.sch.id/petugas123 (portal=admin); siswa@smansa.sch.id/siswa123 (portal=siswa) -> MB-2024001",
+  "seed_data_creation": "Created TEST_UI2_Buku x2 via incoming form in UI test and deleted them. Backend tests create TEST_INC_*/TEST_SUM_*/TEST_REP_* books via /api/incoming and clean them up via DELETE. One TEST_ member and settings mutations are restored to defaults. Lost book created during test is restored to Tersedia.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All iteration-4 features verified green. Note: 'incoming-source-input' is a <select>; use select_option in Playwright. Lost/Found uses window.prompt + window.confirm — register page.on('dialog', d: d.accept()) before clicking. Siswa portal login error exact text: 'Akun siswa hanya dapat masuk melalui portal /siswa'. Previous iter3 left stale TEST_UI_INC books in catalog (title: TEST_UI_INC x2), harmless but may clutter counts."
+}

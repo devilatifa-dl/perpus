@@ -16,13 +16,13 @@ export function Login({ onLogin, portal }) {
       <div className="login-logos"><img src={SCHOOL_LOGO} alt="Logo SMA Negeri 1 Abung Tengah" data-testid="login-school-logo"/><img src={LIBRARY_LOGO} alt="Logo perpustakaan" data-testid="login-library-logo"/></div>
       <p className="overline">{student ? "PORTAL SISWA · PERPUSTAKAAN SEKOLAH" : "PORTAL PETUGAS & ADMIN · PERPUSTAKAAN SEKOLAH"}</p>
       <h1>{student ? <>Jelajahi koleksi,<br/><em>pinjam dengan mudah.</em></> : <>Temukan pengetahuan,<br/><em>mulai dari sini.</em></>}</h1>
-      <p className="login-copy">{student ? "Lihat katalog buku, susunan rak, kartu anggota digital, dan riwayat pinjamanmu." : "Satu ruang digital untuk merawat koleksi, melayani siswa, dan menjaga budaya membaca."}</p>
+      <p className="login-copy">{student ? "Lihat katalog buku dan susunan rak perpustakaan. Hanya lihat, tanpa mengubah data." : "Satu ruang digital untuk merawat koleksi, melayani siswa, dan menjaga budaya membaca."}</p>
       <div className="login-address"><span>SMA 1 NEGERI ABUNG TENGAH</span><span>Jln Raya Subik, Desa Pekurun Selatan</span></div>
     </div>
     <div className="login-panel"><div className="login-panel-inner">
       <p className="eyebrow">{student ? "HALO, SISWA" : "SELAMAT DATANG KEMBALI"}</p>
       <h2>{student ? "Masuk portal siswa" : "Masuk ke ruang kerja"}</h2>
-      <p className="muted">{student ? "Akses baca-saja: katalog, rak, kartu & riwayat." : "Khusus admin dan petugas perpustakaan."}</p>
+      <p className="muted">{student ? "Akses baca-saja: katalog & rak buku." : "Khusus admin dan petugas perpustakaan."}</p>
       <form onSubmit={submit} data-testid="login-form">
         <label>Email sekolah<input data-testid="login-email-input" value={email} onChange={(e) => setEmail(e.target.value)} type="email" required/></label>
         <label>Kata sandi<input data-testid="login-password-input" value={password} onChange={(e) => setPassword(e.target.value)} type="password" required/></label>

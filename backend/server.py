@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import os, re, uuid, bcrypt, jwt
+import os, uuid, bcrypt, jwt
 
 ROOT_DIR = Path(__file__).parent
 mongo_url = os.environ["MONGO_URL"]
@@ -220,19 +220,10 @@ async def add_incoming(data: IncomingInput, user=Depends(current_user)):
     doc = {"id":"IN-"+str(uuid.uuid4())[:8].upper(),"title":data.title,"author":data.author,"category":data.category,"shelf":data.shelf,"quantity":data.quantity,"detail":f"{data.quantity} eksemplar","source":data.source,"date":date,"status":"Tersimpan","book_ids":[b["id"] for b in books],"recorded_by":user["name"],"created_at":now_iso()}
     await db.incoming.insert_one(doc); return public(doc)
 
-def own_member_filter(user):
-    return {"$or": [{"student_id": user.get("student_id", "__none__")}, {"name": {"$regex": f"^{re.escape(user['name'])}$", "$options": "i"}}]}
-
 @api.get("/members")
 async def members(user=Depends(current_user)):
-    query = own_member_filter(user) if user["role"] == "siswa" else {}
-    return await db.members.find(query, {"_id":0}).to_list(200)
-
-@api.get("/members/me")
-async def my_member(user=Depends(current_user)):
-    member = await db.members.find_one(own_member_filter(user), {"_id":0})
-    if not member: raise HTTPException(404, "Data keanggotaan belum terdaftar. Hubungi petugas perpustakaan.")
-    return member
+    staff_only(user)
+    return await db.members.find({}, {"_id":0}).to_list(200)
 
 @api.post("/members")
 async def add_member(data: MemberInput, user=Depends(current_user)):
@@ -241,10 +232,9 @@ async def add_member(data: MemberInput, user=Depends(current_user)):
 
 @api.get("/members/{member_id}/history")
 async def member_history(member_id: str, user=Depends(current_user)):
+    staff_only(user)
     member = await db.members.find_one({"id":member_id}, {"_id":0})
     if not member: raise HTTPException(404, "Anggota tidak ditemukan")
-    if user["role"] == "siswa" and not (member.get("student_id") == user.get("student_id") or member["name"].lower() == user["name"].lower()):
-        raise HTTPException(403, "Anda hanya dapat melihat riwayat Anda sendiri")
     tx = await db.transactions.find({"member_id":member_id}, {"_id":0}).sort("date",1).to_list(300)
     history = []
     for t in tx:

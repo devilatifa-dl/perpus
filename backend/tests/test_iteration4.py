@@ -8,27 +8,72 @@ import requests
 BASE_URL = os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
 
 
-def _login(email, password):
+def _login(email, password, portal="admin"):
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
-    r = s.post(f"{BASE_URL}/api/auth/login", json={"email": email, "password": password})
+    r = s.post(f"{BASE_URL}/api/auth/login",
+               json={"email": email, "password": password, "portal": portal})
     assert r.status_code == 200, r.text
     return s
 
 
 @pytest.fixture
 def admin():
-    return _login("admin@smansa.sch.id", "admin123")
+    return _login("admin@smansa.sch.id", "admin123", "admin")
 
 
 @pytest.fixture
 def petugas():
-    return _login("petugas@smansa.sch.id", "petugas123")
+    return _login("petugas@smansa.sch.id", "petugas123", "admin")
 
 
 @pytest.fixture
 def siswa():
-    return _login("siswa@smansa.sch.id", "siswa123")
+    return _login("siswa@smansa.sch.id", "siswa123", "siswa")
+
+
+# ---- Portal gating ----
+class TestPortalGating:
+    def test_siswa_on_admin_portal_403(self):
+        r = requests.post(f"{BASE_URL}/api/auth/login",
+                          json={"email": "siswa@smansa.sch.id",
+                                "password": "siswa123", "portal": "admin"})
+        assert r.status_code == 403
+
+    def test_admin_on_siswa_portal_403(self):
+        r = requests.post(f"{BASE_URL}/api/auth/login",
+                          json={"email": "admin@smansa.sch.id",
+                                "password": "admin123", "portal": "siswa"})
+        assert r.status_code == 403
+
+    def test_login_sets_cookie(self):
+        r = requests.post(f"{BASE_URL}/api/auth/login",
+                          json={"email": "admin@smansa.sch.id",
+                                "password": "admin123", "portal": "admin"})
+        assert r.status_code == 200
+        assert "access_token" in r.cookies
+
+
+# ---- Siswa scoping ----
+class TestSiswaScoping:
+    def test_members_me(self, siswa):
+        r = siswa.get(f"{BASE_URL}/api/members/me")
+        assert r.status_code == 200
+        assert r.json()["id"] == "MB-2024001"
+
+    def test_members_list_only_own(self, siswa):
+        r = siswa.get(f"{BASE_URL}/api/members")
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) == 1 and data[0]["id"] == "MB-2024001"
+
+    def test_reports_403(self, siswa):
+        r = siswa.get(f"{BASE_URL}/api/reports")
+        assert r.status_code == 403
+
+    def test_transactions_403(self, siswa):
+        r = siswa.get(f"{BASE_URL}/api/transactions")
+        assert r.status_code == 403
 
 
 # ---- Incoming books ----
