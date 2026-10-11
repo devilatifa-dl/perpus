@@ -65,6 +65,68 @@ def build_loans(transactions):
     return loans
 
 
+def table_rows(kind, rows):
+    if kind == "transaksi":
+        header = ["No", "Anggota", "Buku", "Kode", "Tgl Pinjam", "Tgl Kembali", "Status"]
+        widths = [10 * mm, 48 * mm, 70 * mm, 26 * mm, 36 * mm, 36 * mm, 28 * mm]
+        plain = [[r["member_name"], r["book_title"], r["book_id"], fmt_date(r["borrowed_at"], True), fmt_date(r["returned_at"], True), r["status"]] for r in rows]
+        borrowed = sum(1 for r in rows if r["status"] == "Dipinjam"); summary = f"Total peminjaman: {len(rows)} · Masih dipinjam: {borrowed} · Dikembalikan: {len(rows) - borrowed}"
+    elif kind == "masuk":
+        header = ["No", "Judul Buku", "Penulis", "Jumlah", "Sumber", "Rak", "Tanggal", "Dicatat oleh"]
+        widths = [10 * mm, 70 * mm, 45 * mm, 18 * mm, 32 * mm, 16 * mm, 30 * mm, 36 * mm]
+        plain = [[r["title"], r.get("author", "-"), f"{r['quantity']} eks", r.get("source") or "-", r.get("shelf", "-"), fmt_date(r["date"]), r.get("recorded_by", "-")] for r in rows]
+        summary = f"Total penerimaan: {len(rows)} · Total eksemplar: {sum(r.get('quantity', 0) for r in rows)}"
+    else:
+        header = ["No", "Judul Buku", "Kode", "Catatan", "Tgl Lapor", "Status", "Ditemukan", "Pelapor"]
+        widths = [10 * mm, 62 * mm, 24 * mm, 56 * mm, 30 * mm, 22 * mm, 30 * mm, 30 * mm]
+        plain = [[r["title"], r["code"], r.get("detail") if r.get("detail") != r.get("code") else "-", fmt_date(r["date"]), r["status"], fmt_date(r.get("found_at")), r.get("reported_by", "-")] for r in rows]
+        lost = sum(1 for r in rows if r["status"] == "Hilang"); summary = f"Total laporan: {len(rows)} · Masih hilang: {lost} · Ditemukan: {len(rows) - lost}"
+    return header, widths, plain, summary
+
+
+def render_report_xlsx(kind, period, rows, settings, officer):
+    from openpyxl import Workbook
+    from openpyxl.drawing.image import Image as XLImage
+    from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+    now = datetime.now(WIB)
+    header, widths, plain, summary = table_rows(kind, rows)
+    wb = Workbook(); ws = wb.active; ws.title = TITLES[kind][:30]
+    ncol = len(header)
+    for logo_val, fallback, col in ((settings.get("school_logo"), "logo-sekolah.jpg", "A"), (settings.get("library_logo"), "logo-perpustakaan.jpg", get_column_letter(ncol))):
+        try:
+            img = _logo_bytes(logo_val, fallback); xl = XLImage(img); xl.width = xl.height = 60; ws.add_image(xl, f"{col}1")
+        except Exception:
+            pass
+    ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=ncol - 1); ws.merge_cells(start_row=2, start_column=2, end_row=2, end_column=ncol - 1); ws.merge_cells(start_row=3, start_column=2, end_row=3, end_column=ncol - 1)
+    ws["B1"] = "PERPUSTAKAAN SMA 1 NEGERI ABUNG TENGAH"; ws["B1"].font = Font(bold=True, size=14, color="0F2745"); ws["B1"].alignment = Alignment(horizontal="center")
+    ws["B2"] = "Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara"; ws["B2"].alignment = Alignment(horizontal="center"); ws["B2"].font = Font(size=9, color="475569")
+    ws["B3"] = f"{TITLES[kind]} — {PERIODS.get(period, 'Semua waktu')} · dicetak {fmt_long(now, True)} WIB oleh {officer}"; ws["B3"].alignment = Alignment(horizontal="center"); ws["B3"].font = Font(size=9, italic=True, color="475569")
+    ws.row_dimensions[1].height = 24; ws.row_dimensions[2].height = 14; ws.row_dimensions[4].height = 6
+    ws.cell(row=5, column=1, value=summary).font = Font(bold=True, color="0284C7")
+    thin = Side(style="thin", color="CBD5E1"); border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    for j, h in enumerate(header, 1):
+        c = ws.cell(row=7, column=j, value=h); c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745"); c.alignment = Alignment(horizontal="center", vertical="center"); c.border = border
+    for i, r in enumerate(plain, 1):
+        for j, v in enumerate([i] + r, 1):
+            c = ws.cell(row=7 + i, column=j, value=v); c.border = border; c.alignment = Alignment(vertical="center", wrap_text=True)
+            if i % 2 == 0: c.fill = PatternFill("solid", fgColor="F1F5F9")
+    if not plain: ws.cell(row=8, column=2, value="Belum ada data pada periode ini")
+    for j, w in enumerate(widths, 1): ws.column_dimensions[get_column_letter(j)].width = max(6, w / mm * 0.55)
+    ws.freeze_panes = "A8"
+    buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
+
+
+def _logo_bytes(value, fallback):
+    from PIL import Image as PILImage
+    if value and value.startswith("data:"):
+        src = PILImage.open(io.BytesIO(base64.b64decode(value.split(",", 1)[1]))).convert("RGBA")
+        bg = PILImage.new("RGBA", src.size, (255, 255, 255, 255)); bg.alpha_composite(src); src = bg.convert("RGB").resize((180, 180))
+    else:
+        src = PILImage.open(str(ASSETS / fallback)).convert("RGB")
+    out = io.BytesIO(); src.save(out, format="PNG"); out.seek(0); return out
+
+
 def _logo(value, fallback, size=16 * mm):
     try:
         if value and value.startswith("data:"):
@@ -97,21 +159,8 @@ def render_report_pdf(kind, period, rows, settings, officer):
     title = Paragraph(f"{TITLES[kind]} — {PERIODS.get(period, 'Semua waktu')}", ParagraphStyle("t", parent=h1, fontSize=13, spaceBefore=8))
     meta = Paragraph(f"Dicetak {fmt_long(now, True)} WIB · {len(rows)} baris · oleh {officer}", sub)
 
-    if kind == "transaksi":
-        header = ["No", "Anggota", "Buku", "Kode", "Tgl Pinjam", "Tgl Kembali", "Status"]
-        widths = [10 * mm, 48 * mm, 70 * mm, 26 * mm, 36 * mm, 36 * mm, 28 * mm]
-        body = [[str(i + 1), Paragraph(r["member_name"], cellb), Paragraph(r["book_title"], cell), r["book_id"], fmt_date(r["borrowed_at"], True), fmt_date(r["returned_at"], True), r["status"]] for i, r in enumerate(rows)]
-        borrowed = sum(1 for r in rows if r["status"] == "Dipinjam"); summary = f"Total peminjaman: {len(rows)} · Masih dipinjam: {borrowed} · Dikembalikan: {len(rows) - borrowed}"
-    elif kind == "masuk":
-        header = ["No", "Judul Buku", "Penulis", "Jumlah", "Sumber", "Rak", "Tanggal", "Dicatat oleh"]
-        widths = [10 * mm, 70 * mm, 45 * mm, 18 * mm, 32 * mm, 16 * mm, 30 * mm, 36 * mm]
-        body = [[str(i + 1), Paragraph(r["title"], cellb), Paragraph(r.get("author", "-"), cell), f"{r['quantity']} eks", r.get("source") or "-", r.get("shelf", "-"), fmt_date(r["date"]), Paragraph(r.get("recorded_by", "-"), cell)] for i, r in enumerate(rows)]
-        summary = f"Total penerimaan: {len(rows)} · Total eksemplar: {sum(r.get('quantity', 0) for r in rows)}"
-    else:
-        header = ["No", "Judul Buku", "Kode", "Catatan", "Tgl Lapor", "Status", "Ditemukan", "Pelapor"]
-        widths = [10 * mm, 62 * mm, 24 * mm, 56 * mm, 30 * mm, 22 * mm, 30 * mm, 30 * mm]
-        body = [[str(i + 1), Paragraph(r["title"], cellb), r["code"], Paragraph(r.get("detail") if r.get("detail") != r.get("code") else "-", cell), fmt_date(r["date"]), r["status"], fmt_date(r.get("found_at")), Paragraph(r.get("reported_by", "-"), cell)] for i, r in enumerate(rows)]
-        lost = sum(1 for r in rows if r["status"] == "Hilang"); summary = f"Total laporan: {len(rows)} · Masih hilang: {lost} · Ditemukan: {len(rows) - lost}"
+    header, widths, plain, summary = table_rows(kind, rows)
+    body = [[str(i + 1)] + [Paragraph(str(v), cellb if j == 0 else cell) for j, v in enumerate(r)] for i, r in enumerate(plain)]
 
     if not body: body = [["", Paragraph("Belum ada data pada periode ini", cell)] + [""] * (len(header) - 2)]
     table = Table([[Paragraph(h, head) for h in header]] + body, colWidths=widths, repeatRows=1)
