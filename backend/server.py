@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import os, uuid, bcrypt, jwt
+import os, re, uuid, bcrypt, jwt
 
 ROOT_DIR = Path(__file__).parent
 mongo_url = os.environ["MONGO_URL"]
@@ -23,6 +23,7 @@ if len(JWT_SECRET) < 32:
 class LoginInput(BaseModel):
     email: str
     password: str
+    portal: str = "admin"
 
 class BookInput(BaseModel):
     title: str
@@ -146,6 +147,10 @@ async def login(data: LoginInput, response: Response):
         await db.login_attempts.update_one({"identifier": identifier}, {"$set": payload}, upsert=True)
         raise HTTPException(401, "Email atau kata sandi salah")
     await db.login_attempts.delete_one({"identifier": identifier})
+    if data.portal == "siswa" and user["role"] != "siswa":
+        raise HTTPException(403, "Akun petugas/admin harus masuk melalui portal /admin")
+    if data.portal == "admin" and user["role"] == "siswa":
+        raise HTTPException(403, "Akun siswa hanya dapat masuk melalui portal /siswa")
     response.set_cookie("access_token", token_for(user), httponly=True, samesite="lax", max_age=28800)
     return public(user)
 
@@ -201,7 +206,9 @@ async def book_status(book_id: str, data: StatusInput, user=Depends(current_user
     return {"ok":True, "status":"Tersedia"}
 
 @api.get("/incoming")
-async def incoming_list(user=Depends(current_user)): return await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(200)
+async def incoming_list(user=Depends(current_user)):
+    staff_only(user)
+    return await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(200)
 
 @api.post("/incoming")
 async def add_incoming(data: IncomingInput, user=Depends(current_user)):
@@ -213,8 +220,19 @@ async def add_incoming(data: IncomingInput, user=Depends(current_user)):
     doc = {"id":"IN-"+str(uuid.uuid4())[:8].upper(),"title":data.title,"author":data.author,"category":data.category,"shelf":data.shelf,"quantity":data.quantity,"detail":f"{data.quantity} eksemplar","source":data.source,"date":date,"status":"Tersimpan","book_ids":[b["id"] for b in books],"recorded_by":user["name"],"created_at":now_iso()}
     await db.incoming.insert_one(doc); return public(doc)
 
+def own_member_filter(user):
+    return {"$or": [{"student_id": user.get("student_id", "__none__")}, {"name": {"$regex": f"^{re.escape(user['name'])}$", "$options": "i"}}]}
+
 @api.get("/members")
-async def members(user=Depends(current_user)): return await db.members.find({}, {"_id":0}).to_list(200)
+async def members(user=Depends(current_user)):
+    query = own_member_filter(user) if user["role"] == "siswa" else {}
+    return await db.members.find(query, {"_id":0}).to_list(200)
+
+@api.get("/members/me")
+async def my_member(user=Depends(current_user)):
+    member = await db.members.find_one(own_member_filter(user), {"_id":0})
+    if not member: raise HTTPException(404, "Data keanggotaan belum terdaftar. Hubungi petugas perpustakaan.")
+    return member
 
 @api.post("/members")
 async def add_member(data: MemberInput, user=Depends(current_user)):
@@ -242,10 +260,13 @@ async def member_history(member_id: str, user=Depends(current_user)):
 async def shelves(user=Depends(current_user)): return await db.shelves.find({}, {"_id":0}).to_list(50)
 
 @api.get("/transactions")
-async def transactions(user=Depends(current_user)): return await db.transactions.find({}, {"_id":0}).sort("date",-1).to_list(200)
+async def transactions(user=Depends(current_user)):
+    staff_only(user)
+    return await db.transactions.find({}, {"_id":0}).sort("date",-1).to_list(200)
 
 @api.post("/transactions")
 async def transaction(data: TransactionInput, user=Depends(current_user)):
+    staff_only(user)
     member=await db.members.find_one({"id":data.member_id},{"_id":0}); book=await db.books.find_one({"id":data.book_id},{"_id":0})
     if not member or not book: raise HTTPException(404,"Anggota atau buku tidak ditemukan")
     action=data.action; status="Dipinjam" if action=="pinjam" else "Tersedia"
@@ -255,6 +276,7 @@ async def transaction(data: TransactionInput, user=Depends(current_user)):
 
 @api.get("/reports")
 async def reports(user=Depends(current_user)):
+    staff_only(user)
     tx=await db.transactions.find({}, {"_id":0}).sort("date",-1).to_list(200)
     incoming=await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(200)
     missing=await db.missing.find({}, {"_id":0}).sort("date",-1).to_list(200)
