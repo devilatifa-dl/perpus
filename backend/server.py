@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
 from starlette.middleware.cors import CORSMiddleware
@@ -17,6 +17,8 @@ db = client[os.environ["DB_NAME"]]
 app = FastAPI(title="Perpustakaan SMA 1 Negeri Abung Tengah")
 api = APIRouter(prefix="/api")
 JWT_SECRET = os.environ["JWT_SECRET"]
+if len(JWT_SECRET) < 32:
+    raise RuntimeError("JWT_SECRET must contain at least 32 characters")
 
 class LoginInput(BaseModel):
     email: str
@@ -167,10 +169,10 @@ async def transaction(data: TransactionInput, user=Depends(current_user)):
 @api.get("/reports")
 async def reports(user=Depends(current_user)):
     tx=await db.transactions.find({}, {"_id":0}).sort("date",-1).to_list(200)
-    return {"transactions":tx,"incoming":[{"title":"Modul Literasi Digital","quantity":12,"date":"18 Jun 2024","status":"Tersimpan"},{"title":"Koleksi Sains Terapan","quantity":8,"date":"15 Jun 2024","status":"Tersimpan"}],"missing":[{"title":"Kamus Bahasa Inggris","code":"BK-0988","date":"03 Jun 2024","status":"Ditindaklanjuti"}]}
+    return {"transactions":tx,"incoming":[{"title":"Modul Literasi Digital","quantity":12,"detail":"12 eksemplar","date":"18 Jun 2024","status":"Tersimpan"},{"title":"Koleksi Sains Terapan","quantity":8,"detail":"8 eksemplar","date":"15 Jun 2024","status":"Tersimpan"}],"missing":[{"title":"Kamus Bahasa Inggris","code":"BK-0988","detail":"BK-0988","date":"03 Jun 2024","status":"Ditindaklanjuti"}]}
 
 app.include_router(api)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.environ.get("CORS_ORIGINS","*").split(","), allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[os.environ["FRONTEND_URL"]], allow_methods=["*"], allow_headers=["*"])
 
 @app.on_event("shutdown")
 async def shutdown(): client.close()
