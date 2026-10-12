@@ -6,7 +6,23 @@
 .theme-sunset{--c1:#7c2d12;--c2:#ea580c;--acc:#fed7aa;--sub:#ffedd5;--photo:#ffedd5;--photo-ink:#c2410c}
 .theme-midnight{--c1:#0a0a0a;--c2:#262626;--acc:#fbbf24;--sub:#e5e5e5;--line:#fbbf2444;--photo:#fef3c7;--photo-ink:#92400e}
 .theme-light{--c1:#ffffff;--c2:#f1f5f9;--acc:#0284c7;--txt:#0f172a;--sub:#475569;--line:#cbd5e1;--photo:#e0f2fe;--photo-ink:#0369a1}
+.theme-book{--c1:#3a2416;--c2:#7a4a24;--acc:#e8c48a;--sub:#f2e3cc;--line:#e8c48a55;--photo:#f2e3cc;--photo-ink:#7a4a24}
 .id-card.theme-light{border:2px solid #0284c7}
+.id-card.theme-book{border:2px solid #e8c48a;box-shadow:0 16px 28px #3a241633}
+/* Card fonts */
+.id-card{font-family:Outfit,Inter,system-ui,sans-serif}
+.id-card h3,.id-card b,.id-card strong,.id-card small,.id-card span,.id-card p{font-family:inherit}
+.id-card.font-klasik{font-family:Georgia,"Times New Roman",serif}
+.id-card.font-elegan{font-family:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif}
+.id-card.font-mono{font-family:"Courier New",ui-monospace,monospace}
+/* Logo position */
+.id-card.logo-kanan .card-logos{order:4}
+.id-card.logo-tengah .id-card-top{justify-content:center;text-align:center;flex-wrap:wrap}
+.id-card.logo-tengah .card-school{flex:0 1 auto}
+/* Photo position (body order) */
+.id-card.photo-kiri .id-card-body{flex-direction:row}
+.id-card.photo-kanan .id-card-body{flex-direction:row-reverse}
+.id-card.layout-portrait .id-card-body{flex-direction:column}
 .id-card .id-card-top,.id-card .id-card-foot{border-color:var(--line)}
 .id-card .id-card-top small,.id-card .id-card-foot,.id-card .id-card-body span{color:var(--acc)}
 .id-card .id-card-body p,.id-card .id-card-foot span{color:var(--sub)}
@@ -48,6 +64,17 @@
 .layout-option b{font-size:12px;color:#0f172a}
 .layout-option small{font-size:10px;color:#64748b}
 .layout-option.active{border-color:#0284c7;background:#eff6ff}
+.pill-options{display:flex;gap:8px;flex-wrap:wrap}
+.pill-option{border:1px solid #cbd5e1;background:#fff;border-radius:20px;padding:8px 15px;font-size:12px;font-weight:700;color:#475569;cursor:pointer;transition:border-color .15s,background .15s,color .15s}
+.pill-option:hover{border-color:#94a3b8}
+.pill-option.active{border-color:#0284c7;background:#eff6ff;color:#0369a1}
+.pill-option.font-prev-klasik{font-family:Georgia,"Times New Roman",serif}
+.pill-option.font-prev-elegan{font-family:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif}
+.pill-option.font-prev-mono{font-family:"Courier New",ui-monospace,monospace}
+.spacing-val{color:#0284c7;font-size:11px;margin-left:6px}
+.range-input{width:100%;height:6px;-webkit-appearance:none;appearance:none;background:#e2e8f0;border-radius:4px;padding:0;outline:none;cursor:pointer}
+.range-input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:#0284c7;cursor:pointer;box-shadow:0 2px 5px #0284c755}
+.range-input::-moz-range-thumb{width:18px;height:18px;border:0;border-radius:50%;background:#0284c7;cursor:pointer}
 .toggles{display:grid;gap:8px}
 .toggle{display:flex;align-items:center;gap:9px;font-weight:600;color:#334155;cursor:pointer}
 .toggle input{width:16px;height:16px;accent-color:#0284c7}

@@ -44,6 +44,9 @@ class MemberInput(BaseModel):
 class BulkDeleteInput(BaseModel):
     class_name: str
 
+class ResetInput(BaseModel):
+    include_books: bool = False
+
 class PasswordChangeInput(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=6)
@@ -80,6 +83,11 @@ class SettingsInput(BaseModel):
     card_show_qr: bool = True
     card_show_address: bool = True
     card_title: str = "KARTU ANGGOTA PERPUSTAKAAN"
+    card_font: str = "modern"
+    card_school_spacing: float = 0
+    card_logo_pos: str = "kiri"
+    card_photo_pos: str = "kiri"
+    card_qr_pos: str = "atas"
 
 DEFAULT_SETTINGS = SettingsInput().model_dump()
 
@@ -396,6 +404,22 @@ async def delete_member(member_id: str, user=Depends(current_user)):
     if result.deleted_count == 0: raise HTTPException(404, "Anggota tidak ditemukan")
     await db.reservations.update_many({"member_id": member_id, "status": "Menunggu"}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
     return {"ok": True}
+
+@api.post("/admin/reset-data")
+async def reset_data(data: ResetInput, user=Depends(current_user)):
+    if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mereset data")
+    members = (await db.members.delete_many({})).deleted_count
+    transactions = (await db.transactions.delete_many({})).deleted_count
+    incoming = (await db.incoming.delete_many({})).deleted_count
+    missing = (await db.missing.delete_many({})).deleted_count
+    reservations = (await db.reservations.delete_many({})).deleted_count
+    stocktake = (await db.stocktake.delete_many({})).deleted_count
+    if data.include_books:
+        books = (await db.books.delete_many({})).deleted_count
+    else:
+        books = 0
+        await db.books.update_many({}, {"$set": {"status": "Tersedia"}})
+    return {"ok": True, "deleted": {"members": members, "transactions": transactions, "incoming": incoming, "missing": missing, "reservations": reservations, "stocktake": stocktake, "books": books}, "books_deleted": data.include_books}
 
 @api.get("/members/{member_id}/history")
 async def member_history(member_id: str, user=Depends(current_user)):

@@ -7,9 +7,11 @@ export const fmtDate = (d, opts = { day: "numeric", month: "short", year: "numer
 
 export const SCHOOL_LOGO = "/logo-sekolah.png";
 export const LIBRARY_LOGO = "/logo-perpustakaan.png";
-export const DEFAULT_SETTINGS = { school_logo: "", library_logo: "", card_theme: "navy", card_layout: "classic", card_show_qr: true, card_show_address: true, card_title: "KARTU ANGGOTA PERPUSTAKAAN" };
-export const CARD_THEMES = [["navy", "Biru Navy"], ["emerald", "Hijau Zamrud"], ["maroon", "Merah Maroon"], ["sunset", "Jingga Senja"], ["midnight", "Hitam Emas"], ["light", "Putih Bersih"]];
+export const DEFAULT_SETTINGS = { school_logo: "", library_logo: "", card_theme: "navy", card_layout: "classic", card_show_qr: true, card_show_address: true, card_title: "KARTU ANGGOTA PERPUSTAKAAN", card_font: "modern", card_school_spacing: 0, card_logo_pos: "kiri", card_photo_pos: "kiri", card_qr_pos: "atas" };
+export const CARD_THEMES = [["navy", "Biru Navy"], ["emerald", "Hijau Zamrud"], ["maroon", "Merah Maroon"], ["sunset", "Jingga Senja"], ["midnight", "Hitam Emas"], ["light", "Putih Bersih"], ["book", "Tema Buku"]];
 export const CARD_LAYOUTS = [["classic", "Klasik", "Foto kiri, QR di atas"], ["modern", "Modern", "QR kiri, foto kanan"], ["portrait", "Potret", "Vertikal, QR di bawah"]];
+export const CARD_FONTS = [["modern", "Modern"], ["klasik", "Klasik"], ["elegan", "Elegan"], ["mono", "Monospace"]];
+export const CARD_POS = { logo: [["kiri", "Kiri"], ["tengah", "Tengah"], ["kanan", "Kanan"]], photo: [["kiri", "Kiri"], ["kanan", "Kanan"]], qr: [["atas", "Atas"], ["bawah", "Bawah"]] };
 
 export const readFile = (file) => new Promise((resolve, reject) => {
   if (!file) return resolve("");

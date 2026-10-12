@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Save } from "lucide-react";
-import { CARD_LAYOUTS, CARD_THEMES, DEFAULT_SETTINGS } from "../lib";
+import { CARD_LAYOUTS, CARD_THEMES, CARD_FONTS, CARD_POS, DEFAULT_SETTINGS } from "../lib";
 import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
 
@@ -20,6 +20,21 @@ export function CardDesigner({ settings, member, onSave, close }) {
         </div>
         <div className="control-group"><span className="control-label">Susunan</span>
           <div className="layout-options">{CARD_LAYOUTS.map(([id, label, desc]) => <button key={id} type="button" data-testid={`layout-${id}-button`} className={draft.card_layout === id ? "layout-option active" : "layout-option"} onClick={() => set({ card_layout: id })}><b>{label}</b><small>{desc}</small></button>)}</div>
+        </div>
+        <div className="control-group"><span className="control-label">Jenis font</span>
+          <div className="pill-options">{CARD_FONTS.map(([id, label]) => <button key={id} type="button" data-testid={`font-${id}-button`} className={draft.card_font === id ? `pill-option font-prev-${id} active` : `pill-option font-prev-${id}`} onClick={() => set({ card_font: id })}>{label}</button>)}</div>
+        </div>
+        <div className="control-group"><span className="control-label">Posisi logo</span>
+          <div className="pill-options">{CARD_POS.logo.map(([id, label]) => <button key={id} type="button" data-testid={`logopos-${id}-button`} className={draft.card_logo_pos === id ? "pill-option active" : "pill-option"} onClick={() => set({ card_logo_pos: id })}>{label}</button>)}</div>
+        </div>
+        <div className="control-group"><span className="control-label">Posisi foto</span>
+          <div className="pill-options">{CARD_POS.photo.map(([id, label]) => <button key={id} type="button" data-testid={`photopos-${id}-button`} className={draft.card_photo_pos === id ? "pill-option active" : "pill-option"} onClick={() => set({ card_photo_pos: id })}>{label}</button>)}</div>
+        </div>
+        <div className="control-group"><span className="control-label">Posisi QR Code</span>
+          <div className="pill-options">{CARD_POS.qr.map(([id, label]) => <button key={id} type="button" data-testid={`qrpos-${id}-button`} className={draft.card_qr_pos === id ? "pill-option active" : "pill-option"} onClick={() => set({ card_qr_pos: id })}>{label}</button>)}</div>
+        </div>
+        <div className="control-group"><span className="control-label">Spasi nama sekolah <b className="spacing-val">{Number(draft.card_school_spacing).toFixed(1)} px</b></span>
+          <input type="range" min="0" max="8" step="0.5" data-testid="school-spacing-range" value={draft.card_school_spacing} onChange={(e) => set({ card_school_spacing: parseFloat(e.target.value) })} className="range-input"/>
         </div>
         <label>Judul kartu<input data-testid="card-title-input" value={draft.card_title} onChange={(e) => set({ card_title: e.target.value.toUpperCase() })}/></label>
         <div className="toggles">
