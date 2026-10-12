@@ -291,7 +291,8 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Card settings round-4 fields (PUT/GET /api/settings)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -310,4 +311,7 @@ agent_communication:
 
     -agent: "testing"
     -message: "✅ ROUND 3 BACKEND TEST - ALL PASSED (5/5 scenarios). Bulk Member Import (POST /api/members/import): (1) CSV Happy Path - Uploaded CSV with 4 rows (2 valid: Budi Santoso/30001, Siti Aminah/30002; 1 duplicate NIS: 30001; 1 empty kelas). Response: imported=2, skipped=2, total=4, errors=['Baris 4: NIS 30001 sudah terdaftar', 'Baris 5: nama atau kelas kosong']. Verified 2 members created in X TEST A with correct names. (2) XLSX Format - Uploaded .xlsx with 2 valid rows (Rina/30010, Tono/30011). Response: imported=2. Verified 2 members created in XI TEST B. (3) Unsupported Extension - Uploaded .txt file, correctly returned 400 with error message 'Format tidak didukung'. (4) Permission Check - Siswa attempting import correctly returned 403 'Akses ditolak'. (5) CLEANUP - Successfully deleted all test members: X TEST A (2 deleted), XI TEST B (2 deleted). Final members count verified = 0. All business rules working: duplicate NIS detection (within file + DB), empty field validation, file format validation, permission checks. NO ISSUES FOUND."
+
+    -agent: "main"
+    -message: "Round 4: SettingsInput extended with NEW card fields: card_school_name (str, default 'SMA 1 NEGERI ABUNG TENGAH'), card_font_size (str: kecil/sedang/besar), card_school_logo_pos (str: kiri/kanan), card_library_logo_pos (str: kiri/kanan). Removed from UI (but card_school_spacing still in model, harmless) and replaced old card_logo_pos. Test (creds in /app/memory/test_credentials.md): as admin PUT /api/settings with a full body including card_school_name='SMA NEGERI 1 ABUNG TENGAH', card_font_size='besar', card_school_logo_pos='kiri', card_library_logo_pos='kanan' (plus other existing fields) -> 200; GET /api/settings reflects these exact values. Confirm siswa PUT -> 403, siswa GET -> 200. After test, restore settings to defaults (card_school_name='SMA 1 NEGERI ABUNG TENGAH', card_font_size='sedang', card_school_logo_pos='kiri', card_library_logo_pos='kanan', card_theme='navy', card_layout='classic', card_font='modern', card_photo_pos='kiri', card_qr_pos='atas', card_title='KARTU ANGGOTA PERPUSTAKAAN'). Also quick-confirm data still empty (GET /api/members length 0)."
 

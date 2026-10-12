@@ -23,6 +23,15 @@
 .id-card.photo-kiri .id-card-body{flex-direction:row}
 .id-card.photo-kanan .id-card-body{flex-direction:row-reverse}
 .id-card.layout-portrait .id-card-body{flex-direction:column}
+/* Card font size */
+.id-card.size-kecil .card-identity h3{font-size:18px}
+.id-card.size-kecil .card-identity p{font-size:10px}
+.id-card.size-kecil .card-school b{font-size:10px}
+.id-card.size-kecil .card-identity span{font-size:8px}
+.id-card.size-besar .card-identity h3{font-size:28px}
+.id-card.size-besar .card-identity p{font-size:13px}
+.id-card.size-besar .card-school b{font-size:13px}
+.id-card.size-besar .card-identity span{font-size:10px}
 .id-card .id-card-top,.id-card .id-card-foot{border-color:var(--line)}
 .id-card .id-card-top small,.id-card .id-card-foot,.id-card .id-card-body span{color:var(--acc)}
 .id-card .id-card-body p,.id-card .id-card-foot span{color:var(--sub)}

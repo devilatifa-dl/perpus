@@ -84,9 +84,12 @@ class SettingsInput(BaseModel):
     card_show_qr: bool = True
     card_show_address: bool = True
     card_title: str = "KARTU ANGGOTA PERPUSTAKAAN"
+    card_school_name: str = "SMA 1 NEGERI ABUNG TENGAH"
     card_font: str = "modern"
+    card_font_size: str = "sedang"
     card_school_spacing: float = 0
-    card_logo_pos: str = "kiri"
+    card_school_logo_pos: str = "kiri"
+    card_library_logo_pos: str = "kanan"
     card_photo_pos: str = "kiri"
     card_qr_pos: str = "atas"
 

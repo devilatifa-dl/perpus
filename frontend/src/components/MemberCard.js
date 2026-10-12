@@ -5,12 +5,13 @@ export function MemberCard({ member, settings }) {
   const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(member.id)}&margin=0&color=0f2745&bgcolor=ffffff`;
   const qr = s.card_show_qr && <div className="id-qr-wrap"><img className="id-qr" src={qrSrc} alt={`QR ${member.id}`}/></div>;
-  const cls = `id-card theme-${s.card_theme} layout-${s.card_layout} font-${s.card_font} logo-${s.card_logo_pos} photo-${s.card_photo_pos} qr-${s.card_qr_pos}`;
+  const cls = `id-card theme-${s.card_theme} layout-${s.card_layout} font-${s.card_font} size-${s.card_font_size} photo-${s.card_photo_pos} qr-${s.card_qr_pos}`;
   return <div className={cls} id="print-card" data-testid="digital-member-card">
     <div className="id-card-top">
-      <div className="card-logos"><img className="card-logo" src={s.school_logo || SCHOOL_LOGO} alt="Logo sekolah" data-testid="card-school-logo"/><img className="card-logo" src={s.library_logo || LIBRARY_LOGO} alt="Logo perpustakaan" data-testid="card-library-logo"/></div>
-      <div className="card-school"><b style={{ letterSpacing: `${s.card_school_spacing}px` }}>SMA 1 NEGERI ABUNG TENGAH</b><small data-testid="card-title-text">{s.card_title}</small></div>
-      {s.card_qr_pos === "atas" && qr}
+      <img className="card-logo school-logo" style={{ order: s.card_school_logo_pos === "kanan" ? 5 : 0 }} src={s.school_logo || SCHOOL_LOGO} alt="Logo sekolah" data-testid="card-school-logo"/>
+      <img className="card-logo library-logo" style={{ order: s.card_library_logo_pos === "kanan" ? 6 : 1 }} src={s.library_logo || LIBRARY_LOGO} alt="Logo perpustakaan" data-testid="card-library-logo"/>
+      <div className="card-school" style={{ order: 3 }}><b>{s.card_school_name}</b><small data-testid="card-title-text">{s.card_title}</small></div>
+      {s.card_qr_pos === "atas" && qr && <span className="qr-slot" style={{ order: 7 }}>{qr}</span>}
     </div>
     <div className="id-card-body">
       <div className="photo">{member.photo ? <img src={member.photo} alt={member.name}/> : member.name[0]}</div>
