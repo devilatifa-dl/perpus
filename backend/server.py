@@ -1,14 +1,15 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import os, re, uuid, bcrypt, jwt
+import os, re, uuid, bcrypt, jwt, io, csv
+from openpyxl import load_workbook
 from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx
 
 ROOT_DIR = Path(__file__).parent
@@ -380,6 +381,74 @@ async def members(user=Depends(current_user)):
 async def add_member(data: MemberInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah anggota")
     doc=data.model_dump(); doc.update({"id":"MB-"+str(uuid.uuid4())[:8].upper()}); await db.members.insert_one(doc); return public(doc)
+
+def _parse_member_rows(filename: str, content: bytes):
+    name_l = (filename or "").lower()
+    rows = []
+    if name_l.endswith(".csv"):
+        text = content.decode("utf-8-sig", errors="replace")
+        reader = csv.DictReader(io.StringIO(text))
+        for r in reader:
+            rows.append({(k or "").strip().lower(): (str(v).strip() if v is not None else "") for k, v in r.items()})
+    elif name_l.endswith(".xlsx"):
+        try:
+            wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        except Exception:
+            raise HTTPException(400, "Berkas Excel tidak dapat dibaca. Pastikan format .xlsx yang valid.")
+        ws = wb.active
+        headers = None
+        for row in ws.iter_rows(values_only=True):
+            if headers is None:
+                headers = [str(c).strip().lower() if c is not None else "" for c in row]
+                continue
+            d = {}
+            for i, c in enumerate(row):
+                if i < len(headers) and headers[i]:
+                    d[headers[i]] = str(c).strip() if c is not None else ""
+            if any(d.values()):
+                rows.append(d)
+    else:
+        raise HTTPException(400, "Format tidak didukung. Gunakan berkas .csv atau .xlsx")
+    return rows
+
+def _pick(d, *keys):
+    for k in keys:
+        if d.get(k):
+            return d[k]
+    return ""
+
+@api.post("/members/import")
+async def import_members(file: UploadFile = File(...), user=Depends(current_user)):
+    staff_only(user)
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Ukuran berkas maksimal 5MB")
+    rows = _parse_member_rows(file.filename or "", content)
+    if not rows:
+        raise HTTPException(400, "Berkas kosong atau tidak memiliki data")
+    if len(rows) > 2000:
+        raise HTTPException(400, "Maksimal 2000 baris per impor")
+    existing = {m.get("student_id") for m in await db.members.find({}, {"_id": 0, "student_id": 1}).to_list(5000) if m.get("student_id")}
+    seen = set()
+    to_insert, errors, skipped = [], [], 0
+    for idx, d in enumerate(rows, start=2):
+        name = _pick(d, "nama", "name", "nama lengkap", "nama_lengkap")
+        sid = _pick(d, "nis", "student_id", "nomor induk", "no induk", "nomor_induk", "no_induk")
+        cls = _pick(d, "kelas", "class_name", "class", "rombel")
+        if not name or not cls:
+            skipped += 1
+            errors.append(f"Baris {idx}: nama atau kelas kosong")
+            continue
+        if sid and (sid in existing or sid in seen):
+            skipped += 1
+            errors.append(f"Baris {idx}: NIS {sid} sudah terdaftar")
+            continue
+        if sid:
+            seen.add(sid)
+        to_insert.append({"id": "MB-" + str(uuid.uuid4())[:8].upper(), "name": name, "student_id": sid, "class_name": cls, "photo": ""})
+    if to_insert:
+        await db.members.insert_many(to_insert)
+    return {"imported": len(to_insert), "skipped": skipped, "total": len(rows), "errors": errors[:25]}
 
 @api.put("/members/{member_id}")
 async def update_member(member_id: str, data: MemberInput, user=Depends(current_user)):

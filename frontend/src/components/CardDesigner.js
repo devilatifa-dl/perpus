@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Save } from "lucide-react";
-import { CARD_LAYOUTS, CARD_THEMES, CARD_FONTS, CARD_POS, DEFAULT_SETTINGS } from "../lib";
+import { CARD_LAYOUTS, CARD_THEMES, CARD_FONTS, CARD_POS, CARD_PRESETS, DEFAULT_SETTINGS } from "../lib";
 import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
 
@@ -14,6 +14,10 @@ export function CardDesigner({ settings, member, onSave, close }) {
     <div className="designer" data-testid="card-designer">
       <div className="designer-preview"><p className="eyebrow">PRATINJAU LANGSUNG</p><MemberCard member={preview} settings={draft}/></div>
       <div className="designer-controls">
+        <div className="control-group"><span className="control-label">Template siap pakai</span>
+          <div className="pill-options">{CARD_PRESETS.map(([id, label, preset]) => <button key={id} type="button" data-testid={`preset-${id}-button`} className="pill-option preset-pill" onClick={() => set(preset)}>{label}</button>)}</div>
+          <small className="muted">Pilih template untuk mengatur tema, font, dan posisi sekaligus, lalu sesuaikan bila perlu dan tekan Simpan.</small>
+        </div>
         <div className="control-group"><span className="control-label">Tema warna</span>
           <div className="swatches">{CARD_THEMES.map(([id, label]) => <button key={id} type="button" title={label} data-testid={`theme-${id}-button`} className={`swatch theme-${id} ${draft.card_theme === id ? "active" : ""}`} onClick={() => set({ card_theme: id })}>{draft.card_theme === id && <Check size={14}/>}</button>)}</div>
           <small className="muted">{CARD_THEMES.find(([id]) => id === draft.card_theme)?.[1]}</small>
