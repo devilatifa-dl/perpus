@@ -8,7 +8,7 @@ const ACCOUNTS = { admin: ["admin@smansa.sch.id", "admin123"], petugas: ["petuga
 export function Login({ onLogin, portal }) {
   const student = portal === "siswa";
   const roles = student ? ["siswa"] : ["admin", "petugas"];
-  const [email, setEmail] = useState(ACCOUNTS[roles[0]][0]); const [password, setPassword] = useState(ACCOUNTS[roles[0]][1]); const [error, setError] = useState("");
+  const [email, setEmail] = useState(student ? ACCOUNTS.siswa[0] : ""); const [password, setPassword] = useState(student ? ACCOUNTS.siswa[1] : ""); const [error, setError] = useState("");
   const submit = async (e) => { e.preventDefault(); try { const { data } = await api.post("/auth/login", { email, password, portal }); onLogin(data); } catch (err) { setError(err.response?.data?.detail || "Email atau kata sandi salah"); } };
   const demo = (role) => { setEmail(ACCOUNTS[role][0]); setPassword(ACCOUNTS[role][1]); setError(""); };
   return <main className={student ? "login-shell student" : "login-shell"} data-testid={`login-page-${portal}`}>
@@ -29,7 +29,7 @@ export function Login({ onLogin, portal }) {
         {error && <div className="error" data-testid="login-error">{error}</div>}
         <button className="primary full" data-testid="login-submit-button">{student ? "Masuk portal siswa" : "Masuk ke dashboard"} <ChevronRight size={17}/></button>
       </form>
-      <div className="demo-login"><span>AKSES DEMO CEPAT</span><div>{roles.map((role) => <button key={role} data-testid={`demo-login-${role}-button`} onClick={() => demo(role)}>{role}</button>)}</div></div>
+      <div className="demo-login" style={student ? undefined : { display: "none" }}><span>AKSES DEMO CEPAT</span><div>{roles.map((role) => <button key={role} data-testid={`demo-login-${role}-button`} onClick={() => demo(role)}>{role}</button>)}</div></div>
       <p className="portal-switch">{student ? <>Petugas atau admin? <Link to="/admin" data-testid="switch-to-admin-link">Masuk lewat /admin</Link></> : <>Kamu siswa? <Link to="/siswa" data-testid="switch-to-student-link">Masuk lewat /siswa</Link></>}</p>
     </div></div>
   </main>;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, ShieldCheck, X } from "lucide-react";
+import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X } from "lucide-react";
 import { fmtDate } from "../lib";
 import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { Login } from "./Login";
@@ -36,8 +36,7 @@ export default function StudentPortal() {
     </header>
     <main className="student-main">
       <section className="student-hero">
-        <div><p className="eyebrow light">HALO, {user.name.split(" ")[0].toUpperCase()}</p><h1>Buku apa yang ingin <em>kamu baca</em> hari ini?</h1><p>{fmt(available)} dari {fmt(data.stats.books)} buku tersedia untuk dipinjam. Datangi petugas perpustakaan untuk meminjam — tanpa denda.</p></div>
-        <div className="student-hero-badge"><ShieldCheck size={20}/><span>Tanpa denda</span></div>
+        <div><p className="eyebrow light">HALO, {user.name.split(" ")[0].toUpperCase()}</p><h1>Buku apa yang ingin <em>kamu baca</em> hari ini?</h1><p>{fmt(available)} dari {fmt(data.stats.books)} buku tersedia untuk dipinjam. Datangi petugas perpustakaan untuk meminjam.</p></div>
       </section>
       {tab === "katalog" && <>
         <div className="toolbar"><div className="searchbox"><Search size={17}/><input data-testid="student-book-search-input" placeholder="Cari judul, penulis, atau kategori..." value={search} onChange={(e) => setSearch(e.target.value)}/></div><span className="soft-badge">{filtered.length} buku</span></div>
