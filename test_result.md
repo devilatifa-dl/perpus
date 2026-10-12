@@ -203,6 +203,37 @@ backend:
         -working: true
         -agent: "testing"
         -comment: "✅ TESTED: Siswa with portal=admin returns 403, admin with portal=siswa returns 403, petugas with portal=siswa returns 403, admin with portal=admin returns 200, siswa with portal=siswa returns 200. All scenarios passed."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ REGRESSION TEST PASSED (Round 2): All 5 portal separation scenarios still working correctly. No regression detected."
+  - task: "Card settings new fields (PUT/GET /api/settings)"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Added new fields to SettingsInput: card_font, card_school_spacing (float), card_logo_pos, card_photo_pos, card_qr_pos. card_theme can now be 'book'. PUT /api/settings (staff only) and GET /api/settings (all users)."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ TESTED: (1) Admin PUT /api/settings with all new fields (card_theme='book', card_font='klasik', card_school_spacing=3.5, card_logo_pos='kanan', card_photo_pos='kanan', card_qr_pos='bawah') returns 200. (2) GET /api/settings correctly reflects all new field values. (3) Siswa cannot PUT settings (403). (4) Siswa CAN GET settings (200, no staff_only restriction on GET). (5) Settings restored to defaults successfully. All 6 sub-tests passed."
+  - task: "Reset data endpoint (POST /api/admin/reset-data)"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "POST /api/admin/reset-data with body {include_books: bool}. Admin only (403 for petugas/siswa). Deletes members, transactions, incoming, missing, reservations, stocktake, and optionally books. Sets meta.seed.done=True to prevent re-seeding. Returns deleted counts."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ TESTED: (1) Petugas attempting reset returns 403. (2) Siswa attempting reset returns 403. (3) Admin reset with include_books=true returns 200 with ok=true and deleted object containing all required keys (members, transactions, incoming, missing, reservations, stocktake, books). (4) Verified data is empty after reset: books=0, members=0, transactions=0. Data was already empty (intentional per user request), so all counts returned 0. Reset is idempotent and safe. All 9 sub-tests passed."
 
 frontend:
   - task: "Member edit / delete / bulk delete UI"
@@ -242,24 +273,21 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Edit member (PUT /api/members/{id})"
-    - "Delete single member (DELETE /api/members/{id})"
-    - "Bulk delete members by class (POST /api/members/bulk-delete)"
-    - "Change own password (POST /api/account/password)"
-    - "Admin set user password (PUT /api/users/{id}/password)"
-    - "Admin list staff users (GET /api/users)"
-    - "Login portal separation (existing)"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
     -agent: "main"
-    -message: "Please test the new/updated backend endpoints. Credentials in /app/memory/test_credentials.md (admin@smansa.sch.id/admin123, petugas@smansa.sch.id/petugas123, siswa@smansa.sch.id/siswa123). Auth is cookie-based (httponly access_token set on POST /api/auth/login) OR Bearer token. IMPORTANT for password tests: changing passwords mutates seeded accounts which are NOT re-seeded (seed only runs when users collection empty). To avoid breaking other accounts, prefer creating/using a disposable account OR restore the password back to original after the test. Focus: member edit/delete/bulk-delete (incl. reservation cancellation + 404 on empty class), change own password (wrong old pw -> 400, min length), admin set petugas password + 403 when non-admin, GET /users admin-only (403 for petugas/siswa), and portal separation (siswa cannot login portal=admin, admin cannot login portal=siswa)."
+    -message: "Round 2 changes to test. Credentials in /app/memory/test_credentials.md. (1) Settings now has new card fields: card_font, card_school_spacing (float), card_logo_pos, card_photo_pos, card_qr_pos, and card_theme can be 'book'. Test: as staff, PUT /api/settings with these new fields (e.g. card_theme='book', card_font='klasik', card_school_spacing=3.5, card_logo_pos='kanan', card_photo_pos='kanan', card_qr_pos='bawah') returns 200 and GET /api/settings reflects them. Also confirm non-staff (siswa) cannot PUT settings (403) but CAN GET (settings GET has no staff_only). (2) POST /api/admin/reset-data {include_books:bool}: admin -> 200 with deleted counts; petugas -> 403; siswa -> 403. NOTE: data is ALREADY empty now (members/books/transactions = 0) and that is INTENTIONAL (user requested empty data). Reset is idempotent & safe to call. After reset, seed() must NOT repopulate on restart (meta.seed.done flag). DO NOT create large seed data. If you create any test members/books for other checks, clean them up. Prefer verifying reset returns 200 and counts remain 0 afterwards. (3) Quick regression: login still works for admin/petugas/siswa with correct portals."
+
     -agent: "testing"
     -message: "✅ ALL BACKEND TESTS PASSED (5/5 test suites). Tested all endpoints comprehensively: (1) Login portal separation - all 5 scenarios passed including cross-portal blocking, (2) Member CRUD - create/update/delete with proper 404 and 403 handling, (3) Bulk delete - tested with 3 members, verified deletion count and 404 on empty class, (4) Change own password - validated error cases (wrong password, short password) and successful change with password restoration, (5) Admin user management - list users without password_hash exposure, set passwords with proper permission checks and 404 handling. All passwords restored to original values. No issues found."
+
+    -agent: "testing"
+    -message: "✅ ROUND 2 BACKEND TESTS - ALL PASSED (3/3 test suites). (1) Card Settings New Fields: Successfully tested PUT/GET /api/settings with all new fields (card_font, card_school_spacing, card_logo_pos, card_photo_pos, card_qr_pos, card_theme='book'). Admin can update (200), siswa cannot PUT (403) but can GET (200). All field values correctly saved and retrieved. Settings restored to defaults. (2) Reset Data Endpoint: Admin can reset with include_books=true (200), petugas/siswa get 403. Response includes ok=true and deleted object with all required keys. Verified all collections empty after reset (books=0, members=0, transactions=0). Data was already empty as intended, reset is idempotent and safe. (3) Login Portal Separation Regression: All 5 scenarios still working correctly, no regression detected. NO ISSUES FOUND. All backend functionality working as expected."

@@ -507,10 +507,233 @@ def test_admin_user_management():
     
     return all(results)
 
+def test_card_settings_new_fields():
+    """Test 6: Card settings new fields"""
+    print_test("Card Settings New Fields (PUT/GET /api/settings)")
+    
+    results = []
+    
+    # Setup: Login as admin
+    admin = TestSession("admin")
+    if not admin.login():
+        print("❌ FAIL: Could not login as admin")
+        return False
+    
+    # Setup: Login as siswa
+    siswa = TestSession("siswa")
+    if not siswa.login():
+        print("❌ FAIL: Could not login as siswa")
+        return False
+    
+    # Test 6a: PUT /api/settings with ALL fields including new ones
+    print("\n6a. PUT /api/settings with all fields including new card fields (should be 200)")
+    settings_data = {
+        "school_logo": "",
+        "library_logo": "",
+        "card_theme": "book",
+        "card_layout": "portrait",
+        "card_show_qr": True,
+        "card_show_address": True,
+        "card_title": "KARTU ANGGOTA PERPUSTAKAAN",
+        "card_font": "klasik",
+        "card_school_spacing": 3.5,
+        "card_logo_pos": "kanan",
+        "card_photo_pos": "kanan",
+        "card_qr_pos": "bawah"
+    }
+    resp = admin.put("/settings", settings_data)
+    results.append(assert_status(resp, 200, "Admin can update settings with new fields"))
+    
+    # Test 6b: GET /api/settings and verify new fields
+    print("\n6b. GET /api/settings and verify new fields are saved")
+    resp = admin.get("/settings")
+    if assert_status(resp, 200, "GET settings"):
+        settings = resp.json()
+        
+        # Check each new field
+        checks = [
+            ("card_theme", "book"),
+            ("card_font", "klasik"),
+            ("card_school_spacing", 3.5),
+            ("card_logo_pos", "kanan"),
+            ("card_photo_pos", "kanan"),
+            ("card_qr_pos", "bawah")
+        ]
+        
+        all_correct = True
+        for field, expected in checks:
+            actual = settings.get(field)
+            if actual == expected:
+                print(f"   ✅ {field} = {actual}")
+            else:
+                print(f"   ❌ {field} = {actual} (expected {expected})")
+                all_correct = False
+        
+        results.append(all_correct)
+    else:
+        results.append(False)
+    
+    # Test 6c: Siswa cannot PUT settings -> 403
+    print("\n6c. Siswa attempting to PUT /api/settings (should be 403)")
+    resp = siswa.put("/settings", settings_data)
+    results.append(assert_status(resp, 403, "Siswa cannot update settings"))
+    
+    # Test 6d: Siswa CAN GET settings -> 200 (no staff_only on GET)
+    print("\n6d. Siswa can GET /api/settings (should be 200)")
+    resp = siswa.get("/settings")
+    results.append(assert_status(resp, 200, "Siswa can read settings"))
+    
+    # Test 6e: RESTORE settings to defaults
+    print("\n6e. RESTORE settings to defaults")
+    default_settings = {
+        "school_logo": "",
+        "library_logo": "",
+        "card_theme": "navy",
+        "card_layout": "classic",
+        "card_show_qr": True,
+        "card_show_address": True,
+        "card_title": "KARTU ANGGOTA PERPUSTAKAAN",
+        "card_font": "modern",
+        "card_school_spacing": 0,
+        "card_logo_pos": "kiri",
+        "card_photo_pos": "kiri",
+        "card_qr_pos": "atas"
+    }
+    resp = admin.put("/settings", default_settings)
+    if assert_status(resp, 200, "Settings restored to defaults"):
+        print("   ✅ Settings restored successfully")
+        results.append(True)
+    else:
+        print("   ❌ Failed to restore settings")
+        results.append(False)
+    
+    return all(results)
+
+def test_reset_data_endpoint():
+    """Test 7: Reset data endpoint"""
+    print_test("Reset Data Endpoint (POST /api/admin/reset-data)")
+    
+    results = []
+    
+    # Setup: Login as admin
+    admin = TestSession("admin")
+    if not admin.login():
+        print("❌ FAIL: Could not login as admin")
+        return False
+    
+    # Setup: Login as petugas
+    petugas = TestSession("petugas")
+    if not petugas.login():
+        print("❌ FAIL: Could not login as petugas")
+        return False
+    
+    # Setup: Login as siswa
+    siswa = TestSession("siswa")
+    if not siswa.login():
+        print("❌ FAIL: Could not login as siswa")
+        return False
+    
+    # Test 7a: Petugas cannot reset -> 403
+    print("\n7a. Petugas attempting POST /api/admin/reset-data (should be 403)")
+    resp = petugas.post("/admin/reset-data", {"include_books": True})
+    results.append(assert_status(resp, 403, "Petugas cannot reset data"))
+    
+    # Test 7b: Siswa cannot reset -> 403
+    print("\n7b. Siswa attempting POST /api/admin/reset-data (should be 403)")
+    resp = siswa.post("/admin/reset-data", {"include_books": True})
+    results.append(assert_status(resp, 403, "Siswa cannot reset data"))
+    
+    # Test 7c: Admin can reset with include_books=true -> 200
+    print("\n7c. Admin POST /api/admin/reset-data with include_books=true (should be 200)")
+    resp = admin.post("/admin/reset-data", {"include_books": True})
+    if assert_status(resp, 200, "Admin can reset data"):
+        data = resp.json()
+        
+        # Check response structure
+        if "ok" in data and data["ok"] == True:
+            print(f"   ✅ Response has ok=true")
+        else:
+            print(f"   ❌ Response missing ok=true")
+            results.append(False)
+            return all(results)
+        
+        if "deleted" in data:
+            deleted = data["deleted"]
+            print(f"   ✅ Response has 'deleted' object:")
+            print(f"      - members: {deleted.get('members', 'N/A')}")
+            print(f"      - transactions: {deleted.get('transactions', 'N/A')}")
+            print(f"      - incoming: {deleted.get('incoming', 'N/A')}")
+            print(f"      - missing: {deleted.get('missing', 'N/A')}")
+            print(f"      - reservations: {deleted.get('reservations', 'N/A')}")
+            print(f"      - stocktake: {deleted.get('stocktake', 'N/A')}")
+            print(f"      - books: {deleted.get('books', 'N/A')}")
+            
+            # All counts should be present (even if 0)
+            required_keys = ["members", "transactions", "incoming", "missing", "reservations", "stocktake", "books"]
+            has_all_keys = all(k in deleted for k in required_keys)
+            if has_all_keys:
+                print(f"   ✅ All required keys present in deleted object")
+                results.append(True)
+            else:
+                print(f"   ❌ Missing keys in deleted object")
+                results.append(False)
+        else:
+            print(f"   ❌ Response missing 'deleted' object")
+            results.append(False)
+    else:
+        results.append(False)
+    
+    # Test 7d: Verify data is empty after reset
+    print("\n7d. Verify data is empty after reset")
+    
+    # Check books
+    resp = admin.get("/books")
+    if resp.status_code == 200:
+        books = resp.json()
+        if len(books) == 0:
+            print(f"   ✅ Books collection is empty (length=0)")
+            results.append(True)
+        else:
+            print(f"   ❌ Books collection not empty (length={len(books)})")
+            results.append(False)
+    else:
+        print(f"   ❌ Failed to GET /books")
+        results.append(False)
+    
+    # Check members
+    resp = admin.get("/members")
+    if resp.status_code == 200:
+        members = resp.json()
+        if len(members) == 0:
+            print(f"   ✅ Members collection is empty (length=0)")
+            results.append(True)
+        else:
+            print(f"   ❌ Members collection not empty (length={len(members)})")
+            results.append(False)
+    else:
+        print(f"   ❌ Failed to GET /members")
+        results.append(False)
+    
+    # Check transactions
+    resp = admin.get("/transactions")
+    if resp.status_code == 200:
+        transactions = resp.json()
+        if len(transactions) == 0:
+            print(f"   ✅ Transactions collection is empty (length=0)")
+            results.append(True)
+        else:
+            print(f"   ❌ Transactions collection not empty (length={len(transactions)})")
+            results.append(False)
+    else:
+        print(f"   ❌ Failed to GET /transactions")
+        results.append(False)
+    
+    return all(results)
+
 def main():
     """Run all tests"""
     print("\n" + "="*80)
-    print("PERPUSTAKAAN BACKEND API TEST SUITE")
+    print("PERPUSTAKAAN BACKEND API TEST SUITE - ROUND 2")
     print("="*80)
     print(f"Base URL: {BASE_URL}")
     print(f"Testing with credentials from /app/memory/test_credentials.md")
@@ -518,12 +741,10 @@ def main():
     
     test_results = {}
     
-    # Run all tests
-    test_results["Login Portal Separation"] = test_login_portal_separation()
-    test_results["Member CRUD"] = test_member_crud()
-    test_results["Bulk Delete"] = test_bulk_delete()
-    test_results["Change Own Password"] = test_change_own_password()
-    test_results["Admin User Management"] = test_admin_user_management()
+    # Run round-2 tests (and regression test for login portal separation)
+    test_results["Card Settings New Fields"] = test_card_settings_new_fields()
+    test_results["Reset Data Endpoint"] = test_reset_data_endpoint()
+    test_results["Login Portal Separation (Regression)"] = test_login_portal_separation()
     
     # Summary
     print("\n" + "="*80)
