@@ -29,3 +29,15 @@
 .student-identity select{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-weight:600;background:#f8fafc;min-width:220px;color:#0f172a}
 .student-identity .identity-current{font-weight:600;color:#0d9488;font-size:14px}
 .student-identity .identity-hint{color:#b45309;font-size:13px}
+
+/* Student identity type-ahead combobox */
+.identity-combo{position:relative;min-width:260px}
+.identity-combo input{width:100%;padding:9px 32px 9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-weight:600;background:#f8fafc;color:#0f172a}
+.identity-combo input:focus{outline:none;border-color:#0d9488;background:#fff}
+.identity-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:#e2e8f0;color:#334155;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center}
+.identity-clear:hover{background:#cbd5e1}
+.identity-suggest{position:absolute;z-index:40;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.14);max-height:260px;overflow-y:auto;padding:6px}
+.identity-suggest-item{display:block;width:100%;text-align:left;border:none;background:transparent;padding:9px 10px;border-radius:8px;cursor:pointer;color:#0f172a;font-size:14px}
+.identity-suggest-item:hover{background:#f0fdfa}
+.identity-suggest-item small{color:#64748b;font-weight:500}
+.identity-empty{padding:10px;color:#94a3b8;font-size:13px}

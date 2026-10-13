@@ -16,6 +16,7 @@ export default function StudentPortal() {
   const [data, setData] = useState({ books: [], shelves: [], stats: {}, settings: null, mine: [] }); const [toast, setToast] = useState(""); const [busy, setBusy] = useState("");
   const [options, setOptions] = useState([]); const [photoOpen, setPhotoOpen] = useState(false); const [savingPhoto, setSavingPhoto] = useState(false); const [selId, setSelId] = useState(""); const [draftPhoto, setDraftPhoto] = useState("");
   const [meId, setMeId] = useState(() => localStorage.getItem("perpus_me_id") || "");
+  const [meQuery, setMeQuery] = useState(""); const [meOpen, setMeOpen] = useState(false);
   const notify = (t) => { setToast(t); setTimeout(() => setToast(""), 2800); };
   useEffect(() => { api.get("/auth/me").then((r) => setUser(r.data)).catch(() => {}).finally(() => setChecking(false)); }, []);
   const loadOptions = () => api.get("/members/options").then((r) => setOptions(r.data)).catch(() => {});
@@ -23,7 +24,11 @@ export default function StudentPortal() {
   const load = () => Promise.all([api.get("/books"), api.get("/shelves"), api.get("/dashboard"), api.get("/settings")])
     .then(([b, s, d, c]) => setData((prev) => ({ ...prev, books: b.data, shelves: s.data, stats: d.data, settings: c.data })));
   useEffect(() => { if (user && user.role === "siswa") { load(); loadOptions(); loadMine(meId); } }, [user]);
-  const chooseMe = (id) => { setMeId(id); if (id) localStorage.setItem("perpus_me_id", id); else localStorage.removeItem("perpus_me_id"); loadMine(id); };
+  useEffect(() => { if (meId && !meQuery) { const m = options.find((o) => o.id === meId); if (m) setMeQuery(m.name); } }, [options, meId]);
+  const meMatches = (meQuery.trim() ? options.filter((o) => `${o.name} ${o.class_name} ${o.student_id}`.toLowerCase().includes(meQuery.trim().toLowerCase())) : options).slice(0, 8);
+  const onMeInput = (v) => { setMeQuery(v); setMeOpen(true); if (meId) { setMeId(""); localStorage.removeItem("perpus_me_id"); loadMine(""); } };
+  const pickMe = (o) => { setMeId(o.id); localStorage.setItem("perpus_me_id", o.id); setMeQuery(o.name); setMeOpen(false); loadMine(o.id); };
+  const clearMe = () => { setMeId(""); setMeQuery(""); localStorage.removeItem("perpus_me_id"); setMeOpen(false); loadMine(""); };
   const openPhoto = () => { loadOptions(); setSelId(meId || ""); setDraftPhoto((options.find((o) => o.id === meId) || {}).photo || ""); setPhotoOpen(true); };
   const chooseMember = (id) => { setSelId(id); const m = options.find((o) => o.id === id); setDraftPhoto(m?.photo || ""); };
   const savePhoto = async () => { if (!selId) { notify("Pilih nama anggota dulu"); return; } setSavingPhoto(true); try { await api.post(`/members/${selId}/photo`, { photo: draftPhoto }); await loadOptions(); notify("Foto disimpan — kartu anggota diperbarui"); } catch (e) { notify(e.response?.data?.detail || "Gagal menyimpan foto"); } finally { setSavingPhoto(false); } };
@@ -42,7 +47,7 @@ export default function StudentPortal() {
     <header className="student-top">
       <div className="student-brand"><img src={data.settings?.library_logo || LIBRARY_LOGO} alt="Logo perpustakaan"/><div><strong>RUANG BACA · PORTAL SISWA</strong><small>SMA 1 NEGERI ABUNG TENGAH</small></div></div>
       <nav className="student-nav">{tabs.map(([id, label, Icon]) => <button key={id} data-testid={`student-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon size={16}/><span>{label}</span></button>)}</nav>
-      <div className="student-user"><img src={data.settings?.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/><div><b>{user.name}</b><small>Hanya lihat data buku</small></div><button className="icon-button" data-testid="student-logout-button" title="Keluar" onClick={logout}><LogOut size={18}/></button></div>
+      <div className="student-user"><img src={data.settings?.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/><div><b>MURID SMANSA</b><small>Hanya lihat data buku</small></div><button className="icon-button" data-testid="student-logout-button" title="Keluar" onClick={logout}><LogOut size={18}/></button></div>
     </header>
     <main className="student-main">
       <section className="student-hero">
@@ -54,11 +59,15 @@ export default function StudentPortal() {
       </section>
       <div className="student-identity" data-testid="student-identity">
         <span className="identity-label">Pesan buku atas nama:</span>
-        <select data-testid="identity-select" value={meId} onChange={(e) => chooseMe(e.target.value)}>
-          <option value="">— Pilih namamu —</option>
-          {options.map((o) => <option key={o.id} value={o.id}>{o.name}{o.class_name ? ` · ${o.class_name}` : ""}</option>)}
-        </select>
-        {meId ? <span className="identity-current" data-testid="identity-current">Halo, {options.find((o) => o.id === meId)?.name || ""} 👋</span> : <span className="identity-hint">Pilih namamu dulu agar petugas tahu siapa yang memesan</span>}
+        <div className="identity-combo" data-testid="identity-combo">
+          <input type="text" data-testid="identity-input" placeholder="Ketik namamu untuk mencari..." value={meQuery} onChange={(e) => onMeInput(e.target.value)} onFocus={() => setMeOpen(true)} onBlur={() => setTimeout(() => setMeOpen(false), 160)} autoComplete="off"/>
+          {meQuery && <button type="button" className="identity-clear" data-testid="identity-clear" title="Hapus" onClick={clearMe}>×</button>}
+          {meOpen && <div className="identity-suggest" data-testid="identity-suggest">
+            {meMatches.length === 0 && <div className="identity-empty">Nama tidak ditemukan</div>}
+            {meMatches.map((o) => <button type="button" key={o.id} data-testid={`identity-option-${o.id}`} className="identity-suggest-item" onMouseDown={(e) => { e.preventDefault(); pickMe(o); }}><b>{o.name}</b>{o.class_name ? <small> · {o.class_name}</small> : null}</button>)}
+          </div>}
+        </div>
+        {meId ? <span className="identity-current" data-testid="identity-current">Halo, {options.find((o) => o.id === meId)?.name || ""} 👋</span> : <span className="identity-hint">Ketik dan pilih namamu agar petugas tahu siapa yang memesan</span>}
       </div>
       {tab === "katalog" && <>
         <div className="toolbar"><div className="searchbox"><Search size={17}/><input data-testid="student-book-search-input" placeholder="Cari judul, penulis, atau kategori..." value={search} onChange={(e) => setSearch(e.target.value)}/></div><span className="soft-badge">{filtered.length} buku</span></div>
