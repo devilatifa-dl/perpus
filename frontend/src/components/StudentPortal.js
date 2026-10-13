@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X } from "lucide-react";
+import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera } from "lucide-react";
 import { fmtDate } from "../lib";
 import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { Login } from "./Login";
+import { Modal, PhotoBox } from "./Shared";
 import { Shelves } from "./Shelves";
 
 const tabs = [["katalog", "Katalog buku", BookOpen], ["rak", "Rak buku", Boxes], ["pesanan", "Pesanan saya", ListChecks]];
@@ -12,11 +13,14 @@ export default function StudentPortal() {
   const [user, setUser] = useState(null); const [checking, setChecking] = useState(true);
   const [tab, setTab] = useState("katalog"); const [search, setSearch] = useState(""); const [shelfFilter, setShelfFilter] = useState("semua"); const [highlight, setHighlight] = useState("");
   const [data, setData] = useState({ books: [], shelves: [], stats: {}, settings: null, mine: [] }); const [toast, setToast] = useState(""); const [busy, setBusy] = useState("");
+  const [myMember, setMyMember] = useState(null); const [photoOpen, setPhotoOpen] = useState(false); const [savingPhoto, setSavingPhoto] = useState(false);
   const notify = (t) => { setToast(t); setTimeout(() => setToast(""), 2800); };
   useEffect(() => { api.get("/auth/me").then((r) => setUser(r.data)).catch(() => {}).finally(() => setChecking(false)); }, []);
+  const loadMember = () => api.get("/account/member").then((r) => setMyMember(r.data)).catch(() => {});
   const load = () => Promise.all([api.get("/books"), api.get("/shelves"), api.get("/dashboard"), api.get("/settings"), api.get("/reservations/mine")])
     .then(([b, s, d, c, m]) => setData({ books: b.data, shelves: s.data, stats: d.data, settings: c.data, mine: m.data }));
-  useEffect(() => { if (user && user.role === "siswa") load(); }, [user]);
+  useEffect(() => { if (user && user.role === "siswa") { load(); loadMember(); } }, [user]);
+  const savePhoto = async (v) => { setSavingPhoto(true); try { await api.post("/account/photo", { photo: v }); await loadMember(); notify(v ? "Foto berhasil diperbarui" : "Foto dihapus"); } catch (e) { notify(e.response?.data?.detail || "Gagal menyimpan foto"); } finally { setSavingPhoto(false); } };
   const reserve = async (b) => { setBusy(b.id); try { await api.post("/reservations", { book_id: b.id }); await load(); notify(`“${b.title}” masuk antrean pesananmu`); } catch (e) { notify(e.response?.data?.detail || "Gagal memesan"); } finally { setBusy(""); } };
   const cancel = async (r) => { try { await api.delete(`/reservations/${r.id}`); await load(); notify("Pesanan dibatalkan"); } catch (e) { notify(e.response?.data?.detail || "Gagal membatalkan"); } };
   const waitingIds = new Set((data.mine || []).filter((r) => r.status === "Menunggu").map((r) => r.book_id));
@@ -36,7 +40,11 @@ export default function StudentPortal() {
     </header>
     <main className="student-main">
       <section className="student-hero">
-        <div><p className="eyebrow light">HALO, {user.name.split(" ")[0].toUpperCase()}</p><h1>Buku apa yang ingin <em>kamu baca</em> hari ini?</h1><p>{fmt(available)} dari {fmt(data.stats.books)} buku tersedia untuk dipinjam. Datangi petugas perpustakaan untuk meminjam.</p></div>
+        <div><p className="eyebrow light">HALO, PINTAR</p><h1>Buku apa yang ingin <em>kamu baca</em> hari ini?</h1><p>{fmt(available)} dari {fmt(data.stats.books)} buku tersedia untuk dipinjam. Datangi petugas perpustakaan untuk meminjam.</p></div>
+        <div className="student-profile" data-testid="student-profile">
+          <div className="student-profile-avatar">{myMember?.photo ? <img src={myMember.photo} alt="Foto saya"/> : <Camera size={26}/>}</div>
+          <button className="reserve-btn" data-testid="open-photo-upload-button" onClick={() => setPhotoOpen(true)}><Camera size={14}/> Ganti foto saya</button>
+        </div>
       </section>
       {tab === "katalog" && <>
         <div className="toolbar"><div className="searchbox"><Search size={17}/><input data-testid="student-book-search-input" placeholder="Cari judul, penulis, atau kategori..." value={search} onChange={(e) => setSearch(e.target.value)}/></div><span className="soft-badge">{filtered.length} buku</span></div>
@@ -50,6 +58,11 @@ export default function StudentPortal() {
         {data.mine.map((r) => <div className="res-card" key={r.id} data-testid={`my-reservation-${r.id}`}><div className="activity-icon borrow"><BookOpen size={15}/></div><div><b>{r.book_title}</b><span>Rak {r.book_shelf} · dipesan {fmtDate(r.created_at)}{r.processed_by ? ` · diproses ${r.processed_by}` : ""}</span></div><span className={`status ${r.status.toLowerCase()}`}>{r.status}</span>{r.status === "Menunggu" && <button className="icon-button" title="Batalkan" data-testid={`cancel-reservation-${r.id}`} onClick={() => cancel(r)}><X size={16}/></button>}</div>)}
       </div>}
     </main>
+    {photoOpen && <Modal title="Ganti foto saya" close={() => setPhotoOpen(false)}>
+      <p className="account-hint" style={{ marginTop: 0 }}>Unggah foto dirimu. Foto ini akan tampil pada kartu anggota perpustakaanmu.</p>
+      <PhotoBox value={myMember?.photo || ""} onChange={savePhoto} label="Foto saya" testId="student-photo-box"/>
+      {savingPhoto && <p className="account-hint">Menyimpan foto...</p>}
+    </Modal>}
     {toast && <div className="toast" data-testid="toast-message">{toast}</div>}
     <footer className="student-foot"><span>Jln Raya Subik, Desa Pekurun Selatan</span><span>Butuh bantuan? Hubungi petugas perpustakaan <ChevronRight size={12}/></span></footer>
   </div>;

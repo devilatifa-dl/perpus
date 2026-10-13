@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import os, re, uuid, bcrypt, jwt, io, csv
+import os, re, uuid, bcrypt, jwt, io, csv, json
 from openpyxl import load_workbook
 from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx
 
@@ -44,6 +44,9 @@ class MemberInput(BaseModel):
 
 class BulkDeleteInput(BaseModel):
     class_name: str
+
+class PhotoInput(BaseModel):
+    photo: str = ""
 
 class ResetInput(BaseModel):
     include_books: bool = False
@@ -210,7 +213,7 @@ async def set_user_password(user_id: str, data: PasswordSetInput, user=Depends(c
     await db.users.update_one({"id": user_id}, {"$set": {"password_hash": password_hash(data.new_password)}})
     return {"ok": True}
 
-OVERDUE_DAYS = 7
+OVERDUE_DAYS = 3
 
 async def overdue_loans():
     tx = await db.transactions.find({}, {"_id":0}).to_list(5000)
@@ -238,6 +241,25 @@ async def overdue(user=Depends(current_user)):
 
 def own_member_filter(user):
     return {"$or": [{"student_id": user.get("student_id", "__none__")}, {"name": {"$regex": f"^{re.escape(user['name'])}$", "$options": "i"}}]}
+
+@api.get("/account/member")
+async def my_member(user=Depends(current_user)):
+    if user["role"] != "siswa":
+        return None
+    return await db.members.find_one(own_member_filter(user), {"_id":0})
+
+@api.post("/account/photo")
+async def set_my_photo(data: PhotoInput, user=Depends(current_user)):
+    if user["role"] != "siswa":
+        raise HTTPException(403, "Hanya siswa yang dapat mengubah fotonya sendiri")
+    member = await db.members.find_one(own_member_filter(user), {"_id":0})
+    if member:
+        await db.members.update_one({"id": member["id"]}, {"$set": {"photo": data.photo}})
+        return await db.members.find_one({"id": member["id"]}, {"_id":0})
+    # Belum terdaftar sebagai anggota: buat data anggota otomatis dari akun siswa
+    doc = {"id": "MB-" + str(uuid.uuid4())[:8].upper(), "name": user["name"], "student_id": user.get("student_id", ""), "class_name": user.get("class_name", ""), "photo": data.photo}
+    await db.members.insert_one(doc)
+    return {k: v for k, v in doc.items() if k != "_id"}
 
 class ReservationInput(BaseModel):
     book_id: str
@@ -496,6 +518,45 @@ async def reset_data(data: ResetInput, user=Depends(current_user)):
         await db.books.update_many({}, {"$set": {"status": "Tersedia"}})
     await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
     return {"ok": True, "deleted": {"members": members, "transactions": transactions, "incoming": incoming, "missing": missing, "reservations": reservations, "stocktake": stocktake, "books": books}, "books_deleted": data.include_books}
+
+BACKUP_COLLECTIONS = ["books", "members", "transactions", "incoming", "missing", "reservations", "stocktake", "shelves", "settings"]
+
+@api.get("/admin/backup")
+async def backup_data(user=Depends(current_user)):
+    if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mengunduh cadangan data")
+    dump = {}
+    for name in BACKUP_COLLECTIONS:
+        dump[name] = await db[name].find({}, {"_id": 0}).to_list(100000)
+    return {"app": "perpustakaan-sma1-abung-tengah", "version": 1, "generated_at": now_iso(), "collections": dump}
+
+@api.post("/admin/restore")
+async def restore_data(file: UploadFile = File(...), user=Depends(current_user)):
+    if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat memulihkan data")
+    content = await file.read()
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(400, "Ukuran berkas cadangan maksimal 20MB")
+    try:
+        payload = json.loads(content.decode("utf-8-sig", errors="replace"))
+    except Exception:
+        raise HTTPException(400, "Berkas cadangan tidak valid (bukan JSON)")
+    collections = payload.get("collections")
+    if not isinstance(collections, dict):
+        raise HTTPException(400, "Struktur berkas cadangan tidak dikenali")
+    restored = {}
+    for name in BACKUP_COLLECTIONS:
+        rows = collections.get(name)
+        if rows is None:
+            continue
+        if not isinstance(rows, list):
+            raise HTTPException(400, f"Data '{name}' pada cadangan tidak valid")
+        await db[name].delete_many({})
+        clean = [{k: v for k, v in r.items() if k != "_id"} for r in rows if isinstance(r, dict)]
+        if clean:
+            await db[name].insert_many(clean)
+        restored[name] = len(clean)
+    await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
+    return {"ok": True, "restored": restored}
+
 
 @api.get("/members/{member_id}/history")
 async def member_history(member_id: str, user=Depends(current_user)):

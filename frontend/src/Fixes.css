@@ -1,3 +1,18 @@
 .scan-corners{pointer-events:none!important}
 .app-frame[data-user-role="siswa"] [data-testid="add-book-button"],.app-frame[data-user-role="siswa"] [data-testid="add-member-button"]{display:none!important}
 @media(max-width:640px){.sidebar{transition:left .2s}.sidebar.mobile-open{left:0}}
+/* Student profile photo in portal hero */
+.student-hero{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+.student-profile{display:flex;flex-direction:column;align-items:center;gap:10px;flex-shrink:0}
+.student-profile-avatar{width:92px;height:92px;border-radius:20px;overflow:hidden;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;color:#fff;border:2px solid rgba(255,255,255,.35)}
+.student-profile-avatar img{width:100%;height:100%;object-fit:cover}
+
+/* Data & maintenance section in AccountManager */
+.data-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.data-reset-zone{border-top:1px dashed #e2e8f0;padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.reset-books-check{display:flex;align-items:center;gap:8px;font-size:14px;color:#334155}
+.reset-books-check input{width:auto}
+.danger-btn{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;background:#dc2626;color:#fff;border:none;padding:9px 16px;border-radius:10px;font-weight:600;cursor:pointer}
+.danger-btn:hover{background:#b91c1c}
+.danger-btn:disabled{opacity:.6;cursor:not-allowed}
+.reset-warn{display:flex;align-items:center;gap:6px;color:#b45309;margin:0}

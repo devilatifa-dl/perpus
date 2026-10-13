@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { KeyRound, ShieldCheck, Save } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { KeyRound, ShieldCheck, Save, Database, Download, Upload, Trash2, AlertTriangle } from "lucide-react";
 import { api } from "../lib";
 import { Modal } from "./Shared";
 
@@ -8,10 +8,59 @@ export function AccountManager({ user, close, notify }) {
   const [cur, setCur] = useState(""); const [nw, setNw] = useState(""); const [conf, setConf] = useState("");
   const [savingOwn, setSavingOwn] = useState(false);
   const [users, setUsers] = useState([]); const [pwById, setPwById] = useState({}); const [savingId, setSavingId] = useState("");
+  const [busyData, setBusyData] = useState(""); const [resetBooks, setResetBooks] = useState(false);
+  const restoreRef = useRef(null);
 
   useEffect(() => {
     if (isAdmin) api.get("/users").then(r => setUsers(r.data)).catch(() => {});
   }, [isAdmin]);
+
+  const backup = async () => {
+    setBusyData("backup");
+    try {
+      const res = await api.get("/admin/backup");
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `backup-perpustakaan-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      notify("Cadangan data berhasil diunduh");
+    } catch (err) {
+      notify(err.response?.data?.detail || "Gagal mengunduh cadangan");
+    } finally { setBusyData(""); }
+  };
+
+  const restore = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!window.confirm(`Pulihkan data dari "${file.name}"? Seluruh data saat ini akan digantikan oleh isi berkas cadangan.`)) return;
+    setBusyData("restore");
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const res = await api.post("/admin/restore", fd);
+      const total = Object.values(res.data.restored || {}).reduce((a, b) => a + b, 0);
+      notify(`Data berhasil dipulihkan (${total} entri). Memuat ulang...`);
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      notify(err.response?.data?.detail || "Gagal memulihkan data");
+    } finally { setBusyData(""); }
+  };
+
+  const reset = async () => {
+    const msg = resetBooks
+      ? "Reset SEMUA data termasuk koleksi buku? Tindakan ini tidak dapat dibatalkan."
+      : "Reset data (anggota, transaksi, pesanan, dll) kecuali koleksi buku? Tindakan ini tidak dapat dibatalkan.";
+    if (!window.confirm(msg)) return;
+    setBusyData("reset");
+    try {
+      await api.post("/admin/reset-data", { include_books: resetBooks });
+      notify("Data berhasil direset. Memuat ulang...");
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      notify(err.response?.data?.detail || "Gagal mereset data");
+    } finally { setBusyData(""); }
+  };
 
   const changeOwn = async (e) => {
     e.preventDefault();
@@ -60,6 +109,21 @@ export function AccountManager({ user, close, notify }) {
             <button type="button" className="secondary" data-testid={`set-password-button-${u.id}`} disabled={savingId === u.id} onClick={() => setUserPw(u)}><Save size={15}/> {savingId === u.id ? "..." : "Set"}</button>
           </div>
         </div>)}
+      </div>}
+
+      {isAdmin && <div className="account-users" data-testid="data-maintenance">
+        <div className="account-section-head"><Database size={16}/> <span>Data &amp; pemeliharaan</span></div>
+        <p className="account-hint">Unduh cadangan seluruh data, pulihkan dari berkas cadangan, atau reset data perpustakaan.</p>
+        <div className="data-actions">
+          <button type="button" className="secondary" data-testid="backup-data-button" disabled={busyData !== ""} onClick={backup}><Download size={15}/> {busyData === "backup" ? "Menyiapkan..." : "Unduh cadangan"}</button>
+          <button type="button" className="secondary" data-testid="restore-data-button" disabled={busyData !== ""} onClick={() => restoreRef.current?.click()}><Upload size={15}/> {busyData === "restore" ? "Memulihkan..." : "Pulihkan data"}</button>
+          <input ref={restoreRef} type="file" accept="application/json,.json" hidden data-testid="restore-file-input" onChange={restore}/>
+        </div>
+        <div className="data-reset-zone">
+          <label className="reset-books-check"><input type="checkbox" data-testid="reset-include-books" checked={resetBooks} onChange={e => setResetBooks(e.target.checked)}/> Ikut hapus koleksi buku</label>
+          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={reset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Reset data"}</button>
+          <p className="account-hint reset-warn"><AlertTriangle size={13}/> Reset &amp; pulihkan akan mengganti data saat ini dan tidak dapat dibatalkan.</p>
+        </div>
       </div>}
     </div>
   </Modal>;
