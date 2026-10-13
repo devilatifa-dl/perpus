@@ -16,7 +16,7 @@ export function Login({ onLogin, portal }) {
       <div className="login-logos"><img src={SCHOOL_LOGO} alt="Logo SMA Negeri 1 Abung Tengah" data-testid="login-school-logo"/><img src={LIBRARY_LOGO} alt="Logo perpustakaan" data-testid="login-library-logo"/></div>
       <p className="overline">{student ? "PORTAL SISWA · PERPUSTAKAAN SEKOLAH" : "PORTAL PETUGAS & ADMIN · PERPUSTAKAAN SEKOLAH"}</p>
       <h1>{student ? <>Jelajahi koleksi,<br/><em>pinjam dengan mudah.</em></> : <>Temukan pengetahuan,<br/><em>mulai dari sini.</em></>}</h1>
-      <p className="login-copy">{student ? "Lihat katalog buku dan susunan rak perpustakaan. Hanya lihat, tanpa mengubah data." : "Satu ruang digital untuk merawat koleksi, melayani siswa, dan menjaga budaya membaca."}</p>
+      <p className="login-copy">{student ? "Lihat katalog buku dan susunan rak perpustakaan." : "Satu ruang digital untuk merawat koleksi, melayani siswa, dan menjaga budaya membaca."}</p>
       <div className="login-address"><span>SMA 1 NEGERI ABUNG TENGAH</span><span>Jln Raya Subik, Desa Pekurun Selatan</span></div>
     </div>
     <div className="login-panel"><div className="login-panel-inner">

@@ -1,502 +1,363 @@
 #!/usr/bin/env python3
 """
-Backend API Test Suite for Perpustakaan - Round 5
-Tests:
-1. GET /api/overdue - overdue window changed from 7 to 3 days
-2. GET /api/account/member - siswa own member
-3. POST /api/account/photo - siswa photo upload
-4. GET /api/admin/backup - backup data
-5. POST /api/admin/restore - restore data
+Backend API Test Suite - Round 6
+Tests for:
+1. GET /api/members/options
+2. POST /api/members/{member_id}/photo
+3. POST /api/members/promote
 """
 
 import requests
 import json
-import io
+import sys
+import os
 
-# Configuration
+# Base URL from environment
 BASE_URL = "https://perpus-app-6.preview.emergentagent.com/api"
 
-# Test credentials from /app/memory/test_credentials.md
+# Test credentials
 ADMIN_CREDS = {"email": "admin@smansa.sch.id", "password": "admin123", "portal": "admin"}
 PETUGAS_CREDS = {"email": "petugas@smansa.sch.id", "password": "petugas123", "portal": "admin"}
 SISWA_CREDS = {"email": "siswa@smansa.sch.id", "password": "siswa123", "portal": "siswa"}
 
-def login(credentials):
-    """Login and return session with cookies"""
-    session = requests.Session()
-    resp = session.post(f"{BASE_URL}/auth/login", json=credentials)
-    if resp.status_code != 200:
-        raise Exception(f"Login failed: {resp.status_code} {resp.text}")
-    return session
+# Test data
+TEST_MEMBERS = [
+    {"name": "Uji Satu", "student_id": "90001", "class_name": "X IPA 1"},
+    {"name": "Uji Dua", "student_id": "90002", "class_name": "X IPA 1"},
+    {"name": "Uji Tiga", "student_id": "90003", "class_name": "X IPS 1"}
+]
 
-def test_overdue_window():
-    """Test 1: GET /api/overdue returns days=3 (staff only)"""
-    print("\n" + "="*80)
-    print("TEST 1: Overdue Window Changed (7 -> 3 days)")
-    print("="*80)
-    
-    # Test as admin (staff)
-    print("\n1.1: Admin accessing /api/overdue")
-    session = login(ADMIN_CREDS)
-    resp = session.get(f"{BASE_URL}/overdue")
-    
-    print(f"Status Code: {resp.status_code}")
-    print(f"Response: {resp.json()}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    data = resp.json()
-    
-    if 'days' not in data:
-        print("❌ FAILED: Response missing 'days' field")
-        return False
-    
-    if data['days'] != 3:
-        print(f"❌ FAILED: Expected days=3, got days={data['days']}")
-        return False
-    
-    print(f"✅ Admin: days={data['days']} (correct)")
-    
-    # Test as petugas (staff)
-    print("\n1.2: Petugas accessing /api/overdue")
-    session = login(PETUGAS_CREDS)
-    resp = session.get(f"{BASE_URL}/overdue")
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    data = resp.json()
-    if data['days'] != 3:
-        print(f"❌ FAILED: Expected days=3, got days={data['days']}")
-        return False
-    
-    print(f"✅ Petugas: days={data['days']} (correct)")
-    
-    # Test as siswa (should get 403)
-    print("\n1.3: Siswa accessing /api/overdue (should get 403)")
-    session = login(SISWA_CREDS)
-    resp = session.get(f"{BASE_URL}/overdue")
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 403:
-        print(f"❌ FAILED: Expected 403, got {resp.status_code}")
-        return False
-    
-    print("✅ Siswa: 403 (correct)")
-    
-    print("\n✅ PASSED: Overdue window correctly returns days=3, staff only")
-    return True
+# Sample base64 image (1x1 transparent PNG)
+SAMPLE_PHOTO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
-def test_siswa_member_and_photo():
-    """Test 2 & 3: GET /api/account/member and POST /api/account/photo"""
-    print("\n" + "="*80)
-    print("TEST 2 & 3: Siswa Own Member + Photo")
-    print("="*80)
-    
-    # Test 2.1: GET /api/account/member as siswa (may be null initially)
-    print("\n2.1: GET /api/account/member as siswa")
-    session_siswa = login(SISWA_CREDS)
-    resp = session_siswa.get(f"{BASE_URL}/account/member")
-    
-    print(f"Status Code: {resp.status_code}")
-    print(f"Response: {resp.json()}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    initial_member = resp.json()
-    print(f"✅ Siswa GET member: {initial_member}")
-    
-    # Test 2.2: GET /api/account/member as admin (should return null)
-    print("\n2.2: GET /api/account/member as admin (should return null)")
-    session_admin = login(ADMIN_CREDS)
-    resp = session_admin.get(f"{BASE_URL}/account/member")
-    
-    print(f"Status Code: {resp.status_code}")
-    print(f"Response: {resp.json()}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    if resp.json() is not None:
-        print(f"❌ FAILED: Expected null for admin, got {resp.json()}")
-        return False
-    
-    print("✅ Admin GET member: null (correct)")
-    
-    # Test 2.3: GET /api/account/member as petugas (should return null)
-    print("\n2.3: GET /api/account/member as petugas (should return null)")
-    session_petugas = login(PETUGAS_CREDS)
-    resp = session_petugas.get(f"{BASE_URL}/account/member")
-    
-    print(f"Status Code: {resp.status_code}")
-    print(f"Response: {resp.json()}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    if resp.json() is not None:
-        print(f"❌ FAILED: Expected null for petugas, got {resp.json()}")
-        return False
-    
-    print("✅ Petugas GET member: null (correct)")
-    
-    # Test 3.1: POST /api/account/photo as siswa
-    print("\n3.1: POST /api/account/photo as siswa")
-    photo_data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-    resp = session_siswa.post(f"{BASE_URL}/account/photo", json={"photo": photo_data})
-    
-    print(f"Status Code: {resp.status_code}")
-    print(f"Response: {resp.json()}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    member_with_photo = resp.json()
-    
-    if 'photo' not in member_with_photo:
-        print("❌ FAILED: Response missing 'photo' field")
-        return False
-    
-    if member_with_photo['photo'] != photo_data:
-        print("❌ FAILED: Photo data mismatch")
-        return False
-    
-    print(f"✅ Siswa POST photo: member returned with photo set")
-    
-    # Store member_id for cleanup
-    member_id = member_with_photo.get('id')
-    
-    # Test 3.2: GET /api/account/member again to verify photo persisted
-    print("\n3.2: GET /api/account/member again (verify photo persisted)")
-    resp = session_siswa.get(f"{BASE_URL}/account/member")
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    member_check = resp.json()
-    
-    if member_check is None:
-        print("❌ FAILED: Member should exist after photo upload")
-        return False
-    
-    if member_check.get('photo') != photo_data:
-        print("❌ FAILED: Photo not persisted correctly")
-        return False
-    
-    print("✅ Photo persisted correctly")
-    
-    # Test 3.3: POST /api/account/photo as admin (should get 403)
-    print("\n3.3: POST /api/account/photo as admin (should get 403)")
-    resp = session_admin.post(f"{BASE_URL}/account/photo", json={"photo": photo_data})
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 403:
-        print(f"❌ FAILED: Expected 403, got {resp.status_code}")
-        return False
-    
-    print("✅ Admin POST photo: 403 (correct)")
-    
-    # Test 3.4: POST /api/account/photo as petugas (should get 403)
-    print("\n3.4: POST /api/account/photo as petugas (should get 403)")
-    resp = session_petugas.post(f"{BASE_URL}/account/photo", json={"photo": photo_data})
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 403:
-        print(f"❌ FAILED: Expected 403, got {resp.status_code}")
-        return False
-    
-    print("✅ Petugas POST photo: 403 (correct)")
-    
-    # CLEANUP: Delete the auto-created member
-    print("\n3.5: CLEANUP - Delete auto-created siswa member")
-    if member_id:
-        resp = session_admin.delete(f"{BASE_URL}/members/{member_id}")
-        print(f"Delete Status Code: {resp.status_code}")
+class TestSession:
+    def __init__(self, name, credentials):
+        self.name = name
+        self.credentials = credentials
+        self.session = requests.Session()
+        self.user_id = None
         
-        if resp.status_code == 200:
-            print(f"✅ Deleted member {member_id}")
+    def login(self):
+        """Login and store session cookie"""
+        resp = self.session.post(f"{BASE_URL}/auth/login", json=self.credentials)
+        if resp.status_code != 200:
+            print(f"❌ {self.name} login failed: {resp.status_code} {resp.text}")
+            return False
+        print(f"✅ {self.name} logged in successfully")
+        return True
+    
+    def get(self, path):
+        """GET request with session"""
+        return self.session.get(f"{BASE_URL}{path}")
+    
+    def post(self, path, json_data=None):
+        """POST request with session"""
+        return self.session.post(f"{BASE_URL}{path}", json=json_data)
+    
+    def delete(self, path):
+        """DELETE request with session"""
+        return self.session.delete(f"{BASE_URL}{path}")
+
+def print_section(title):
+    print(f"\n{'='*70}")
+    print(f"  {title}")
+    print(f"{'='*70}")
+
+def test_member_options(admin_session, siswa_session, created_member_ids):
+    """Test GET /api/members/options"""
+    print_section("TEST 1: GET /api/members/options")
+    
+    passed = 0
+    total = 0
+    
+    # Test 1.1: Siswa can access member options
+    total += 1
+    print("\n[1.1] GET /api/members/options as SISWA")
+    resp = siswa_session.get("/members/options")
+    if resp.status_code == 200:
+        data = resp.json()
+        if isinstance(data, list):
+            # Check if our test members are in the list
+            found_members = [m for m in data if m.get("id") in created_member_ids]
+            if len(found_members) == len(created_member_ids):
+                # Verify fields
+                required_fields = ["id", "name", "class_name", "student_id", "photo"]
+                all_fields_present = all(
+                    all(field in member for field in required_fields)
+                    for member in found_members
+                )
+                if all_fields_present:
+                    print(f"✅ PASS: Siswa can access member options, found {len(found_members)} test members with all required fields")
+                    passed += 1
+                else:
+                    print(f"❌ FAIL: Some required fields missing from member objects")
+            else:
+                print(f"❌ FAIL: Expected {len(created_member_ids)} test members, found {len(found_members)}")
         else:
-            print(f"⚠️  Could not delete member {member_id}: {resp.status_code}")
-    
-    # Verify members count is 0
-    print("\n3.6: Verify members count = 0")
-    resp = session_admin.get(f"{BASE_URL}/members")
-    members = resp.json()
-    print(f"Final members count: {len(members)}")
-    
-    if len(members) != 0:
-        print(f"⚠️  WARNING: Expected 0 members, got {len(members)}")
-        print("Remaining members:")
-        for m in members:
-            print(f"  - {m.get('name')} ({m.get('student_id')}) - {m.get('class_name')}")
+            print(f"❌ FAIL: Expected list response, got {type(data)}")
     else:
-        print("✅ Members count = 0 (correct)")
+        print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
     
-    print("\n✅ PASSED: Siswa member + photo endpoints working correctly")
-    return True
-
-def test_backup():
-    """Test 4: GET /api/admin/backup"""
-    print("\n" + "="*80)
-    print("TEST 4: Backup Data")
-    print("="*80)
-    
-    # Test 4.1: GET /api/admin/backup as admin
-    print("\n4.1: GET /api/admin/backup as admin")
-    session_admin = login(ADMIN_CREDS)
-    resp = session_admin.get(f"{BASE_URL}/admin/backup")
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    backup_data = resp.json()
-    print(f"Response keys: {list(backup_data.keys())}")
-    
-    # Verify required keys
-    required_keys = ['app', 'version', 'generated_at', 'collections']
-    for key in required_keys:
-        if key not in backup_data:
-            print(f"❌ FAILED: Missing required key '{key}'")
-            return False
-    
-    print(f"✅ Admin backup: has all required keys {required_keys}")
-    
-    # Verify collections object
-    collections = backup_data['collections']
-    required_collections = ['books', 'members', 'transactions', 'incoming', 'missing', 'reservations', 'stocktake', 'shelves', 'settings']
-    
-    print(f"Collections keys: {list(collections.keys())}")
-    
-    for coll in required_collections:
-        if coll not in collections:
-            print(f"❌ FAILED: Missing collection '{coll}'")
-            return False
-    
-    print(f"✅ Collections object has all required collections: {required_collections}")
-    
-    # Store backup for restore test
-    global BACKUP_DATA
-    BACKUP_DATA = backup_data
-    
-    # Test 4.2: GET /api/admin/backup as petugas (should get 403)
-    print("\n4.2: GET /api/admin/backup as petugas (should get 403)")
-    session_petugas = login(PETUGAS_CREDS)
-    resp = session_petugas.get(f"{BASE_URL}/admin/backup")
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 403:
-        print(f"❌ FAILED: Expected 403, got {resp.status_code}")
-        return False
-    
-    print("✅ Petugas: 403 (correct)")
-    
-    # Test 4.3: GET /api/admin/backup as siswa (should get 403)
-    print("\n4.3: GET /api/admin/backup as siswa (should get 403)")
-    session_siswa = login(SISWA_CREDS)
-    resp = session_siswa.get(f"{BASE_URL}/admin/backup")
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 403:
-        print(f"❌ FAILED: Expected 403, got {resp.status_code}")
-        return False
-    
-    print("✅ Siswa: 403 (correct)")
-    
-    print("\n✅ PASSED: Backup endpoint working correctly")
-    return True
-
-def test_restore():
-    """Test 5: POST /api/admin/restore"""
-    print("\n" + "="*80)
-    print("TEST 5: Restore Data")
-    print("="*80)
-    
-    # Test 5.1: Safe round-trip restore as admin
-    print("\n5.1: POST /api/admin/restore as admin (safe round-trip)")
-    session_admin = login(ADMIN_CREDS)
-    
-    # Use backup from previous test
-    if 'BACKUP_DATA' not in globals():
-        print("❌ FAILED: No backup data available (run backup test first)")
-        return False
-    
-    backup_json = json.dumps(BACKUP_DATA)
-    
-    # Create file-like object
-    files = {
-        'file': ('backup.json', backup_json, 'application/json')
-    }
-    
-    resp = session_admin.post(f"{BASE_URL}/admin/restore", files=files)
-    
-    print(f"Status Code: {resp.status_code}")
-    print(f"Response: {resp.json()}")
-    
-    if resp.status_code != 200:
-        print(f"❌ FAILED: Expected 200, got {resp.status_code}")
-        return False
-    
-    restore_result = resp.json()
-    
-    if 'ok' not in restore_result or restore_result['ok'] != True:
-        print("❌ FAILED: Response missing 'ok: true'")
-        return False
-    
-    if 'restored' not in restore_result:
-        print("❌ FAILED: Response missing 'restored' object")
-        return False
-    
-    print(f"✅ Admin restore: {restore_result}")
-    
-    # Test 5.2: POST /api/admin/restore as petugas (should get 403)
-    print("\n5.2: POST /api/admin/restore as petugas (should get 403)")
-    session_petugas = login(PETUGAS_CREDS)
-    
-    files = {
-        'file': ('backup.json', backup_json, 'application/json')
-    }
-    
-    resp = session_petugas.post(f"{BASE_URL}/admin/restore", files=files)
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 403:
-        print(f"❌ FAILED: Expected 403, got {resp.status_code}")
-        return False
-    
-    print("✅ Petugas: 403 (correct)")
-    
-    # Test 5.3: POST /api/admin/restore as siswa (should get 403)
-    print("\n5.3: POST /api/admin/restore as siswa (should get 403)")
-    session_siswa = login(SISWA_CREDS)
-    
-    files = {
-        'file': ('backup.json', backup_json, 'application/json')
-    }
-    
-    resp = session_siswa.post(f"{BASE_URL}/admin/restore", files=files)
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 403:
-        print(f"❌ FAILED: Expected 403, got {resp.status_code}")
-        return False
-    
-    print("✅ Siswa: 403 (correct)")
-    
-    # Test 5.4: Invalid JSON file (should get 400)
-    print("\n5.4: POST /api/admin/restore with invalid JSON (should get 400)")
-    
-    invalid_json = "not json at all"
-    files = {
-        'file': ('backup.json', invalid_json, 'application/json')
-    }
-    
-    resp = session_admin.post(f"{BASE_URL}/admin/restore", files=files)
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 400:
-        print(f"❌ FAILED: Expected 400, got {resp.status_code}")
-        return False
-    
-    print("✅ Invalid JSON: 400 (correct)")
-    
-    # Test 5.5: Valid JSON but missing 'collections' (should get 400)
-    print("\n5.5: POST /api/admin/restore with JSON missing 'collections' (should get 400)")
-    
-    invalid_structure = json.dumps({"foo": 1})
-    files = {
-        'file': ('backup.json', invalid_structure, 'application/json')
-    }
-    
-    resp = session_admin.post(f"{BASE_URL}/admin/restore", files=files)
-    
-    print(f"Status Code: {resp.status_code}")
-    
-    if resp.status_code != 400:
-        print(f"❌ FAILED: Expected 400, got {resp.status_code}")
-        return False
-    
-    print("✅ Missing 'collections': 400 (correct)")
-    
-    # Test 5.6: Verify data remains empty
-    print("\n5.6: Verify library data remains empty")
-    resp = session_admin.get(f"{BASE_URL}/members")
-    members = resp.json()
-    print(f"Members count: {len(members)}")
-    
-    if len(members) != 0:
-        print(f"⚠️  WARNING: Expected 0 members, got {len(members)}")
+    # Test 1.2: Admin can also access member options
+    total += 1
+    print("\n[1.2] GET /api/members/options as ADMIN")
+    resp = admin_session.get("/members/options")
+    if resp.status_code == 200:
+        data = resp.json()
+        if isinstance(data, list):
+            print(f"✅ PASS: Admin can access member options, returned {len(data)} members")
+            passed += 1
+        else:
+            print(f"❌ FAIL: Expected list response")
     else:
-        print("✅ Members count = 0 (correct)")
+        print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
     
-    print("\n✅ PASSED: Restore endpoint working correctly")
-    return True
+    print(f"\n📊 Member Options Test: {passed}/{total} passed")
+    return passed, total
+
+def test_member_photo(admin_session, siswa_session, created_member_ids):
+    """Test POST /api/members/{member_id}/photo"""
+    print_section("TEST 2: POST /api/members/{member_id}/photo")
+    
+    passed = 0
+    total = 0
+    
+    # Get the first test member ID
+    member_id = created_member_ids[0] if created_member_ids else None
+    if not member_id:
+        print("❌ No test members available for photo test")
+        return 0, 0
+    
+    # Test 2.1: Siswa can update member photo
+    total += 1
+    print(f"\n[2.1] POST /api/members/{member_id}/photo as SISWA")
+    resp = siswa_session.post(f"/members/{member_id}/photo", {"photo": SAMPLE_PHOTO})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("photo") == SAMPLE_PHOTO:
+            print(f"✅ PASS: Siswa can update member photo, photo field matches")
+            passed += 1
+        else:
+            print(f"❌ FAIL: Photo field doesn't match expected value")
+    else:
+        print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
+    
+    # Test 2.2: Verify photo persisted via GET /api/members/options
+    total += 1
+    print(f"\n[2.2] Verify photo persisted via GET /api/members/options")
+    resp = siswa_session.get("/members/options")
+    if resp.status_code == 200:
+        data = resp.json()
+        member = next((m for m in data if m.get("id") == member_id), None)
+        if member and member.get("photo") == SAMPLE_PHOTO:
+            print(f"✅ PASS: Photo persisted correctly for member {member_id}")
+            passed += 1
+        else:
+            print(f"❌ FAIL: Photo not found or doesn't match")
+    else:
+        print(f"❌ FAIL: Expected 200, got {resp.status_code}")
+    
+    # Test 2.3: Non-existent member ID returns 404
+    total += 1
+    print(f"\n[2.3] POST /api/members/NONEXISTENT/photo as SISWA")
+    resp = siswa_session.post("/members/NONEXISTENT/photo", {"photo": SAMPLE_PHOTO})
+    if resp.status_code == 404:
+        print(f"✅ PASS: Non-existent member returns 404")
+        passed += 1
+    else:
+        print(f"❌ FAIL: Expected 404, got {resp.status_code}: {resp.text}")
+    
+    # Test 2.4: Admin can also update member photo
+    total += 1
+    print(f"\n[2.4] POST /api/members/{member_id}/photo as ADMIN")
+    new_photo = "data:image/png;base64,ADMIN_PHOTO_DATA"
+    resp = admin_session.post(f"/members/{member_id}/photo", {"photo": new_photo})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("photo") == new_photo:
+            print(f"✅ PASS: Admin can update member photo")
+            passed += 1
+        else:
+            print(f"❌ FAIL: Photo field doesn't match")
+    else:
+        print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
+    
+    print(f"\n📊 Member Photo Test: {passed}/{total} passed")
+    return passed, total
+
+def test_promote_members(admin_session, siswa_session, created_member_ids):
+    """Test POST /api/members/promote"""
+    print_section("TEST 3: POST /api/members/promote")
+    
+    passed = 0
+    total = 0
+    
+    # Test 3.1: Admin can promote members from X IPA 1 to XI IPA 1
+    total += 1
+    print(f"\n[3.1] POST /api/members/promote as ADMIN (X IPA 1 -> XI IPA 1)")
+    resp = admin_session.post("/members/promote", {"from_class": "X IPA 1", "to_class": "XI IPA 1"})
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("ok") and data.get("moved") == 2 and data.get("from_class") == "X IPA 1" and data.get("to_class") == "XI IPA 1":
+            print(f"✅ PASS: Promotion successful, moved {data.get('moved')} members")
+            passed += 1
+        else:
+            print(f"❌ FAIL: Response structure incorrect: {data}")
+    else:
+        print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
+    
+    # Test 3.2: Verify members now have class_name "XI IPA 1"
+    total += 1
+    print(f"\n[3.2] Verify members promoted to XI IPA 1")
+    resp = admin_session.get("/members")
+    if resp.status_code == 200:
+        data = resp.json()
+        promoted_members = [m for m in data if m.get("id") in created_member_ids[:2]]  # First 2 members
+        if all(m.get("class_name") == "XI IPA 1" for m in promoted_members):
+            print(f"✅ PASS: All promoted members now in XI IPA 1")
+            passed += 1
+        else:
+            print(f"❌ FAIL: Some members not promoted correctly")
+    else:
+        print(f"❌ FAIL: Expected 200, got {resp.status_code}")
+    
+    # Test 3.3: Siswa cannot promote members (403)
+    total += 1
+    print(f"\n[3.3] POST /api/members/promote as SISWA")
+    resp = siswa_session.post("/members/promote", {"from_class": "XI IPA 1", "to_class": "XII IPA 1"})
+    if resp.status_code == 403:
+        print(f"✅ PASS: Siswa correctly denied (403)")
+        passed += 1
+    else:
+        print(f"❌ FAIL: Expected 403, got {resp.status_code}: {resp.text}")
+    
+    # Test 3.4: Same from_class and to_class returns 400
+    total += 1
+    print(f"\n[3.4] POST /api/members/promote with same from/to class")
+    resp = admin_session.post("/members/promote", {"from_class": "XI IPA 1", "to_class": "XI IPA 1"})
+    if resp.status_code == 400:
+        print(f"✅ PASS: Same class correctly rejected (400)")
+        passed += 1
+    else:
+        print(f"❌ FAIL: Expected 400, got {resp.status_code}: {resp.text}")
+    
+    # Test 3.5: Non-existent from_class returns 404
+    total += 1
+    print(f"\n[3.5] POST /api/members/promote with non-existent from_class")
+    resp = admin_session.post("/members/promote", {"from_class": "ZZZ NONEXISTENT", "to_class": "XII IPA 1"})
+    if resp.status_code == 404:
+        print(f"✅ PASS: Non-existent class correctly returns 404")
+        passed += 1
+    else:
+        print(f"❌ FAIL: Expected 404, got {resp.status_code}: {resp.text}")
+    
+    print(f"\n📊 Promote Members Test: {passed}/{total} passed")
+    return passed, total
+
+def cleanup_test_members(admin_session):
+    """Delete all test members to return to empty state"""
+    print_section("CLEANUP: Delete all test members")
+    
+    # Delete members from XI IPA 1 (promoted from X IPA 1)
+    print("\n[CLEANUP] Bulk delete XI IPA 1")
+    resp = admin_session.post("/members/bulk-delete", {"class_name": "XI IPA 1"})
+    if resp.status_code == 200:
+        data = resp.json()
+        print(f"✅ Deleted {data.get('deleted', 0)} members from XI IPA 1")
+    else:
+        print(f"⚠️  Bulk delete XI IPA 1 failed: {resp.status_code}")
+    
+    # Delete members from X IPS 1
+    print("\n[CLEANUP] Bulk delete X IPS 1")
+    resp = admin_session.post("/members/bulk-delete", {"class_name": "X IPS 1"})
+    if resp.status_code == 200:
+        data = resp.json()
+        print(f"✅ Deleted {data.get('deleted', 0)} members from X IPS 1")
+    else:
+        print(f"⚠️  Bulk delete X IPS 1 failed: {resp.status_code}")
+    
+    # Verify final count is 0
+    print("\n[CLEANUP] Verify final members count = 0")
+    resp = admin_session.get("/members")
+    if resp.status_code == 200:
+        data = resp.json()
+        count = len(data)
+        if count == 0:
+            print(f"✅ Final members count = 0 (data empty as required)")
+            return True
+        else:
+            print(f"⚠️  Final members count = {count} (expected 0)")
+            return False
+    else:
+        print(f"⚠️  Could not verify final count: {resp.status_code}")
+        return False
 
 def main():
-    """Run all tests"""
-    print("\n" + "="*80)
-    print("PERPUSTAKAAN BACKEND TEST SUITE - ROUND 5")
-    print("="*80)
-    print(f"Base URL: {BASE_URL}")
+    print("="*70)
+    print("  PERPUSTAKAAN BACKEND TEST - ROUND 6")
+    print("  Testing: members/options, members/{id}/photo, members/promote")
+    print("="*70)
     
-    results = []
+    # Initialize sessions
+    admin = TestSession("ADMIN", ADMIN_CREDS)
+    siswa = TestSession("SISWA", SISWA_CREDS)
     
-    try:
-        # Run tests in order
-        results.append(("Overdue Window (7->3 days)", test_overdue_window()))
-        results.append(("Siswa Member + Photo", test_siswa_member_and_photo()))
-        results.append(("Backup Data", test_backup()))
-        results.append(("Restore Data", test_restore()))
-        
-    except Exception as e:
-        print(f"\n❌ CRITICAL ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        results.append(("Critical Error", False))
+    # Login
+    print_section("LOGIN")
+    if not admin.login():
+        print("❌ Admin login failed, cannot continue")
+        sys.exit(1)
+    if not siswa.login():
+        print("❌ Siswa login failed, cannot continue")
+        sys.exit(1)
     
-    # Summary
-    print("\n" + "="*80)
-    print("TEST SUMMARY")
-    print("="*80)
+    # Create test members
+    print_section("SETUP: Create test members")
+    created_member_ids = []
+    for member_data in TEST_MEMBERS:
+        resp = admin.post("/members", member_data)
+        if resp.status_code == 200:
+            member = resp.json()
+            member_id = member.get("id")
+            created_member_ids.append(member_id)
+            print(f"✅ Created member: {member_data['name']} (ID: {member_id}, Class: {member_data['class_name']})")
+        else:
+            print(f"❌ Failed to create member {member_data['name']}: {resp.status_code} {resp.text}")
     
-    for test_name, passed in results:
-        status = "✅ PASSED" if passed else "❌ FAILED"
-        print(f"{status}: {test_name}")
+    if len(created_member_ids) != len(TEST_MEMBERS):
+        print(f"❌ Failed to create all test members, cannot continue")
+        sys.exit(1)
     
-    total = len(results)
-    passed = sum(1 for _, p in results if p)
+    # Run tests
+    total_passed = 0
+    total_tests = 0
     
-    print(f"\nTotal: {passed}/{total} tests passed")
+    p, t = test_member_options(admin, siswa, created_member_ids)
+    total_passed += p
+    total_tests += t
     
-    if passed == total:
-        print("\n🎉 ALL TESTS PASSED!")
-        return 0
+    p, t = test_member_photo(admin, siswa, created_member_ids)
+    total_passed += p
+    total_tests += t
+    
+    p, t = test_promote_members(admin, siswa, created_member_ids)
+    total_passed += p
+    total_tests += t
+    
+    # Cleanup
+    cleanup_success = cleanup_test_members(admin)
+    
+    # Final summary
+    print_section("FINAL SUMMARY")
+    print(f"\n📊 Total Tests: {total_passed}/{total_tests} passed")
+    print(f"🧹 Cleanup: {'✅ Success' if cleanup_success else '⚠️  Incomplete'}")
+    
+    if total_passed == total_tests and cleanup_success:
+        print("\n✅ ALL TESTS PASSED - Round 6 Complete")
+        sys.exit(0)
     else:
-        print(f"\n⚠️  {total - passed} test(s) failed")
-        return 1
+        print(f"\n❌ SOME TESTS FAILED - {total_tests - total_passed} failures")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    exit(main())
+    main()

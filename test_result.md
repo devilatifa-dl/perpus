@@ -306,6 +306,49 @@ backend:
         -agent: "testing"
         -comment: "✅ TESTED: (1) Admin POST /api/admin/restore with safe round-trip backup JSON returns 200 with {ok: true, restored: {...}}. Data remains unchanged. (2) Petugas POST /api/admin/restore returns 403 (correct, admin only). (3) Siswa POST /api/admin/restore returns 403 (correct, admin only). (4) Admin POST with invalid JSON ('not json at all') returns 400 (correct validation). (5) Admin POST with valid JSON but missing 'collections' key ({\"foo\":1}) returns 400 (correct validation). (6) Final members count verified = 0 (data kept empty as requested). All 6 sub-tests passed. Restore working correctly with proper validation."
 
+  - task: "Member options list for siswa (GET /api/members/options)"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Any logged-in user (incl siswa) can GET /api/members/options -> list of {id,name,class_name,student_id,photo} sorted by class then name. Used by siswa to pick a member before uploading a photo."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ TESTED: (1) Siswa GET /api/members/options returns 200 with list of members, all required fields present (id, name, class_name, student_id, photo). Found all 3 test members created. (2) Admin GET /api/members/options returns 200 with list. Both roles can access endpoint successfully. All scenarios passed."
+  - task: "Update member photo by id, siswa-accessible (POST /api/members/{id}/photo)"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "POST /api/members/{member_id}/photo {photo} updatable by ANY logged-in user including siswa (by design: student picks a member name then changes photo). Returns updated member. 404 if member not found. Member card auto-reflects new photo."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ TESTED: (1) Siswa POST /api/members/{id}/photo with base64 photo returns 200, updated member with photo field matching input. (2) Verified photo persisted via GET /api/members/options. (3) POST to non-existent member ID returns 404 (correct). (4) Admin can also POST photo successfully (200). All scenarios passed."
+  - task: "Promote members to next class (POST /api/members/promote)"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Staff only (403 siswa). Body {from_class, to_class}. Moves all members from from_class to to_class (update_many). Returns {ok, moved, from_class, to_class}. 400 if empty/same classes, 404 if no members in from_class."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ TESTED: (1) Admin POST /api/members/promote {from_class:'X IPA 1', to_class:'XI IPA 1'} returns 200 with {ok:true, moved:2, from_class, to_class}. (2) Verified via GET /api/members that both promoted members now have class_name='XI IPA 1'. (3) Siswa POST returns 403 (correct, staff only). (4) Same from_class==to_class returns 400 (correct validation). (5) Non-existent from_class returns 404 (correct). All scenarios passed."
+
 frontend:
   - task: "Member edit / delete / bulk delete UI"
     implemented: true
@@ -344,11 +387,14 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 4
+  test_sequence: 6
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Member options list for siswa (GET /api/members/options)"
+    - "Update member photo by id, siswa-accessible (POST /api/members/{id}/photo)"
+    - "Promote members to next class (POST /api/members/promote)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -377,3 +423,9 @@ agent_communication:
 
     -agent: "main"
     -message: "Round 5: Four new/changed backend items to test (creds in /app/memory/test_credentials.md). (1) Overdue window: GET /api/overdue (staff) now returns days=3 (was 7). (2) Siswa photo: GET /api/account/member returns the siswa's own member doc or null (non-siswa -> null). POST /api/account/photo {photo:'<base64 or any string>'} as SISWA -> updates/creates own member photo and returns the member; as admin/petugas -> 403. NOTE data may be empty so a member is auto-created for the siswa; AFTER testing, CLEAN UP that member (login staff, DELETE /api/members/{id}) so members count returns to 0. (3) Backup: GET /api/admin/backup as admin -> 200 with {app,version,generated_at,collections{...}}; petugas/siswa -> 403. (4) Restore: POST /api/admin/restore multipart field 'file' with a backup JSON as admin -> 200 {ok, restored}; petugas/siswa -> 403; invalid json/structure -> 400. SAFE approach: GET backup first, then POST that exact JSON back (data stays same). Keep library data EMPTY at the end (user wants it empty)."
+
+    -agent: "main"
+    -message: "Round 6: Three new backend endpoints for (a) siswa self-service photo upload by picking a member, and (b) class promotion. Creds in /app/memory/test_credentials.md. Data is currently EMPTY (members=0), so CREATE a few test members as admin first, test, then CLEAN UP so members returns to 0. Tests: (1) GET /api/members/options as SISWA -> 200 list including the test members with fields id,name,class_name,student_id,photo (also works for staff). (2) POST /api/members/{id}/photo as SISWA with {photo:'data:image/png;base64,...'} -> 200 returns updated member with new photo; GET options reflects it; 404 for bad id. Confirm staff can also call it. (3) POST /api/members/promote as admin {from_class:'X IPA 1', to_class:'XI IPA 1'} after creating members in 'X IPA 1' -> 200 {moved:N}; verify those members now have class_name 'XI IPA 1'; siswa -> 403; same from==to -> 400; non-existent from_class -> 404. CLEANUP: delete all test members (bulk-delete per class) so members count = 0 at end."
+
+    -agent: "testing"
+    -message: "✅ ROUND 6 BACKEND TESTS - ALL PASSED (11/11 tests, 3/3 endpoints). Created 3 test members (Uji Satu/90001/X IPA 1, Uji Dua/90002/X IPA 1, Uji Tiga/90003/X IPS 1). (1) GET /api/members/options: Siswa can access (200) with all required fields (id, name, class_name, student_id, photo), admin can also access (200). (2) POST /api/members/{id}/photo: Siswa can update photo (200), photo persisted correctly, non-existent ID returns 404, admin can also update photo (200). (3) POST /api/members/promote: Admin promoted X IPA 1 -> XI IPA 1 (200, moved=2), verified members updated to XI IPA 1, siswa gets 403, same from/to class returns 400, non-existent from_class returns 404. CLEANUP: Successfully deleted all test members via bulk-delete (XI IPA 1: 2 deleted, X IPS 1: 2 deleted), plus 1 pre-existing member from XII IPA 1. Final members count = 0 (data empty as required). NO ISSUES FOUND. All three endpoints working correctly with proper permissions, validation, and error handling."

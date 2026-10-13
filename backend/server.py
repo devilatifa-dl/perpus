@@ -45,6 +45,10 @@ class MemberInput(BaseModel):
 class BulkDeleteInput(BaseModel):
     class_name: str
 
+class PromoteInput(BaseModel):
+    from_class: str
+    to_class: str
+
 class PhotoInput(BaseModel):
     photo: str = ""
 
@@ -402,6 +406,12 @@ async def members(user=Depends(current_user)):
     staff_only(user)
     return await db.members.find({}, {"_id":0}).to_list(200)
 
+@api.get("/members/options")
+async def member_options(user=Depends(current_user)):
+    rows = await db.members.find({}, {"_id":0,"id":1,"name":1,"class_name":1,"student_id":1,"photo":1}).to_list(5000)
+    rows.sort(key=lambda m: (m.get("class_name",""), m.get("name","")))
+    return rows
+
 @api.post("/members")
 async def add_member(data: MemberInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah anggota")
@@ -483,6 +493,28 @@ async def update_member(member_id: str, data: MemberInput, user=Depends(current_
     await db.members.update_one({"id": member_id}, {"$set": data.model_dump()})
     updated = await db.members.find_one({"id": member_id}, {"_id":0})
     return updated
+
+@api.post("/members/{member_id}/photo")
+async def set_member_photo(member_id: str, data: PhotoInput, user=Depends(current_user)):
+    member = await db.members.find_one({"id": member_id}, {"_id":0})
+    if not member: raise HTTPException(404, "Anggota tidak ditemukan")
+    await db.members.update_one({"id": member_id}, {"$set": {"photo": data.photo}})
+    return await db.members.find_one({"id": member_id}, {"_id":0})
+
+@api.post("/members/promote")
+async def promote_members(data: PromoteInput, user=Depends(current_user)):
+    staff_only(user)
+    from_c = data.from_class.strip()
+    to_c = data.to_class.strip()
+    if not from_c or not to_c:
+        raise HTTPException(400, "Kelas asal dan kelas tujuan wajib diisi")
+    if from_c == to_c:
+        raise HTTPException(400, "Kelas asal dan tujuan tidak boleh sama")
+    count = await db.members.count_documents({"class_name": from_c})
+    if count == 0:
+        raise HTTPException(404, "Tidak ada anggota pada kelas asal tersebut")
+    result = await db.members.update_many({"class_name": from_c}, {"$set": {"class_name": to_c}})
+    return {"ok": True, "moved": result.modified_count, "from_class": from_c, "to_class": to_c}
 
 @api.post("/members/bulk-delete")
 async def bulk_delete_members(data: BulkDeleteInput, user=Depends(current_user)):
