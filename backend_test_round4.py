@@ -12,7 +12,7 @@ import requests
 import json
 
 # Configuration
-BASE_URL = "https://perpus-library.preview.emergentagent.com/api"
+BASE_URL = "https://perpus-app-6.preview.emergentagent.com/api"
 
 # Test credentials from /app/memory/test_credentials.md
 ADMIN_CREDS = {"email": "admin@smansa.sch.id", "password": "admin123", "portal": "admin"}
