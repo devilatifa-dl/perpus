@@ -15,17 +15,20 @@ export default function StudentPortal() {
   const [tab, setTab] = useState("katalog"); const [search, setSearch] = useState(""); const [shelfFilter, setShelfFilter] = useState("semua"); const [highlight, setHighlight] = useState("");
   const [data, setData] = useState({ books: [], shelves: [], stats: {}, settings: null, mine: [] }); const [toast, setToast] = useState(""); const [busy, setBusy] = useState("");
   const [options, setOptions] = useState([]); const [photoOpen, setPhotoOpen] = useState(false); const [savingPhoto, setSavingPhoto] = useState(false); const [selId, setSelId] = useState(""); const [draftPhoto, setDraftPhoto] = useState("");
+  const [meId, setMeId] = useState(() => localStorage.getItem("perpus_me_id") || "");
   const notify = (t) => { setToast(t); setTimeout(() => setToast(""), 2800); };
   useEffect(() => { api.get("/auth/me").then((r) => setUser(r.data)).catch(() => {}).finally(() => setChecking(false)); }, []);
   const loadOptions = () => api.get("/members/options").then((r) => setOptions(r.data)).catch(() => {});
-  const load = () => Promise.all([api.get("/books"), api.get("/shelves"), api.get("/dashboard"), api.get("/settings"), api.get("/reservations/mine")])
-    .then(([b, s, d, c, m]) => setData({ books: b.data, shelves: s.data, stats: d.data, settings: c.data, mine: m.data }));
-  useEffect(() => { if (user && user.role === "siswa") { load(); loadOptions(); } }, [user]);
-  const openPhoto = () => { loadOptions(); setSelId(""); setDraftPhoto(""); setPhotoOpen(true); };
+  const loadMine = (id) => api.get("/reservations/mine", { params: id ? { member_id: id } : {} }).then((r) => setData((d) => ({ ...d, mine: r.data }))).catch(() => {});
+  const load = () => Promise.all([api.get("/books"), api.get("/shelves"), api.get("/dashboard"), api.get("/settings")])
+    .then(([b, s, d, c]) => setData((prev) => ({ ...prev, books: b.data, shelves: s.data, stats: d.data, settings: c.data })));
+  useEffect(() => { if (user && user.role === "siswa") { load(); loadOptions(); loadMine(meId); } }, [user]);
+  const chooseMe = (id) => { setMeId(id); if (id) localStorage.setItem("perpus_me_id", id); else localStorage.removeItem("perpus_me_id"); loadMine(id); };
+  const openPhoto = () => { loadOptions(); setSelId(meId || ""); setDraftPhoto((options.find((o) => o.id === meId) || {}).photo || ""); setPhotoOpen(true); };
   const chooseMember = (id) => { setSelId(id); const m = options.find((o) => o.id === id); setDraftPhoto(m?.photo || ""); };
   const savePhoto = async () => { if (!selId) { notify("Pilih nama anggota dulu"); return; } setSavingPhoto(true); try { await api.post(`/members/${selId}/photo`, { photo: draftPhoto }); await loadOptions(); notify("Foto disimpan — kartu anggota diperbarui"); } catch (e) { notify(e.response?.data?.detail || "Gagal menyimpan foto"); } finally { setSavingPhoto(false); } };
-  const reserve = async (b) => { setBusy(b.id); try { await api.post("/reservations", { book_id: b.id }); await load(); notify(`“${b.title}” masuk antrean pesananmu`); } catch (e) { notify(e.response?.data?.detail || "Gagal memesan"); } finally { setBusy(""); } };
-  const cancel = async (r) => { try { await api.delete(`/reservations/${r.id}`); await load(); notify("Pesanan dibatalkan"); } catch (e) { notify(e.response?.data?.detail || "Gagal membatalkan"); } };
+  const reserve = async (b) => { if (!meId) { notify("Pilih namamu dulu di bagian atas sebelum memesan"); return; } setBusy(b.id); try { await api.post("/reservations", { book_id: b.id, member_id: meId }); await Promise.all([load(), loadMine(meId)]); notify(`“${b.title}” masuk antrean pesanan`); } catch (e) { notify(e.response?.data?.detail || "Gagal memesan"); } finally { setBusy(""); } };
+  const cancel = async (r) => { try { await api.delete(`/reservations/${r.id}`, { params: meId ? { member_id: meId } : {} }); await Promise.all([load(), loadMine(meId)]); notify("Pesanan dibatalkan"); } catch (e) { notify(e.response?.data?.detail || "Gagal membatalkan"); } };
   const waitingIds = new Set((data.mine || []).filter((r) => r.status === "Menunggu").map((r) => r.book_id));
   if (checking) return <div className="loading">Membuka portal siswa...</div>;
   if (!user) return <Login onLogin={setUser} portal="siswa"/>;
@@ -49,6 +52,14 @@ export default function StudentPortal() {
           <button className="reserve-btn" data-testid="open-photo-upload-button" onClick={openPhoto}><Camera size={14}/> Unggah foto anggota</button>
         </div>
       </section>
+      <div className="student-identity" data-testid="student-identity">
+        <span className="identity-label">Pesan buku atas nama:</span>
+        <select data-testid="identity-select" value={meId} onChange={(e) => chooseMe(e.target.value)}>
+          <option value="">— Pilih namamu —</option>
+          {options.map((o) => <option key={o.id} value={o.id}>{o.name}{o.class_name ? ` · ${o.class_name}` : ""}</option>)}
+        </select>
+        {meId ? <span className="identity-current" data-testid="identity-current">Halo, {options.find((o) => o.id === meId)?.name || ""} 👋</span> : <span className="identity-hint">Pilih namamu dulu agar petugas tahu siapa yang memesan</span>}
+      </div>
       {tab === "katalog" && <>
         <div className="toolbar"><div className="searchbox"><Search size={17}/><input data-testid="student-book-search-input" placeholder="Cari judul, penulis, atau kategori..." value={search} onChange={(e) => setSearch(e.target.value)}/></div><span className="soft-badge">{filtered.length} buku</span></div>
         <div className="shelf-chips" data-testid="shelf-chips"><button data-testid="shelf-chip-semua" className={shelfFilter === "semua" ? "active" : ""} onClick={() => setShelfFilter("semua")}>Semua rak</button>{data.shelves.map((s) => <button key={s.id} data-testid={`shelf-chip-${s.id}`} className={shelfFilter === s.id ? "active" : ""} onClick={() => setShelfFilter(s.id)}><MapPin size={12}/> {s.id} · {s.name}</button>)}</div>

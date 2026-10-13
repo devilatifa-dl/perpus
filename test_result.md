@@ -391,10 +391,24 @@ metadata:
   run_ui: false
 
 test_plan:
+backend_round7:
+  - task: "Reservation with member selection (shared siswa kiosk)"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Shared siswa kiosk account. POST /api/reservations now accepts optional member_id: if provided, reservation is recorded under THAT member (member_name/class_name) so admin knows who ordered; else falls back to own_member_filter. GET /api/reservations/mine?member_id=<id> returns that member's reservations. DELETE /api/reservations/{id}?member_id=<id> allows siswa to cancel only if member_id matches the reservation's member. Admin queue (GET /api/reservations) already returns member_name/class_name."
+        -working: true
+        -agent: "testing"
+        -comment: "✅ TESTED ALL 6 SCENARIOS (11/11 sub-tests passed). Setup: Created 2 test members (Andi/70001/XII IPA 1, Budi/70002/XII IPA 1), used 2 existing available books. TEST 1: Siswa POST /api/reservations {book_id, member_id:Andi} -> 200, reservation.member_name='Andi', class_name='XII IPA 1' (CORRECT - records actual ordering member, not siswa account name). TEST 2: Admin GET /api/reservations -> Andi's reservation visible with member_name='Andi', class_name='XII IPA 1'. TEST 3: Siswa GET /api/reservations/mine?member_id=Andi -> returns Andi's reservation; ?member_id=Budi -> does NOT contain Andi's reservation (filtering works correctly). TEST 4: Siswa POST /api/reservations {book_id, member_id:Budi} -> 200, member_name='Budi', class_name='XII IPA 1'. TEST 5: Siswa DELETE /api/reservations/{Andi_res_id}?member_id=Budi -> 403 (member mismatch protection works); DELETE with member_id=Andi -> 200, status='Dibatalkan' (correct cancellation). TEST 6: Backward compat - Siswa POST /api/reservations {book_id} WITHOUT member_id -> 404 (siswa account has no member record, falls back to own_member_filter as expected - acceptable per requirements). CLEANUP: Bulk deleted test members (XII IPA 1: 2 deleted), final members count = 0 (data empty as required). NO ISSUES FOUND. All reservation member_id scenarios working correctly: records actual ordering member's name, filters by member_id, validates member_id on delete, backward compatible."
+
   current_focus:
-    - "Member options list for siswa (GET /api/members/options)"
-    - "Update member photo by id, siswa-accessible (POST /api/members/{id}/photo)"
-    - "Promote members to next class (POST /api/members/promote)"
+    - "Reservation with member selection (POST /api/reservations member_id, GET /api/reservations/mine?member_id, DELETE with member_id)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -429,3 +443,9 @@ agent_communication:
 
     -agent: "testing"
     -message: "✅ ROUND 6 BACKEND TESTS - ALL PASSED (11/11 tests, 3/3 endpoints). Created 3 test members (Uji Satu/90001/X IPA 1, Uji Dua/90002/X IPA 1, Uji Tiga/90003/X IPS 1). (1) GET /api/members/options: Siswa can access (200) with all required fields (id, name, class_name, student_id, photo), admin can also access (200). (2) POST /api/members/{id}/photo: Siswa can update photo (200), photo persisted correctly, non-existent ID returns 404, admin can also update photo (200). (3) POST /api/members/promote: Admin promoted X IPA 1 -> XI IPA 1 (200, moved=2), verified members updated to XI IPA 1, siswa gets 403, same from/to class returns 400, non-existent from_class returns 404. CLEANUP: Successfully deleted all test members via bulk-delete (XI IPA 1: 2 deleted, X IPS 1: 2 deleted), plus 1 pre-existing member from XII IPA 1. Final members count = 0 (data empty as required). NO ISSUES FOUND. All three endpoints working correctly with proper permissions, validation, and error handling."
+
+    -agent: "main"
+    -message: "Round 7: Book reservation now carries the ACTUAL ordering member's name (shared siswa kiosk). Creds in /app/memory/test_credentials.md. Data is EMPTY — as admin create 2 members (e.g. Andi/70001/XII IPA 1, Budi/70002/XII IPA 1) and ensure at least 1 book exists with status 'Tersedia' (create via POST /api/books if none; capture book id). Tests: (1) As SISWA, POST /api/reservations {book_id, member_id:<Andi id>} -> 200; the returned reservation member_name must equal 'Andi' (NOT the siswa account's default name). (2) As admin, GET /api/reservations -> the new reservation appears with member_name 'Andi' and class_name 'XII IPA 1'. (3) GET /api/reservations/mine?member_id=<Andi id> as siswa -> returns Andi's reservation(s) only; with member_id=<Budi id> -> empty/none of Andi's. (4) POST /api/reservations {book_id, member_id:<Budi id>} for a different available book as siswa -> recorded under 'Budi'. (5) DELETE /api/reservations/{Andi_res_id}?member_id=<Budi id> as siswa -> 403 (mismatch); DELETE with member_id=<Andi id> -> 200 cancelled. (6) Backward compat: POST /api/reservations {book_id} WITHOUT member_id as siswa -> falls back to own_member_filter (may 404 if the siswa account has no member record — that's acceptable, just report). CLEANUP: cancel/delete test reservations, bulk-delete the test members (class 'XII IPA 1'), and delete any test books you created so data returns to empty. Report member_name values seen in each reservation."
+
+    -agent: "testing"
+    -message: "✅ ROUND 7 BACKEND TESTS - ALL PASSED (6/6 test scenarios, 11/11 sub-tests). Reservation with member selection feature working perfectly. Key findings: (1) When siswa creates reservation with member_id, the reservation correctly records THAT member's name (e.g., 'Andi') NOT the siswa account's name ('Bima Pratama'). (2) Admin can see all reservations with correct member_name and class_name. (3) GET /api/reservations/mine?member_id filtering works correctly - returns only that member's reservations. (4) DELETE with member_id validation works - returns 403 on mismatch, 200 on correct member_id. (5) Backward compatibility maintained - POST without member_id falls back to own_member_filter (404 if no member record, as expected). (6) All test data cleaned up successfully: members count = 0, no waiting reservations. NO ISSUES FOUND. The shared siswa kiosk feature is fully functional and ready for production use."

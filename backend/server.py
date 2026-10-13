@@ -267,6 +267,7 @@ async def set_my_photo(data: PhotoInput, user=Depends(current_user)):
 
 class ReservationInput(BaseModel):
     book_id: str
+    member_id: str = ""
 
 class ProcessInput(BaseModel):
     action: str
@@ -279,14 +280,20 @@ async def reservations(user=Depends(current_user)):
     return rows
 
 @api.get("/reservations/mine")
-async def my_reservations(user=Depends(current_user)):
-    member = await db.members.find_one(own_member_filter(user), {"_id":0})
+async def my_reservations(member_id: str = "", user=Depends(current_user)):
+    if member_id:
+        member = await db.members.find_one({"id": member_id}, {"_id":0})
+    else:
+        member = await db.members.find_one(own_member_filter(user), {"_id":0})
     if not member: return []
     return await db.reservations.find({"member_id": member["id"]}, {"_id":0}).sort("created_at", -1).to_list(100)
 
 @api.post("/reservations")
 async def reserve(data: ReservationInput, user=Depends(current_user)):
-    member = await db.members.find_one(own_member_filter(user), {"_id":0})
+    if data.member_id:
+        member = await db.members.find_one({"id": data.member_id}, {"_id":0})
+    else:
+        member = await db.members.find_one(own_member_filter(user), {"_id":0})
     if not member: raise HTTPException(404, "Data keanggotaan belum terdaftar. Hubungi petugas perpustakaan.")
     book = await db.books.find_one({"id": data.book_id}, {"_id":0})
     if not book: raise HTTPException(404, "Buku tidak ditemukan")
@@ -299,12 +306,15 @@ async def reserve(data: ReservationInput, user=Depends(current_user)):
     await db.reservations.insert_one(doc); return public(doc)
 
 @api.delete("/reservations/{res_id}")
-async def cancel_reservation(res_id: str, user=Depends(current_user)):
+async def cancel_reservation(res_id: str, member_id: str = "", user=Depends(current_user)):
     res = await db.reservations.find_one({"id": res_id}, {"_id":0})
     if not res: raise HTTPException(404, "Pesanan tidak ditemukan")
     if user["role"] == "siswa":
-        member = await db.members.find_one(own_member_filter(user), {"_id":0})
-        if not member or member["id"] != res["member_id"]: raise HTTPException(403, "Bukan pesanan Anda")
+        if member_id:
+            if member_id != res["member_id"]: raise HTTPException(403, "Bukan pesanan anggota ini")
+        else:
+            member = await db.members.find_one(own_member_filter(user), {"_id":0})
+            if not member or member["id"] != res["member_id"]: raise HTTPException(403, "Bukan pesanan Anda")
     if res["status"] != "Menunggu": raise HTTPException(400, "Pesanan sudah diproses")
     await db.reservations.update_one({"id": res_id}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
     return {"ok": True}
