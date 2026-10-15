@@ -1,4 +1,4 @@
-# PRD — Perpustakaan SMA 1 Negeri Abung Tengah
+# PRD — Perpustakaan SMA Negeri 1 Abung Tengah
 
 ## Problem statement (original)
 Web perpustakaan sekolah dengan design modern & keren untuk SMA 1 NEGERI ABUNG TENGAH (Jln Raya Subik, Desa Pekurun Selatan). Fitur: tambah/hapus buku, tambah/cetak anggota, kartu anggota digital, scan QR untuk pinjam/kembalikan, laporan buku masuk & hilang, laporan harian & bulanan, susunan rak, tanpa denda. 3 peran: admin, petugas, siswa.
@@ -36,6 +36,19 @@ Web perpustakaan sekolah dengan design modern & keren untuk SMA 1 NEGERI ABUNG T
 - Reservasi Buku (antrean saja, buku TIDAK dikunci; maks 3 aktif; tidak boleh duplikat; buku Hilang tidak bisa dipesan): siswa `POST/GET mine/DELETE /api/reservations`, tab "Pesanan saya" + tombol "Pesan buku" di katalog (menampilkan jumlah antre). Petugas: panel "Antrean pesanan siswa" di Ringkasan & Sirkulasi → Pinjamkan (buat transaksi pinjam, status Dipinjamkan) / Tolak.
 - Stok Opname: Rak buku → "Mulai stok opname": pilih rak, pindai QR / ketik kode, centang per buku, deteksi salah rak, Selesai → simpan POST /api/stocktake; buku tidak terpindai diputuskan satu per satu (tombol tandai hilang → modal). Badge "Opname terakhir".
 - QRScanner dipindah ke `components/QRScanner.js`.
+
+### 15 Okt 2026 — sesi Devi Latifa
+- Teks: nama sekolah → "SMA NEGERI 1 ABUNG TENGAH" (semua UI, PDF/Excel, default kartu + migrasi settings); nama admin "Administrator" → "Devi Latifa" (seed + migrasi); hero siswa "HALO SISWA/SISWI SMANSA".
+- Stok buku (keputusan user: satu judul, satu QR, ada angka stok): field stock/borrowed/lost/available, status dihitung (Tersedia/Dipinjam/Hilang/Habis). Migrasi `normalize_books()` menggabungkan buku judul+penulis sama (remap transaksi/pesanan/laporan). Pinjam −1 tersedia, kembali +1 (atomic), anggota tak boleh pinjam judul sama 2x, kembali hanya jika anggota memang meminjam. Tambah buku / buku masuk judul sama → menambah stok. PATCH /api/books/{id}/stock. Hilang/ditemukan per eksemplar. Tombol QR label per judul.
+- Pengunjung (`backend/visits.py`, menu Pengunjung): scan QR kartu/NIS (kamera kontinu atau alat pemindai USB/ketik) → scan 1 masuk, scan 2 keluar (penjaga dobel-scan 30 dtk); tamu tanpa kartu (nama, asal, keperluan); catat keluar manual, hapus; auto keluar jam sekolah (bawaan 14:00 WIB, bisa diubah, dijalankan saat data dibuka — check_out diset tepat jam tsb). Ringkasan di dashboard.
+- Laporan: tab Kunjungan (+PDF/Excel) & Statistik & persentase (per hari, per kelas %, anggota vs tamu %, cara keluar %, jam kedatangan, rincian harian; PDF/Excel type=statistik).
+
+### 15 Okt 2026 (lanjutan)
+- Peringkat Rajin Berkunjung: GET /api/visits/leaderboard?month=YYYY-MM (10 besar siswa + peringkat kelas dengan %, hanya kunjungan anggota). Tab di Laporan (podium, PDF/Excel type=peringkat&period=YYYY-MM) dan tab "Peringkat" di portal siswa (menyorot "kamu" berdasarkan nama terpilih).
+- Edit buku: PUT /api/books/{id} (judul, penulis, kategori, rak, ISBN, sampul; tolak duplikat judul+penulis; judul baru diteruskan ke transaksi/pesanan/laporan hilang). Tombol Atur stok kini ikon Layers.
+- Rak: POST/PUT/DELETE /api/shelves (ganti kode memindahkan buku otomatis; hapus rak berisi buku wajib pilih rak tujuan; minimal 1 rak). UI ShelfManager di menu Rak buku.
+- Teks "kunjungan" → "Pengunjung" di UI & judul PDF (opsi keperluan tamu "Kunjungan dinas" tetap).
+- Modal kini bisa ditutup dengan tombol Escape.
 
 ## Tech stack
 Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind (preflight) + CSS kustom (App.css, Card.css, Portal.css). QR: html5-qrcode; QR gen: api.qrserver.com.
