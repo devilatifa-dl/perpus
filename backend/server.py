@@ -16,7 +16,7 @@ ROOT_DIR = Path(__file__).parent
 mongo_url = os.environ["MONGO_URL"]
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ["DB_NAME"]]
-app = FastAPI(title="Perpustakaan SMA 1 Negeri Abung Tengah")
+app = FastAPI(title="Perpustakaan SMA Negeri 1 Abung Tengah")
 api = APIRouter(prefix="/api")
 JWT_SECRET = os.environ["JWT_SECRET"]
 if len(JWT_SECRET) < 32:
@@ -34,7 +34,24 @@ class BookInput(BaseModel):
     shelf: str = "R-01"
     isbn: str = ""
     cover: str = ""
-    status: str = "Tersedia"
+    stock: int = Field(1, ge=1, le=1000)
+
+class BookUpdate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    author: str = Field(..., min_length=1, max_length=120)
+    category: str = Field("Umum", max_length=60)
+    shelf: str = Field(..., min_length=1, max_length=20)
+    isbn: str = Field("", max_length=40)
+    cover: str = ""
+
+class ShelfInput(BaseModel):
+    id: str = Field(..., pattern=r"^[A-Za-z0-9-]{1,12}$")
+    name: str = Field(..., min_length=1, max_length=60)
+    capacity: int = Field(..., ge=1, le=10000)
+    color: str = Field("azure", max_length=20)
+
+class StockInput(BaseModel):
+    stock: int = Field(..., ge=0, le=5000)
 
 class MemberInput(BaseModel):
     name: str
@@ -91,7 +108,7 @@ class SettingsInput(BaseModel):
     card_show_qr: bool = True
     card_show_address: bool = True
     card_title: str = "KARTU ANGGOTA PERPUSTAKAAN"
-    card_school_name: str = "SMA 1 NEGERI ABUNG TENGAH"
+    card_school_name: str = "SMA NEGERI 1 ABUNG TENGAH"
     card_font: str = "modern"
     card_font_size: str = "sedang"
     card_school_spacing: float = 0
@@ -117,6 +134,74 @@ def public(doc):
 def password_hash(value):
     return bcrypt.hashpw(value.encode(), bcrypt.gensalt()).decode()
 
+def book_key(b):
+    return (str(b.get("title", "")).strip().lower(), str(b.get("author", "")).strip().lower())
+
+def compute_state(b):
+    stock = max(int(b.get("stock") or 0), 0); borrowed = max(int(b.get("borrowed") or 0), 0); lost = max(int(b.get("lost") or 0), 0)
+    borrowed = min(borrowed, stock)
+    available = stock - borrowed
+    status = "Tersedia" if available > 0 else ("Dipinjam" if borrowed > 0 else ("Hilang" if lost > 0 else "Habis"))
+    return {"stock": stock, "borrowed": borrowed, "lost": lost, "available": available, "status": status}
+
+async def refresh_book(book_id):
+    doc = await db.books.find_one({"id": book_id}, {"_id": 0})
+    if not doc: return None
+    state = compute_state(doc)
+    await db.books.update_one({"id": book_id}, {"$set": state})
+    return {**doc, **state}
+
+async def find_same_book(title, author):
+    key = (title.strip().lower(), author.strip().lower())
+    rx = {"$regex": f"^\\s*{re.escape(title.strip())}\\s*$", "$options": "i"}
+    for b in await db.books.find({"title": rx}, {"_id": 0}).to_list(50):
+        if book_key(b) == key: return b
+    return None
+
+async def normalize_books():
+    """Gabungkan buku berjudul & penulis sama menjadi satu judul dengan angka stok (idempoten)."""
+    books = await db.books.find({}, {"_id": 0}).sort("created_at", 1).to_list(100000)
+    groups = {}
+    for b in books: groups.setdefault(book_key(b), []).append(b)
+    for items in groups.values():
+        if len(items) == 1 and "stock" in items[0] and "available" in items[0]: continue
+        main = items[0]; stock = borrowed = lost = 0
+        for b in items:
+            if "stock" in b:
+                stock += int(b.get("stock") or 0); borrowed += int(b.get("borrowed") or 0); lost += int(b.get("lost") or 0)
+            else:
+                st = b.get("status", "Tersedia")
+                if st == "Hilang": lost += 1
+                else:
+                    stock += 1
+                    if st == "Dipinjam": borrowed += 1
+        extra = {"cover": next((b.get("cover") for b in items if b.get("cover")), ""), "isbn": next((b.get("isbn") for b in items if b.get("isbn")), "")}
+        await db.books.update_one({"id": main["id"]}, {"$set": {**compute_state({"stock": stock, "borrowed": borrowed, "lost": lost}), **extra}})
+        others = [b["id"] for b in items[1:]]
+        if not others: continue
+        await db.books.delete_many({"id": {"$in": others}})
+        for coll in ("transactions", "reservations", "missing"):
+            await db[coll].update_many({"book_id": {"$in": others}}, {"$set": {"book_id": main["id"]}})
+        await db.missing.update_many({"code": {"$in": others}}, {"$set": {"code": main["id"]}})
+        for inc in await db.incoming.find({"book_ids": {"$in": others}}, {"_id": 0, "id": 1, "book_ids": 1}).to_list(5000):
+            ids = list(dict.fromkeys(main["id"] if i in others else i for i in inc.get("book_ids", [])))
+            await db.incoming.update_one({"id": inc["id"]}, {"$set": {"book_ids": ids}})
+
+async def open_loan_count(member_id, book_id):
+    p = await db.transactions.count_documents({"member_id": member_id, "book_id": book_id, "action": "pinjam"})
+    k = await db.transactions.count_documents({"member_id": member_id, "book_id": book_id, "action": "kembali"})
+    return p - k
+
+async def take_copy(book_id):
+    res = await db.books.find_one_and_update({"id": book_id, "$expr": {"$gt": ["$stock", "$borrowed"]}}, {"$inc": {"borrowed": 1}})
+    if not res: raise HTTPException(400, "Stok buku habis — semua eksemplar sedang dipinjam")
+    return await refresh_book(book_id)
+
+async def return_copy(book_id):
+    res = await db.books.find_one_and_update({"id": book_id, "borrowed": {"$gt": 0}}, {"$inc": {"borrowed": -1}})
+    if not res: raise HTTPException(400, "Tidak ada eksemplar buku ini yang sedang dipinjam")
+    return await refresh_book(book_id)
+
 def token_for(user):
     return jwt.encode({"sub": user["id"], "exp": datetime.now(timezone.utc) + timedelta(hours=8)}, JWT_SECRET, algorithm="HS256")
 
@@ -135,8 +220,8 @@ async def current_user(request: Request):
 async def seed():
     if await db.users.count_documents({}) == 0:
         users = [
-            {"id":"u-admin","name":"Administrator","email":"admin@smansa.sch.id","role":"admin","password_hash":password_hash("admin123")},
-            {"id":"u-petugas","name":"Rina Pustakawan","email":"petugas@smansa.sch.id","role":"petugas","password_hash":password_hash("petugas123")},
+            {"id":"u-admin","name":"Devi Latifa","email":"admin@smansa.sch.id","role":"admin","password_hash":password_hash("admin123")},
+            {"id":"u-petugas","name":"Pustakawan","email":"petugas@smansa.sch.id","role":"petugas","password_hash":password_hash("petugas123")},
             {"id":"u-siswa","name":"Bima Pratama","email":"siswa@smansa.sch.id","role":"siswa","student_id":"24001","password_hash":password_hash("siswa123")},
         ]
         await db.users.insert_many(users)
@@ -158,6 +243,12 @@ async def seed():
             await db.transactions.insert_many([{ "id":"TRX-001","member_id":"MB-2024001","member_name":"Bima Pratama","book_id":"BK-1043","book_title":"Ensiklopedia Sains Remaja","action":"pinjam","date":(datetime.now(timezone.utc)-timedelta(days=10)).isoformat()},{"id":"TRX-002","member_id":"MB-2024002","member_name":"Siti Rahma","book_id":"BK-1042","book_title":"Laskar Pelangi","action":"kembali","date":now_iso()}])
         await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
     await db.members.update_many({}, {"$unset": {"email": "", "phone": ""}})
+    await db.users.update_one({"id": "u-admin", "name": "Administrator"}, {"$set": {"name": "Devi Latifa"}})
+    await db.users.update_one({"id": "u-petugas", "name": "Rina Pustakawan"}, {"$set": {"name": "Pustakawan"}})
+    for coll, field in (("incoming", "recorded_by"), ("missing", "reported_by"), ("reservations", "processed_by"), ("visits", "recorded_by"), ("visits", "checkout_by"), ("stocktake", "officer")):
+        await db[coll].update_many({field: "Rina Pustakawan"}, {"$set": {field: "Pustakawan"}})
+    await db.settings.update_many({"card_school_name": "SMA 1 NEGERI ABUNG TENGAH"}, {"$set": {"card_school_name": "SMA NEGERI 1 ABUNG TENGAH"}})
+    await normalize_books()
     await db.users.update_one({"id":"u-siswa","student_id":{"$exists":False}},{"$set":{"student_id":"24001"}})
 
 @app.on_event("startup")
@@ -165,7 +256,7 @@ async def startup():
     await seed()
 
 @api.get("/")
-async def root(): return {"message":"Perpustakaan SMA 1 Negeri Abung Tengah aktif"}
+async def root(): return {"message":"Perpustakaan SMA Negeri 1 Abung Tengah aktif"}
 
 @api.post("/auth/login")
 async def login(data: LoginInput, response: Response):
@@ -236,7 +327,14 @@ async def dashboard(user=Depends(current_user)):
     incoming = await db.incoming.aggregate([{"$group":{"_id":None,"total":{"$sum":"$quantity"}}}]).to_list(1)
     overdue = len(await overdue_loans()) if user["role"] != "siswa" else 0
     waiting = await db.reservations.count_documents({"status":"Menunggu"}) if user["role"] != "siswa" else 0
-    return {"books":await db.books.count_documents({}),"members":await db.members.count_documents({}),"borrowed":await db.books.count_documents({"status":"Dipinjam"}),"missing":await db.books.count_documents({"status":"Hilang"}),"incoming":incoming[0]["total"] if incoming else 0,"transactions":await db.transactions.count_documents({}),"overdue":overdue,"reservations_waiting":waiting}
+    agg = await db.books.aggregate([{"$group":{"_id":None,"stock":{"$sum":"$stock"},"borrowed":{"$sum":"$borrowed"},"lost":{"$sum":"$lost"},"available":{"$sum":"$available"},"titles":{"$sum":1}}}]).to_list(1)
+    a = agg[0] if agg else {"stock":0,"borrowed":0,"lost":0,"available":0,"titles":0}
+    vis = {"visitors_today":0,"visitors_inside":0}
+    if user["role"] != "siswa":
+        await visits_auto_close()
+        today = datetime.now(WIB).date().isoformat()
+        vis = {"visitors_today": await db.visits.count_documents({"date": today}), "visitors_inside": await db.visits.count_documents({"date": today, "check_out": None})}
+    return {**vis, "books":a["stock"],"titles":a["titles"],"available":a["available"],"members":await db.members.count_documents({}),"borrowed":a["borrowed"],"missing":a["lost"],"incoming":incoming[0]["total"] if incoming else 0,"transactions":await db.transactions.count_documents({}),"overdue":overdue,"reservations_waiting":waiting}
 
 @api.get("/overdue")
 async def overdue(user=Depends(current_user)):
@@ -297,7 +395,7 @@ async def reserve(data: ReservationInput, user=Depends(current_user)):
     if not member: raise HTTPException(404, "Data keanggotaan belum terdaftar. Hubungi petugas perpustakaan.")
     book = await db.books.find_one({"id": data.book_id}, {"_id":0})
     if not book: raise HTTPException(404, "Buku tidak ditemukan")
-    if book["status"] == "Hilang": raise HTTPException(400, "Buku sedang hilang, tidak bisa dipesan")
+    if int(book.get("stock") or 0) <= 0: raise HTTPException(400, "Stok buku ini kosong, tidak bisa dipesan")
     if await db.reservations.find_one({"book_id": book["id"], "member_id": member["id"], "status": "Menunggu"}):
         raise HTTPException(400, "Kamu sudah memesan buku ini")
     if await db.reservations.count_documents({"member_id": member["id"], "status": "Menunggu"}) >= 3:
@@ -326,8 +424,9 @@ async def process_reservation(res_id: str, data: ProcessInput, user=Depends(curr
     if not res or res["status"] != "Menunggu": raise HTTPException(404, "Pesanan menunggu tidak ditemukan")
     if data.action == "pinjam":
         book = await db.books.find_one({"id": res["book_id"]}, {"_id":0})
-        if not book or book["status"] != "Tersedia": raise HTTPException(400, "Buku belum tersedia untuk dipinjamkan")
-        await db.books.update_one({"id": book["id"]}, {"$set": {"status":"Dipinjam"}})
+        if not book: raise HTTPException(404, "Buku tidak ditemukan")
+        if await open_loan_count(res["member_id"], book["id"]) > 0: raise HTTPException(400, "Anggota ini masih meminjam buku yang sama")
+        await take_copy(book["id"])
         await db.transactions.insert_one({"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":res["member_id"],"member_name":res["member_name"],"book_id":book["id"],"book_title":book["title"],"action":"pinjam","date":now_iso(),"reservation_id":res_id})
         status = "Dipinjamkan"
     elif data.action == "tolak": status = "Ditolak"
@@ -373,7 +472,40 @@ async def books(user=Depends(current_user)):
 @api.post("/books")
 async def add_book(data: BookInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah buku")
-    doc = data.model_dump(); doc.update({"id":"BK-"+str(uuid.uuid4())[:8].upper(),"created_at":now_iso()}); await db.books.insert_one(doc); return public(doc)
+    same = await find_same_book(data.title, data.author)
+    if same:
+        await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.stock}, **({"$set": {"cover": data.cover}} if data.cover and not same.get("cover") else {})})
+        return {**(await refresh_book(same["id"])), "merged": True, "added": data.stock}
+    doc = data.model_dump(); doc.update({"id":"BK-"+str(uuid.uuid4())[:8].upper(),"created_at":now_iso(),"borrowed":0,"lost":0}); doc.update(compute_state(doc))
+    await db.books.insert_one(doc); return {**public(doc), "merged": False, "added": data.stock}
+
+@api.put("/books/{book_id}")
+async def update_book(book_id: str, data: BookUpdate, user=Depends(current_user)):
+    staff_only(user)
+    book = await db.books.find_one({"id": book_id}, {"_id": 0})
+    if not book: raise HTTPException(404, "Buku tidak ditemukan")
+    if not await db.shelves.find_one({"id": data.shelf}): raise HTTPException(400, "Rak tidak ditemukan")
+    title, author = data.title.strip(), data.author.strip()
+    same = await find_same_book(title, author)
+    if same and same["id"] != book_id: raise HTTPException(400, f"Judul & penulis ini sudah ada ({same['id']}). Gunakan Atur stok untuk menambah eksemplar.")
+    upd = {"title": title, "author": author, "category": data.category.strip() or "Umum", "shelf": data.shelf, "isbn": data.isbn.strip(), "cover": data.cover, "updated_at": now_iso()}
+    await db.books.update_one({"id": book_id}, {"$set": upd})
+    if title != book["title"]:
+        await db.transactions.update_many({"book_id": book_id}, {"$set": {"book_title": title}})
+        await db.reservations.update_many({"book_id": book_id}, {"$set": {"book_title": title}})
+        await db.missing.update_many({"book_id": book_id}, {"$set": {"title": title}})
+    if data.shelf != book.get("shelf"):
+        await db.reservations.update_many({"book_id": book_id, "status": "Menunggu"}, {"$set": {"book_shelf": data.shelf}})
+    return await refresh_book(book_id)
+
+@api.patch("/books/{book_id}/stock")
+async def set_book_stock(book_id: str, data: StockInput, user=Depends(current_user)):
+    staff_only(user)
+    book = await db.books.find_one({"id": book_id}, {"_id": 0})
+    if not book: raise HTTPException(404, "Buku tidak ditemukan")
+    if data.stock < int(book.get("borrowed") or 0): raise HTTPException(400, f"Stok tidak boleh kurang dari jumlah yang sedang dipinjam ({book.get('borrowed', 0)})")
+    await db.books.update_one({"id": book_id}, {"$set": {"stock": data.stock}})
+    return await refresh_book(book_id)
 
 @api.delete("/books/{book_id}")
 async def delete_book(book_id: str, user=Depends(current_user)):
@@ -388,12 +520,17 @@ async def book_status(book_id: str, data: StatusInput, user=Depends(current_user
     if data.status not in ["Hilang", "Tersedia"]: raise HTTPException(400, "Status tidak valid")
     book = await db.books.find_one({"id":book_id}, {"_id":0})
     if not book: raise HTTPException(404, "Buku tidak ditemukan")
-    if data.status == "Hilang" and book["status"] == "Hilang": raise HTTPException(400, "Buku sudah berstatus hilang")
-    await db.books.update_one({"id":book_id}, {"$set":{"status":data.status}})
     if data.status == "Hilang":
-        report = {"id":"LS-"+str(uuid.uuid4())[:8].upper(),"book_id":book_id,"title":book["title"],"code":book_id,"detail":data.note or book_id,"date":now_iso(),"status":"Hilang","reported_by":data.reporter.strip() or user["name"]}
+        res = await db.books.find_one_and_update({"id": book_id, "$expr": {"$gt": ["$stock", "$borrowed"]}}, {"$inc": {"stock": -1, "lost": 1}})
+        if not res: raise HTTPException(400, "Tidak ada eksemplar di rak yang bisa ditandai hilang")
+        await refresh_book(book_id)
+        report = {"id":"LS-"+str(uuid.uuid4())[:8].upper(),"book_id":book_id,"title":book["title"],"code":book_id,"detail":data.note or "1 eksemplar","date":now_iso(),"status":"Hilang","reported_by":data.reporter.strip() or user["name"]}
         await db.missing.insert_one(report); return public(report)
-    await db.missing.update_many({"book_id":book_id,"status":"Hilang"}, {"$set":{"status":"Ditemukan","found_at":now_iso()}})
+    res = await db.books.find_one_and_update({"id": book_id, "lost": {"$gt": 0}}, {"$inc": {"stock": 1, "lost": -1}})
+    if not res: raise HTTPException(400, "Tidak ada eksemplar buku ini yang tercatat hilang")
+    await refresh_book(book_id)
+    first = await db.missing.find_one({"book_id": book_id, "status": "Hilang"}, {"_id": 0}, sort=[("date", 1)])
+    if first: await db.missing.update_one({"id": first["id"]}, {"$set": {"status": "Ditemukan", "found_at": now_iso()}})
     return {"ok":True, "status":"Tersedia"}
 
 @api.get("/incoming")
@@ -405,10 +542,15 @@ async def incoming_list(user=Depends(current_user)):
 async def add_incoming(data: IncomingInput, user=Depends(current_user)):
     staff_only(user)
     date = data.date or now_iso()[:10]
-    base = data.model_dump(exclude={"quantity","date","source"})
-    books = [{**base, "id":"BK-"+str(uuid.uuid4())[:8].upper(), "status":"Tersedia", "created_at":now_iso()} for _ in range(data.quantity)]
-    await db.books.insert_many(books)
-    doc = {"id":"IN-"+str(uuid.uuid4())[:8].upper(),"title":data.title,"author":data.author,"category":data.category,"shelf":data.shelf,"quantity":data.quantity,"detail":f"{data.quantity} eksemplar","source":data.source,"date":date,"status":"Tersimpan","book_ids":[b["id"] for b in books],"recorded_by":user["name"],"created_at":now_iso()}
+    same = await find_same_book(data.title, data.author)
+    if same:
+        await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.quantity}, **({"$set": {"cover": data.cover}} if data.cover and not same.get("cover") else {})})
+        book = await refresh_book(same["id"]); merged = True
+    else:
+        base = data.model_dump(exclude={"quantity","date","source"})
+        book = {**base, "id":"BK-"+str(uuid.uuid4())[:8].upper(), "stock": data.quantity, "borrowed": 0, "lost": 0, "created_at":now_iso()}; book.update(compute_state(book))
+        await db.books.insert_one(book); merged = False
+    doc = {"id":"IN-"+str(uuid.uuid4())[:8].upper(),"title":data.title,"author":data.author,"category":data.category,"shelf":data.shelf,"quantity":data.quantity,"detail":f"{data.quantity} eksemplar","source":data.source,"date":date,"status":"Tersimpan","book_ids":[book["id"]],"book_id":book["id"],"merged":merged,"stock_after":book["stock"],"recorded_by":user["name"],"created_at":now_iso()}
     await db.incoming.insert_one(doc); return public(doc)
 
 @api.get("/members")
@@ -557,11 +699,12 @@ async def reset_data(data: ResetInput, user=Depends(current_user)):
         books = (await db.books.delete_many({})).deleted_count
     else:
         books = 0
-        await db.books.update_many({}, {"$set": {"status": "Tersedia"}})
+        await db.books.update_many({}, [{"$set": {"stock": {"$add": [{"$ifNull": ["$stock", 0]}, {"$ifNull": ["$lost", 0]}]}, "lost": 0, "borrowed": 0}}, {"$set": {"available": "$stock", "status": {"$cond": [{"$gt": ["$stock", 0]}, "Tersedia", "Habis"]}}}])
+    await db.visits.delete_many({})
     await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
     return {"ok": True, "deleted": {"members": members, "transactions": transactions, "incoming": incoming, "missing": missing, "reservations": reservations, "stocktake": stocktake, "books": books}, "books_deleted": data.include_books}
 
-BACKUP_COLLECTIONS = ["books", "members", "transactions", "incoming", "missing", "reservations", "stocktake", "shelves", "settings"]
+BACKUP_COLLECTIONS = ["books", "members", "transactions", "incoming", "missing", "reservations", "stocktake", "shelves", "settings", "visits"]
 
 @api.get("/admin/backup")
 async def backup_data(user=Depends(current_user)):
@@ -596,6 +739,7 @@ async def restore_data(file: UploadFile = File(...), user=Depends(current_user))
         if clean:
             await db[name].insert_many(clean)
         restored[name] = len(clean)
+    await normalize_books()
     await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
     return {"ok": True, "restored": restored}
 
@@ -617,7 +761,45 @@ async def member_history(member_id: str, user=Depends(current_user)):
     return {"member":member,"history":history,"total":len(history),"active":active}
 
 @api.get("/shelves")
-async def shelves(user=Depends(current_user)): return await db.shelves.find({}, {"_id":0}).to_list(50)
+async def shelves(user=Depends(current_user)): return await db.shelves.find({}, {"_id":0}).sort("id", 1).to_list(200)
+
+@api.post("/shelves")
+async def add_shelf(data: ShelfInput, user=Depends(current_user)):
+    staff_only(user)
+    sid = data.id.strip().upper()
+    if await db.shelves.find_one({"id": sid}): raise HTTPException(400, f"Kode rak {sid} sudah dipakai")
+    doc = {"id": sid, "name": data.name.strip(), "capacity": data.capacity, "color": data.color, "created_at": now_iso()}
+    await db.shelves.insert_one(doc); return public(doc)
+
+@api.put("/shelves/{shelf_id}")
+async def update_shelf(shelf_id: str, data: ShelfInput, user=Depends(current_user)):
+    staff_only(user)
+    shelf = await db.shelves.find_one({"id": shelf_id}, {"_id": 0})
+    if not shelf: raise HTTPException(404, "Rak tidak ditemukan")
+    new_id = data.id.strip().upper()
+    if new_id != shelf_id and await db.shelves.find_one({"id": new_id}): raise HTTPException(400, f"Kode rak {new_id} sudah dipakai")
+    await db.shelves.update_one({"id": shelf_id}, {"$set": {"id": new_id, "name": data.name.strip(), "capacity": data.capacity, "color": data.color, "updated_at": now_iso()}})
+    moved = 0
+    if new_id != shelf_id:
+        moved = (await db.books.update_many({"shelf": shelf_id}, {"$set": {"shelf": new_id}})).modified_count
+        await db.incoming.update_many({"shelf": shelf_id}, {"$set": {"shelf": new_id}})
+        await db.stocktake.update_many({"shelf": shelf_id}, {"$set": {"shelf": new_id}})
+        await db.reservations.update_many({"book_shelf": shelf_id}, {"$set": {"book_shelf": new_id}})
+    return {**(await db.shelves.find_one({"id": new_id}, {"_id": 0})), "books_updated": moved}
+
+@api.delete("/shelves/{shelf_id}")
+async def delete_shelf(shelf_id: str, move_to: str = "", user=Depends(current_user)):
+    staff_only(user)
+    if not await db.shelves.find_one({"id": shelf_id}): raise HTTPException(404, "Rak tidak ditemukan")
+    if await db.shelves.count_documents({}) <= 1: raise HTTPException(400, "Minimal harus ada satu rak")
+    count = await db.books.count_documents({"shelf": shelf_id})
+    if count:
+        if not move_to: raise HTTPException(400, f"Rak masih berisi {count} judul buku. Pilih rak tujuan untuk memindahkannya.")
+        if move_to == shelf_id or not await db.shelves.find_one({"id": move_to}): raise HTTPException(400, "Rak tujuan tidak valid")
+        await db.books.update_many({"shelf": shelf_id}, {"$set": {"shelf": move_to}})
+        await db.reservations.update_many({"book_shelf": shelf_id, "status": "Menunggu"}, {"$set": {"book_shelf": move_to}})
+    await db.shelves.delete_one({"id": shelf_id})
+    return {"ok": True, "moved": count, "move_to": move_to or None}
 
 @api.get("/transactions")
 async def transactions(user=Depends(current_user)):
@@ -629,9 +811,15 @@ async def transaction(data: TransactionInput, user=Depends(current_user)):
     staff_only(user)
     member=await db.members.find_one({"id":data.member_id},{"_id":0}); book=await db.books.find_one({"id":data.book_id},{"_id":0})
     if not member or not book: raise HTTPException(404,"Anggota atau buku tidak ditemukan")
-    action=data.action; status="Dipinjam" if action=="pinjam" else "Tersedia"
-    if action=="pinjam" and book["status"] != "Tersedia": raise HTTPException(400,"Buku sedang dipinjam")
-    await db.books.update_one({"id":book["id"]},{"$set":{"status":status}})
+    action=data.action
+    if action not in ("pinjam","kembali"): raise HTTPException(400,"Aksi tidak valid")
+    open_count = await open_loan_count(member["id"], book["id"])
+    if action=="pinjam":
+        if open_count > 0: raise HTTPException(400,"Anggota ini masih meminjam buku yang sama")
+        await take_copy(book["id"])
+    else:
+        if open_count <= 0: raise HTTPException(400,"Anggota ini tidak sedang meminjam buku ini")
+        await return_copy(book["id"])
     doc={"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":member["id"],"member_name":member["name"],"book_id":book["id"],"book_title":book["title"],"action":action,"date":now_iso()}; await db.transactions.insert_one(doc); return public(doc)
 
 @api.get("/reports")
@@ -643,8 +831,18 @@ async def reports(user=Depends(current_user)):
     return {"transactions":tx,"loans":build_loans(tx),"incoming":incoming,"missing":missing}
 
 async def export_rows(type: str, period: str):
-    if type not in ("transaksi","masuk","hilang"): raise HTTPException(400, "Jenis laporan tidak valid")
+    if type not in ("transaksi","masuk","hilang","kunjungan","statistik","peringkat"): raise HTTPException(400, "Jenis laporan tidak valid")
     now = datetime.now(WIB)
+    settings = await db.settings.find_one({"id":"main"}, {"_id":0}) or {}
+    if type == "peringkat":
+        await visits_auto_close()
+        return await visit_leaderboard(period if re.match(r"^\d{4}-\d{2}$", period or "") else None, limit=50), settings, now
+    if type in ("kunjungan","statistik"):
+        await visits_auto_close()
+        if type == "statistik":
+            return await visit_stats(period), settings, now
+        rows = await db.visits.find({}, {"_id":0}).sort("check_in",-1).to_list(20000)
+        return [r for r in rows if in_visit_period(r.get("check_in"), period, now)], settings, now
     if type == "transaksi":
         rows = build_loans(await db.transactions.find({}, {"_id":0}).to_list(2000))
     elif type == "masuk":
@@ -652,14 +850,13 @@ async def export_rows(type: str, period: str):
     else:
         rows = await db.missing.find({}, {"_id":0}).sort("date",-1).to_list(2000)
     rows = [r for r in rows if in_period(r.get("date"), period, now)]
-    settings = await db.settings.find_one({"id":"main"}, {"_id":0}) or {}
     return rows, settings, now
 
 @api.get("/reports/export.pdf")
 async def export_report(type: str = "transaksi", period: str = "semua", user=Depends(current_user)):
     staff_only(user)
     rows, settings, now = await export_rows(type, period)
-    pdf = render_report_pdf(type, period, rows, settings, user["name"])
+    pdf = render_report_pdf(type, rows["label"] if type == "peringkat" else period, rows, settings, user["name"])
     filename = f"laporan-{type}-{period}-{now.strftime('%Y%m%d')}.pdf"
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
@@ -667,10 +864,12 @@ async def export_report(type: str = "transaksi", period: str = "semua", user=Dep
 async def export_report_xlsx(type: str = "transaksi", period: str = "semua", user=Depends(current_user)):
     staff_only(user)
     rows, settings, now = await export_rows(type, period)
-    data = render_report_xlsx(type, period, rows, settings, user["name"])
+    data = render_report_xlsx(type, rows["label"] if type == "peringkat" else period, rows, settings, user["name"])
     filename = f"laporan-{type}-{period}-{now.strftime('%Y%m%d')}.xlsx"
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
+from visits import build_router, visits_auto_close, visit_stats, in_visit_period, visit_leaderboard
+api.include_router(build_router(db, current_user, staff_only, now_iso))
 app.include_router(api)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[os.environ["FRONTEND_URL"]], allow_methods=["*"], allow_headers=["*"])
 

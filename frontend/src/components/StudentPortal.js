@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera } from "lucide-react";
+import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera, Trophy } from "lucide-react";
+import { Leaderboard } from "./Leaderboard";
 import { fmtDate } from "../lib";
 import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { Login } from "./Login";
@@ -8,7 +9,7 @@ import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
 import { Shelves } from "./Shelves";
 
-const tabs = [["katalog", "Katalog buku", BookOpen], ["rak", "Rak buku", Boxes], ["pesanan", "Pesanan saya", ListChecks]];
+const tabs = [["katalog", "Katalog buku", BookOpen], ["rak", "Rak buku", Boxes], ["pesanan", "Pesanan saya", ListChecks], ["peringkat", "Peringkat", Trophy]];
 
 export default function StudentPortal() {
   const [user, setUser] = useState(null); const [checking, setChecking] = useState(true);
@@ -17,7 +18,7 @@ export default function StudentPortal() {
   const [options, setOptions] = useState([]); const [photoOpen, setPhotoOpen] = useState(false); const [savingPhoto, setSavingPhoto] = useState(false); const [selId, setSelId] = useState(""); const [draftPhoto, setDraftPhoto] = useState("");
   const [meId, setMeId] = useState(() => localStorage.getItem("perpus_me_id") || "");
   const [meQuery, setMeQuery] = useState(""); const [meOpen, setMeOpen] = useState(false);
-  const notify = (t) => { setToast(t); setTimeout(() => setToast(""), 2800); };
+  const notify = (t) => { setToast(t); clearTimeout(window.__perpusToastS); window.__perpusToastS = setTimeout(() => setToast(""), 3200); };
   useEffect(() => { api.get("/auth/me").then((r) => setUser(r.data)).catch(() => {}).finally(() => setChecking(false)); }, []);
   const loadOptions = () => api.get("/members/options").then((r) => setOptions(r.data)).catch(() => {});
   const loadMine = (id) => api.get("/reservations/mine", { params: id ? { member_id: id } : {} }).then((r) => setData((d) => ({ ...d, mine: r.data }))).catch(() => {});
@@ -42,16 +43,16 @@ export default function StudentPortal() {
   const filtered = data.books.filter((b) => (shelfFilter === "semua" || b.shelf === shelfFilter) && `${b.title} ${b.author} ${b.category} ${b.id}`.toLowerCase().includes(search.toLowerCase()));
   const shelfName = (id) => data.shelves.find((s) => s.id === id)?.name || "";
   const goToShelf = (id) => { setHighlight(id); setTab("rak"); };
-  const available = data.books.filter((b) => b.status === "Tersedia").length;
+  const available = data.books.reduce((a, b) => a + (b.available || 0), 0);
   return <div className="student-shell" data-testid="student-portal" data-user-role="siswa">
     <header className="student-top">
-      <div className="student-brand"><img src={data.settings?.library_logo || LIBRARY_LOGO} alt="Logo perpustakaan"/><div><strong>RUANG BACA · PORTAL SISWA</strong><small>SMA 1 NEGERI ABUNG TENGAH</small></div></div>
+      <div className="student-brand"><img src={data.settings?.library_logo || LIBRARY_LOGO} alt="Logo perpustakaan"/><div><strong>RUANG BACA · PORTAL SISWA</strong><small>SMA NEGERI 1 ABUNG TENGAH</small></div></div>
       <nav className="student-nav">{tabs.map(([id, label, Icon]) => <button key={id} data-testid={`student-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon size={16}/><span>{label}</span></button>)}</nav>
       <div className="student-user"><img src={data.settings?.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/><div><b>MURID SMANSA</b><small>Hanya lihat data buku</small></div><button className="icon-button" data-testid="student-logout-button" title="Keluar" onClick={logout}><LogOut size={18}/></button></div>
     </header>
     <main className="student-main">
       <section className="student-hero">
-        <div><p className="eyebrow light">HALO, PINTAR</p><h1>Buku apa yang ingin <em>kamu baca</em> hari ini?</h1><p>{fmt(available)} dari {fmt(data.stats.books)} buku tersedia untuk dipinjam. Datangi petugas perpustakaan untuk meminjam.</p></div>
+        <div><p className="eyebrow light">HALO SISWA/SISWI SMANSA</p><h1>Buku apa yang ingin <em>kamu baca</em> hari ini?</h1><p>{fmt(available)} dari {fmt(data.stats.books)} eksemplar ({fmt(data.books.length)} judul) tersedia untuk dipinjam. Datangi petugas perpustakaan untuk meminjam.</p></div>
         <div className="student-profile" data-testid="student-profile">
           <div className="student-profile-avatar"><Camera size={26}/></div>
           <button className="reserve-btn" data-testid="open-photo-upload-button" onClick={openPhoto}><Camera size={14}/> Unggah foto anggota</button>
@@ -72,9 +73,10 @@ export default function StudentPortal() {
       {tab === "katalog" && <>
         <div className="toolbar"><div className="searchbox"><Search size={17}/><input data-testid="student-book-search-input" placeholder="Cari judul, penulis, atau kategori..." value={search} onChange={(e) => setSearch(e.target.value)}/></div><span className="soft-badge">{filtered.length} buku</span></div>
         <div className="shelf-chips" data-testid="shelf-chips"><button data-testid="shelf-chip-semua" className={shelfFilter === "semua" ? "active" : ""} onClick={() => setShelfFilter("semua")}>Semua rak</button>{data.shelves.map((s) => <button key={s.id} data-testid={`shelf-chip-${s.id}`} className={shelfFilter === s.id ? "active" : ""} onClick={() => setShelfFilter(s.id)}><MapPin size={12}/> {s.id} · {s.name}</button>)}</div>
-        <div className="catalog-grid">{filtered.map((b) => <div className="catalog-card" key={b.id} data-testid={`catalog-${b.id}`}><div className="catalog-cover">{b.cover ? <img src={b.cover} alt={b.title}/> : <BookOpen size={28}/>}</div><div className="catalog-info"><span className={`status ${b.status.toLowerCase()}`}>{b.status}</span><b>{b.title}</b><small>{b.author}</small><div className="catalog-meta"><span>{b.category}</span><span>·</span><span>{b.id}</span></div><div className="catalog-shelf" data-testid={`catalog-shelf-${b.id}`}><MapPin size={13}/><span>Rak {b.shelf}{shelfName(b.shelf) ? ` · ${shelfName(b.shelf)}` : ""}</span><button data-testid={`goto-shelf-${b.id}`} onClick={() => goToShelf(b.shelf)}>Lihat rak</button></div>{b.status !== "Hilang" && (waitingIds.has(b.id) ? <button className="reserve-btn" disabled data-testid={`reserved-${b.id}`}><ListChecks size={14}/> Sudah dipesan</button> : <button className="reserve-btn" data-testid={`reserve-${b.id}`} disabled={busy === b.id} onClick={() => reserve(b)}><BookmarkPlus size={14}/> Pesan buku{b.waiting ? ` · ${b.waiting} antre` : ""}</button>)}</div></div>)}{filtered.length === 0 && <p className="muted">Tidak ada buku yang cocok.</p>}</div>
+        <div className="catalog-grid">{filtered.map((b) => <div className="catalog-card" key={b.id} data-testid={`catalog-${b.id}`}><div className="catalog-cover">{b.cover ? <img src={b.cover} alt={b.title}/> : <BookOpen size={28}/>}</div><div className="catalog-info"><span className={`status ${b.status.toLowerCase()}`}>{b.status}</span><b>{b.title}</b><small>{b.author}</small><div className="catalog-stock" data-testid={`catalog-stock-${b.id}`}>Stok: <b>{b.available}</b> dari {b.stock} tersedia</div><div className="catalog-meta"><span>{b.category}</span><span>·</span><span>{b.id}</span></div><div className="catalog-shelf" data-testid={`catalog-shelf-${b.id}`}><MapPin size={13}/><span>Rak {b.shelf}{shelfName(b.shelf) ? ` · ${shelfName(b.shelf)}` : ""}</span><button data-testid={`goto-shelf-${b.id}`} onClick={() => goToShelf(b.shelf)}>Lihat rak</button></div>{b.stock > 0 && (waitingIds.has(b.id) ? <button className="reserve-btn" disabled data-testid={`reserved-${b.id}`}><ListChecks size={14}/> Sudah dipesan</button> : <button className="reserve-btn" data-testid={`reserve-${b.id}`} disabled={busy === b.id} onClick={() => reserve(b)}><BookmarkPlus size={14}/> Pesan buku{b.waiting ? ` · ${b.waiting} antre` : ""}</button>)}</div></div>)}{filtered.length === 0 && <p className="muted">Tidak ada buku yang cocok.</p>}</div>
       </>}
       {tab === "rak" && <Shelves data={data} highlight={highlight}/>}
+      {tab === "peringkat" && <Leaderboard mode="siswa" meId={meId}/>}
       {tab === "pesanan" && <div className="my-reservations" data-testid="my-reservations">
         <p className="muted" style={{ marginTop: 0 }}>Pesanan diproses petugas di meja sirkulasi. Datang membawa kartu anggotamu. Maksimal 3 pesanan aktif.</p>
         {data.mine.length === 0 && <div className="panel" data-testid="my-reservations-empty">Belum ada pesanan. Pilih buku di katalog lalu tekan “Pesan buku”.</div>}

@@ -33,7 +33,7 @@ export function IncomingForm({ shelves, close, onSaved }) {
         <label>ISBN (opsional)<input data-testid="incoming-isbn-input" value={form.isbn} onChange={(e) => set("isbn", e.target.value)}/></label>
       </div>
       {error && <div className="error" data-testid="incoming-error">{error}</div>}
-      <button className="primary full" data-testid="save-incoming-button" disabled={busy}><PackagePlus size={16}/> {busy ? "Menyimpan..." : `Simpan ${form.quantity || 1} eksemplar ke koleksi`}</button>
+      <button className="primary full" data-testid="save-incoming-button" disabled={busy}><PackagePlus size={16}/> {busy ? "Menyimpan..." : `Tambah ${form.quantity || 1} eksemplar ke stok`}</button>
     </form>
   </Modal>;
 }

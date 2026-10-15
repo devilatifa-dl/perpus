@@ -1,8 +1,10 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Camera, Upload, X } from "lucide-react";
 import { readFile } from "../lib";
 
 export function Modal({ title, close, children, wide }) {
+  const closeRef = useRef(close); closeRef.current = close;
+  useEffect(() => { const onKey = (e) => { if (e.key === "Escape") closeRef.current?.(); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []);
   return <div className="modal-backdrop" data-testid="modal-backdrop" onClick={(e) => { if (e.target.classList.contains("modal-backdrop")) close(); }}>
     <div className={wide ? "modal wide" : "modal"}><div className="modal-head"><h3>{title}</h3><button className="icon-button" data-testid="close-modal-button" onClick={close}><X size={18}/></button></div>{children}</div>
   </div>;

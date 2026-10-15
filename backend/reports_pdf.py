@@ -13,8 +13,9 @@ NAVY = colors.HexColor("#0f2745")
 BLUE = colors.HexColor("#0284c7")
 LIGHT = colors.HexColor("#f1f5f9")
 
-TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang"}
-PERIODS = {"semua": "Semua waktu", "harian": "Harian", "bulanan": "Bulanan"}
+TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung"}
+PERIODS = {"semua": "Semua waktu", "harian": "Harian", "bulanan": "Bulanan", "7hari": "7 hari terakhir", "30hari": "30 hari terakhir"}
+CHECKOUT_LABEL = {"scan": "Scan", "manual": "Petugas", "otomatis": "Otomatis"}
 
 
 BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
@@ -58,7 +59,8 @@ def build_loans(transactions):
         else:
             stack = open_by_book.get(t["book_id"]) or []
             if stack:
-                loan = stack.pop(0); loan.update(returned_at=t["date"], status="Dikembalikan")
+                idx = next((i for i, l in enumerate(stack) if l["member_id"] == t["member_id"]), 0)
+                loan = stack.pop(idx); loan.update(returned_at=t["date"], status="Dikembalikan")
             else:
                 loans.append({"id": t["id"], "member_id": t["member_id"], "member_name": t["member_name"], "book_id": t["book_id"], "book_title": t["book_title"], "borrowed_at": None, "returned_at": t["date"], "status": "Dikembalikan", "date": t["date"]})
     loans.sort(key=lambda l: l["returned_at"] or l["borrowed_at"] or "", reverse=True)
@@ -76,6 +78,24 @@ def table_rows(kind, rows):
         widths = [10 * mm, 70 * mm, 45 * mm, 18 * mm, 32 * mm, 16 * mm, 30 * mm, 36 * mm]
         plain = [[r["title"], r.get("author", "-"), f"{r['quantity']} eks", r.get("source") or "-", r.get("shelf", "-"), fmt_date(r["date"]), r.get("recorded_by", "-")] for r in rows]
         summary = f"Total penerimaan: {len(rows)} · Total eksemplar: {sum(r.get('quantity', 0) for r in rows)}"
+    elif kind == "kunjungan":
+        header = ["No", "Nama", "Jenis", "Kelas / Asal", "Keperluan", "Masuk", "Keluar", "Cara keluar"]
+        widths = [10 * mm, 52 * mm, 20 * mm, 36 * mm, 46 * mm, 34 * mm, 34 * mm, 28 * mm]
+        plain = [[r["name"], "Anggota" if r.get("kind") == "anggota" else "Tamu", (r.get("class_name") if r.get("kind") == "anggota" else (r.get("origin") or "Tamu")) or "-", r.get("purpose") or "-", fmt_date(r.get("check_in"), True), fmt_date(r.get("check_out"), True) if r.get("check_out") else "Masih di dalam", CHECKOUT_LABEL.get(r.get("checkout_type"), "-")] for r in rows]
+        mem = sum(1 for r in rows if r.get("kind") == "anggota"); n = len(rows) or 1
+        summary = f"Total pengunjung: {len(rows)} · Anggota: {mem} ({mem * 100 / n:.1f}%) · Tamu: {len(rows) - mem} ({(len(rows) - mem) * 100 / n:.1f}%)" if rows else "Total pengunjung: 0"
+    elif kind == "statistik":
+        st = rows; header = ["No", "Kelas", "Jumlah pengunjung", "Persentase"]
+        widths = [12 * mm, 120 * mm, 60 * mm, 60 * mm]
+        plain = [[c["class_name"], str(c["count"]), f"{c['pct']:.1f}%"] for c in st["per_class"]]
+        kinds = " · ".join(f"{k['label']}: {k['count']} ({k['pct']:.1f}%)" for k in st["kinds"])
+        summary = f"Total pengunjung: {st['total']} · Rata-rata {st['avg_per_day']}/hari · {kinds} · Durasi rata-rata {st['avg_duration_min']} menit"
+    elif kind == "peringkat":
+        lb = rows; header = ["Peringkat", "Nama Siswa", "Kelas", "Kunjungan", "Hari datang", "Total waktu", "Persentase"]
+        widths = [22 * mm, 70 * mm, 40 * mm, 30 * mm, 30 * mm, 34 * mm, 30 * mm]
+        plain = [[s_["name"], s_["class_name"], str(s_["visits"]), str(s_["days"]), f"{s_.get('minutes', 0) // 60} j {s_.get('minutes', 0) % 60} m", f"{s_['pct']:.1f}%"] for s_ in lb["students"]]
+        top_cls = lb["classes"][0]["class_name"] if lb["classes"] else "-"
+        summary = f"{lb['label']} · Total kunjungan anggota: {lb['total_visits']} · Siswa aktif: {lb['active_students']} · Kelas teraktif: {top_cls}"
     else:
         header = ["No", "Judul Buku", "Kode", "Catatan", "Tgl Lapor", "Status", "Ditemukan", "Pelapor"]
         widths = [10 * mm, 62 * mm, 24 * mm, 56 * mm, 30 * mm, 22 * mm, 30 * mm, 30 * mm]
@@ -99,9 +119,9 @@ def render_report_xlsx(kind, period, rows, settings, officer):
         except Exception:
             pass
     ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=ncol - 1); ws.merge_cells(start_row=2, start_column=2, end_row=2, end_column=ncol - 1); ws.merge_cells(start_row=3, start_column=2, end_row=3, end_column=ncol - 1)
-    ws["B1"] = "PERPUSTAKAAN SMA 1 NEGERI ABUNG TENGAH"; ws["B1"].font = Font(bold=True, size=14, color="0F2745"); ws["B1"].alignment = Alignment(horizontal="center")
+    ws["B1"] = "PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH"; ws["B1"].font = Font(bold=True, size=14, color="0F2745"); ws["B1"].alignment = Alignment(horizontal="center")
     ws["B2"] = "Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara"; ws["B2"].alignment = Alignment(horizontal="center"); ws["B2"].font = Font(size=9, color="475569")
-    ws["B3"] = f"{TITLES[kind]} — {PERIODS.get(period, 'Semua waktu')} · dicetak {fmt_long(now, True)} WIB oleh {officer}"; ws["B3"].alignment = Alignment(horizontal="center"); ws["B3"].font = Font(size=9, italic=True, color="475569")
+    ws["B3"] = f"{TITLES[kind]} — {PERIODS.get(period, period or 'Semua waktu')} · dicetak {fmt_long(now, True)} WIB oleh {officer}"; ws["B3"].alignment = Alignment(horizontal="center"); ws["B3"].font = Font(size=9, italic=True, color="475569")
     ws.row_dimensions[1].height = 24; ws.row_dimensions[2].height = 14; ws.row_dimensions[4].height = 6
     ws.cell(row=5, column=1, value=summary).font = Font(bold=True, color="0284C7")
     thin = Side(style="thin", color="CBD5E1"); border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -112,6 +132,23 @@ def render_report_xlsx(kind, period, rows, settings, officer):
             c = ws.cell(row=7 + i, column=j, value=v); c.border = border; c.alignment = Alignment(vertical="center", wrap_text=True)
             if i % 2 == 0: c.fill = PatternFill("solid", fgColor="F1F5F9")
     if not plain: ws.cell(row=8, column=2, value="Belum ada data pada periode ini")
+    if kind == "peringkat" and rows["classes"]:
+        start = 7 + max(len(plain), 1) + 3
+        ws.cell(row=start - 1, column=1, value="Peringkat kelas").font = Font(bold=True, color="0F2745")
+        for j, h in enumerate(["Peringkat", "Kelas", "Kunjungan", "Siswa berkunjung", "Persentase"], 1):
+            c = ws.cell(row=start, column=j, value=h); c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745"); c.border = border
+        for i, cl in enumerate(rows["classes"], 1):
+            for j, v in enumerate([cl["rank"], cl["class_name"], cl["visits"], cl["members"], f"{cl['pct']:.1f}%"], 1):
+                c = ws.cell(row=start + i, column=j, value=v); c.border = border
+    if kind == "statistik":
+        start = 7 + max(len(plain), 1) + 3
+        ws.cell(row=start - 1, column=1, value="Pengunjung per hari").font = Font(bold=True, color="0F2745")
+        tot = rows["total"] or 1
+        for j, h in enumerate(["Tanggal", "Total", "Anggota", "Tamu", "Persentase"], 1):
+            c = ws.cell(row=start, column=j, value=h); c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745"); c.border = border
+        for i, d in enumerate(rows["per_day"], 1):
+            for j, v in enumerate([fmt_date(d["date"]), d["total"], d["anggota"], d["tamu"], f"{d['total'] * 100 / tot:.1f}%"], 1):
+                c = ws.cell(row=start + i, column=j, value=v); c.border = border
     for j, w in enumerate(widths, 1): ws.column_dimensions[get_column_letter(j)].width = max(6, w / mm * 0.55)
     ws.freeze_panes = "A8"
     buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
@@ -153,11 +190,11 @@ def render_report_pdf(kind, period, rows, settings, officer):
     cellb = ParagraphStyle("cellb", parent=cell, fontName="Helvetica-Bold")
     head = ParagraphStyle("head", fontName="Helvetica-Bold", fontSize=8, textColor=colors.white)
 
-    kop = Table([[_logo(settings.get("school_logo"), "logo-sekolah.jpg"), [Paragraph("PERPUSTAKAAN SMA 1 NEGERI ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara · Tanpa denda, budaya membaca", sub)], _logo(settings.get("library_logo"), "logo-perpustakaan.jpg")]], colWidths=[20 * mm, None, 20 * mm])
+    kop = Table([[_logo(settings.get("school_logo"), "logo-sekolah.jpg"), [Paragraph("PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara · Tanpa denda, budaya membaca", sub)], _logo(settings.get("library_logo"), "logo-perpustakaan.jpg")]], colWidths=[20 * mm, None, 20 * mm])
     kop.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LINEBELOW", (0, 0), (-1, 0), 1.5, NAVY), ("BOTTOMPADDING", (0, 0), (-1, 0), 6)]))
 
-    title = Paragraph(f"{TITLES[kind]} — {PERIODS.get(period, 'Semua waktu')}", ParagraphStyle("t", parent=h1, fontSize=13, spaceBefore=8))
-    meta = Paragraph(f"Dicetak {fmt_long(now, True)} WIB · {len(rows)} baris · oleh {officer}", sub)
+    title = Paragraph(f"{TITLES[kind]} — {PERIODS.get(period, period or 'Semua waktu')}", ParagraphStyle("t", parent=h1, fontSize=13, spaceBefore=8))
+    meta = Paragraph(f"Dicetak {fmt_long(now, True)} WIB · {len(rows) if isinstance(rows, list) else rows.get('total', rows.get('total_visits', 0))} data · oleh {officer}", sub)
 
     header, widths, plain, summary = table_rows(kind, rows)
     body = [[str(i + 1)] + [Paragraph(str(v), cellb if j == 0 else cell) for j, v in enumerate(r)] for i, r in enumerate(plain)]
@@ -166,6 +203,19 @@ def render_report_pdf(kind, period, rows, settings, officer):
     table = Table([[Paragraph(h, head) for h in header]] + body, colWidths=widths, repeatRows=1)
     table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")), ("FONTSIZE", (0, 1), (-1, -1), 8.5), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
 
+    extra = []
+    if kind == "statistik":
+        days = [d for d in rows["per_day"]][-31:]
+        tot = rows["total"] or 1
+        dbody = [[Paragraph(h, head) for h in ["Tanggal", "Total", "Anggota", "Tamu", "Persentase"]]] + [[fmt_date(d["date"]), str(d["total"]), str(d["anggota"]), str(d["tamu"]), f"{d['total'] * 100 / tot:.1f}%"] for d in days]
+        dt = Table(dbody, colWidths=[60 * mm, 40 * mm, 40 * mm, 40 * mm, 40 * mm], repeatRows=1)
+        dt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")), ("FONTSIZE", (0, 1), (-1, -1), 8.5), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+        extra = [Spacer(1, 12), Paragraph("Pengunjung per hari", ParagraphStyle("t2", parent=h1, fontSize=11)), Spacer(1, 4), dt]
+    if kind == "peringkat" and rows["classes"]:
+        cbody = [[Paragraph(h, head) for h in ["Peringkat", "Kelas", "Kunjungan", "Siswa berkunjung", "Persentase"]]] + [[str(c["rank"]), c["class_name"], str(c["visits"]), str(c["members"]), f"{c['pct']:.1f}%"] for c in rows["classes"]]
+        ct = Table(cbody, colWidths=[30 * mm, 70 * mm, 40 * mm, 50 * mm, 40 * mm], repeatRows=1)
+        ct.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")), ("FONTSIZE", (0, 1), (-1, -1), 8.5), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+        extra = [Spacer(1, 12), Paragraph("Peringkat kelas", ParagraphStyle("t3", parent=h1, fontSize=11)), Spacer(1, 4), ct]
     sign = Table([["", Paragraph(f"Pekurun Selatan, {fmt_long(now)}<br/>Petugas Perpustakaan,<br/><br/><br/><br/><b>{officer}</b>", ParagraphStyle("s", parent=cell, alignment=1))]], colWidths=[None, 70 * mm])
-    doc.build([kop, title, meta, Spacer(1, 4), Paragraph(summary, ParagraphStyle("sum", parent=sub, textColor=BLUE, fontName="Helvetica-Bold")), Spacer(1, 6), table, Spacer(1, 14), sign])
+    doc.build([kop, title, meta, Spacer(1, 4), Paragraph(summary, ParagraphStyle("sum", parent=sub, textColor=BLUE, fontName="Helvetica-Bold")), Spacer(1, 6), table, *extra, Spacer(1, 14), sign])
     return buf.getvalue()

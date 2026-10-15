@@ -8,7 +8,7 @@ export function Stocktake({ data, user, reload, notify, close }) {
   const [shelf, setShelf] = useState(data.shelves[0]?.id || "");
   const [scanned, setScanned] = useState([]); const [misplaced, setMisplaced] = useState([]);
   const [manual, setManual] = useState(""); const [scan, setScan] = useState(false); const [finished, setFinished] = useState(false); const [lostTarget, setLostTarget] = useState(null); const [saved, setSaved] = useState(null);
-  const shelfBooks = data.books.filter((b) => b.shelf === shelf && b.status !== "Hilang");
+  const shelfBooks = data.books.filter((b) => b.shelf === shelf && b.stock > 0);
   const unscanned = shelfBooks.filter((b) => !scanned.includes(b.id));
   const handle = (code) => {
     const c = code.trim().toUpperCase(); const book = data.books.find((b) => b.id.toUpperCase() === c || (b.isbn && b.isbn.toUpperCase() === c));
@@ -38,9 +38,9 @@ export function Stocktake({ data, user, reload, notify, close }) {
       <div><p className="eyebrow">DAFTAR BUKU DI RAK {shelf}</p>
         {shelfBooks.map((b) => { const ok = scanned.includes(b.id); return <div className={ok ? "stock-row ok" : "stock-row"} key={b.id} data-testid={`stock-${b.id}`}>
           <span className={ok ? "tick on" : "tick"}>{ok ? <Check size={13}/> : null}</span>
-          <div><b>{b.title}</b><span>{b.id} · {b.author}</span></div>
+          <div><b>{b.title}</b><span>{b.id} · {b.author} · {b.available} eks di rak{b.borrowed ? ` · ${b.borrowed} dipinjam` : ""}</span></div>
           {!finished && !ok && <button className="text-button" data-testid={`stock-mark-${b.id}`} onClick={() => handle(b.id)}>Ada</button>}
-          {finished && !ok && <button className="warn-icon" title="Tandai hilang" data-testid={`stock-lost-${b.id}`} onClick={() => setLostTarget(b)}><AlertTriangle size={15}/></button>}
+          {finished && !ok && b.available > 0 && <button className="warn-icon" title="Tandai hilang" data-testid={`stock-lost-${b.id}`} onClick={() => setLostTarget(b)}><AlertTriangle size={15}/></button>}
           {finished && !ok && <span className="status hilang">Tidak terpindai</span>}
         </div>; })}
         {shelfBooks.length === 0 && <p className="muted">Rak ini kosong.</p>}

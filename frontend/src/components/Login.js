@@ -17,7 +17,7 @@ export function Login({ onLogin, portal }) {
       <p className="overline">{student ? "PORTAL SISWA · PERPUSTAKAAN SEKOLAH" : "PORTAL PETUGAS & ADMIN · PERPUSTAKAAN SEKOLAH"}</p>
       <h1>{student ? <>Jelajahi koleksi,<br/><em>pinjam dengan mudah.</em></> : <>Temukan pengetahuan,<br/><em>mulai dari sini.</em></>}</h1>
       <p className="login-copy">{student ? "Lihat katalog buku dan susunan rak perpustakaan." : "Satu ruang digital untuk merawat koleksi, melayani siswa, dan menjaga budaya membaca."}</p>
-      <div className="login-address"><span>SMA 1 NEGERI ABUNG TENGAH</span><span>Jln Raya Subik, Desa Pekurun Selatan</span></div>
+      <div className="login-address"><span>SMA NEGERI 1 ABUNG TENGAH</span><span>Jln Raya Subik, Desa Pekurun Selatan</span></div>
     </div>
     <div className="login-panel"><div className="login-panel-inner">
       <p className="eyebrow">{student ? "HALO, SISWA" : "SELAMAT DATANG KEMBALI"}</p>

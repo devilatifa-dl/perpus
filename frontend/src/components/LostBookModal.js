@@ -18,8 +18,8 @@ export function LostBookModal({ book, user, mode, close, onDone }) {
       {lost ? <>
         <label>Catatan kehilangan<textarea data-testid="lost-note-input" rows={3} placeholder="Contoh: tidak ditemukan saat stock opname, terakhir dipinjam kelas XI IPA 2" value={note} onChange={(e) => setNote(e.target.value)}/></label>
         <label>Nama pelapor<input data-testid="lost-reporter-input" required value={reporter} onChange={(e) => setReporter(e.target.value)}/></label>
-        <p className="muted" style={{ fontSize: 12 }}>Buku tetap tercatat di koleksi dengan status <b>Hilang</b> dan masuk laporan buku hilang. Bisa dipulihkan jika ditemukan.</p>
-      </> : <p className="muted" style={{ fontSize: 13 }}>Status buku akan kembali <b>Tersedia</b> dan laporan kehilangannya ditandai <b>Ditemukan</b>.</p>}
+        <p className="muted" style={{ fontSize: 12 }}><b>1 eksemplar</b> akan dikurangi dari stok tersedia ({book.available ?? "-"} di rak) dan masuk laporan buku hilang. Bisa dipulihkan jika ditemukan.</p>
+      </> : <p className="muted" style={{ fontSize: 13 }}><b>1 eksemplar</b> kembali ke stok ({book.lost || 0} tercatat hilang) dan laporan kehilangannya ditandai <b>Ditemukan</b>.</p>}
       {error && <div className="error" data-testid="lost-error">{error}</div>}
       <button className={lost ? "primary full warn-btn" : "primary full"} data-testid="confirm-status-button" disabled={busy}>{busy ? "Menyimpan..." : lost ? "Tandai hilang" : "Pulihkan ke koleksi"}</button>
     </form>

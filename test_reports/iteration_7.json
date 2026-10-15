@@ -1,0 +1,69 @@
+{
+  "summary": "Completed testing of Round 8 features: Leaderboard (backend & admin UI), Edit Book, Shelves CRUD, and Text Rename. Backend tests: 35/35 passed. Frontend tests: 15/20 completed (modal/session issues prevented full completion).",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Modal (Shared.js)",
+        "issue": "Modal backdrop remains after closing, blocking navigation clicks",
+        "selector": "[data-testid='modal-backdrop']",
+        "fix_priority": "MEDIUM",
+        "workaround": "Use force=True in Playwright or refresh page"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Backend: GET /api/visits/leaderboard returns correct structure with month, label, students, classes",
+    "Backend: Leaderboard with ?month=YYYY-MM parameter works correctly",
+    "Backend: Invalid month format returns 400",
+    "Backend: Siswa can access leaderboard without 'minutes' field",
+    "Backend: Export leaderboard PDF returns 200 with correct content-type",
+    "Backend: Export leaderboard Excel returns 200 with correct content-type",
+    "Backend: PUT /api/books/{id} with valid data returns 200 and updates book",
+    "Backend: PUT /api/books/{id} with invalid shelf returns 400 'Rak tidak ditemukan'",
+    "Backend: PUT /api/books/{id} with duplicate title+author returns 400",
+    "Backend: Siswa cannot edit book (403)",
+    "Backend: POST /api/shelves creates new shelf",
+    "Backend: POST /api/shelves with duplicate ID returns 400",
+    "Backend: PUT /api/shelves/{id} updates shelf and moves books",
+    "Backend: DELETE /api/shelves/{id} deletes empty shelf",
+    "Backend: Siswa cannot create/edit/delete shelves (403)",
+    "Backend: POST /api/visits/scan still works (regression)",
+    "Backend: POST /api/transactions still works (regression)",
+    "Backend: GET /api/visits/stats still works (regression)",
+    "Frontend: Admin login successful",
+    "Frontend: 'DAFTAR PENGUNJUNG' heading present on Pengunjung page",
+    "Frontend: 'Belum ada pengunjung pada tanggal ini' empty state text correct",
+    "Frontend: 'Pengunjung' tab label in Laporan section",
+    "Frontend: 'Total pengunjung' summary text present",
+    "Frontend: Leaderboard tab loads with [data-testid='leaderboard']",
+    "Frontend: Month select dropdown present [data-testid='leaderboard-month-select']",
+    "Frontend: Leaderboard podium present [data-testid='leaderboard-podium']",
+    "Frontend: Students leaderboard panel present [data-testid='leaderboard-students']",
+    "Frontend: Classes leaderboard panel present [data-testid='leaderboard-classes']",
+    "Frontend: PDF and Excel download buttons present",
+    "Frontend: Edit book button (Pencil icon) present [data-testid='edit-book-{id}-button']",
+    "Frontend: Edit book modal opens with [data-testid='edit-book-form']",
+    "Frontend: Stock field NOT present in edit form (correct - only in 'Atur stok' modal)",
+    "Frontend: Title field prefilled in edit form",
+    "Frontend: 'Atur stok' button (Layers icon) present [data-testid='stock-book-{id}-button']"
+  ],
+  "test_report_links": [
+    "/app/backend_test.py"
+  ],
+  "success_percentage": {
+    "backend": "100% (35/35 tests passed)",
+    "frontend": "75% (15/20 tests completed - modal blocking prevented full test suite)"
+  },
+  "updated_files": [
+    "/app/backend_test.py"
+  ],
+  "action_item_for_main_agent": "1. Fix modal backdrop issue: After closing a modal (edit book, add shelf), the backdrop remains and blocks navigation clicks. The modal-backdrop div should be removed when modal closes. 2. Complete manual verification of: Shelves page (add/edit/delete shelf buttons and forms), Student portal leaderboard with identity picker, and regression tests for visitor scan and circulation. All backend APIs are working correctly.",
+  "should_call_test_agent_after_fix": "false",
+  "should_main_agent_test_itself": "true"
+}

@@ -7,7 +7,7 @@ export const fmtDate = (d, opts = { day: "numeric", month: "short", year: "numer
 
 export const SCHOOL_LOGO = "/logo-sekolah.png";
 export const LIBRARY_LOGO = "/logo-perpustakaan.png";
-export const DEFAULT_SETTINGS = { school_logo: "", library_logo: "", card_theme: "navy", card_layout: "classic", card_show_qr: true, card_show_address: true, card_title: "KARTU ANGGOTA PERPUSTAKAAN", card_school_name: "SMA 1 NEGERI ABUNG TENGAH", card_font: "modern", card_font_size: "sedang", card_school_spacing: 0, card_school_logo_pos: "kiri", card_library_logo_pos: "kanan", card_photo_pos: "kiri", card_qr_pos: "atas" };
+export const DEFAULT_SETTINGS = { school_logo: "", library_logo: "", card_theme: "navy", card_layout: "classic", card_show_qr: true, card_show_address: true, card_title: "KARTU ANGGOTA PERPUSTAKAAN", card_school_name: "SMA NEGERI 1 ABUNG TENGAH", card_font: "modern", card_font_size: "sedang", card_school_spacing: 0, card_school_logo_pos: "kiri", card_library_logo_pos: "kanan", card_photo_pos: "kiri", card_qr_pos: "atas" };
 export const CARD_THEMES = [["navy", "Biru Navy"], ["emerald", "Hijau Zamrud"], ["maroon", "Merah Maroon"], ["sunset", "Jingga Senja"], ["midnight", "Hitam Emas"], ["light", "Putih Bersih"], ["book", "Tema Buku"]];
 export const CARD_LAYOUTS = [["classic", "Klasik", "Foto kiri, QR di atas"], ["modern", "Modern", "QR kiri, foto kanan"], ["portrait", "Potret", "Vertikal, QR di bawah"]];
 export const CARD_FONTS = [["modern", "Modern"], ["klasik", "Klasik"], ["elegan", "Elegan"], ["mono", "Monospace"]];

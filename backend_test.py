@@ -1,30 +1,37 @@
 #!/usr/bin/env python3
 """
-Backend Test Suite - Round 7: Reservation with Member Selection
-Tests the shared siswa kiosk feature where reservations record the actual ordering member's name.
+Backend Test Suite - Round 8: Leaderboard, Edit Book, Shelves, Text Rename
+Tests new features: visit leaderboard, book editing, shelf management, and text changes.
 """
 
 import requests
 import json
 import sys
+from datetime import datetime, timedelta
 from typing import Dict, Optional
 
 # Base URL from frontend/.env
-BASE_URL = "https://perpus-app-6.preview.emergentagent.com/api"
+BASE_URL = "https://perpus-app-8.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_CREDS = {"email": "admin@smansa.sch.id", "password": "admin123", "portal": "admin"}
+PETUGAS_CREDS = {"email": "petugas@smansa.sch.id", "password": "petugas123", "portal": "admin"}
 SISWA_CREDS = {"email": "siswa@smansa.sch.id", "password": "siswa123", "portal": "siswa"}
 
 class TestSession:
     def __init__(self):
         self.admin_session = requests.Session()
+        self.petugas_session = requests.Session()
         self.siswa_session = requests.Session()
         self.test_data = {
             "members": [],
             "books": [],
-            "reservations": []
+            "shelves": [],
+            "visits": [],
+            "original_books": {}  # Store original book data for restoration
         }
+        self.tests_passed = 0
+        self.tests_failed = 0
     
     def login(self, session: requests.Session, creds: Dict) -> bool:
         """Login and store session cookie"""
@@ -40,159 +47,640 @@ class TestSession:
             print(f"✗ Login error for {creds['email']}: {e}")
             return False
     
-    def setup_test_data(self) -> bool:
-        """Create test members and books as admin"""
-        print("\n=== SETUP: Creating Test Data ===")
-        
-        # Create 2 test members
-        members_to_create = [
-            {"name": "Andi", "student_id": "70001", "class_name": "XII IPA 1"},
-            {"name": "Budi", "student_id": "70002", "class_name": "XII IPA 1"}
-        ]
-        
-        for member_data in members_to_create:
-            try:
-                resp = self.admin_session.post(f"{BASE_URL}/members", json=member_data)
-                if resp.status_code == 200:
-                    member = resp.json()
-                    self.test_data["members"].append(member)
-                    print(f"✓ Created member: {member['name']} (ID: {member['id']}, NIS: {member['student_id']})")
-                else:
-                    print(f"✗ Failed to create member {member_data['name']}: {resp.status_code} {resp.text}")
-                    return False
-            except Exception as e:
-                print(f"✗ Error creating member {member_data['name']}: {e}")
-                return False
-        
-        # Check if books exist
-        try:
-            resp = self.admin_session.get(f"{BASE_URL}/books")
-            if resp.status_code == 200:
-                books = resp.json()
-                available_books = [b for b in books if b.get("status") == "Tersedia"]
-                
-                if len(available_books) >= 2:
-                    self.test_data["books"] = available_books[:2]
-                    print(f"✓ Found {len(available_books)} available books, using 2 for tests")
-                    for book in self.test_data["books"]:
-                        print(f"  - {book['title']} (ID: {book['id']}, Status: {book['status']})")
-                else:
-                    # Need to create books
-                    print(f"Only {len(available_books)} available books found, creating 2 test books...")
-                    books_to_create = [
-                        {
-                            "title": "Test Book Round 7 Alpha",
-                            "author": "Test Author A",
-                            "category": "Test",
-                            "shelf": "R-01",
-                            "isbn": "TEST-70001",
-                            "cover": "",
-                            "status": "Tersedia"
-                        },
-                        {
-                            "title": "Test Book Round 7 Beta",
-                            "author": "Test Author B",
-                            "category": "Test",
-                            "shelf": "R-01",
-                            "isbn": "TEST-70002",
-                            "cover": "",
-                            "status": "Tersedia"
-                        }
-                    ]
-                    
-                    for book_data in books_to_create:
-                        resp = self.admin_session.post(f"{BASE_URL}/books", json=book_data)
-                        if resp.status_code == 200:
-                            book = resp.json()
-                            self.test_data["books"].append(book)
-                            print(f"✓ Created book: {book['title']} (ID: {book['id']})")
-                        else:
-                            print(f"✗ Failed to create book: {resp.status_code} {resp.text}")
-                            return False
-            else:
-                print(f"✗ Failed to get books: {resp.status_code}")
-                return False
-        except Exception as e:
-            print(f"✗ Error checking/creating books: {e}")
-            return False
-        
-        print(f"\n✓ Setup complete: {len(self.test_data['members'])} members, {len(self.test_data['books'])} books")
-        return True
+    def test(self, name: str, condition: bool, details: str = ""):
+        """Record test result"""
+        if condition:
+            self.tests_passed += 1
+            print(f"✅ PASS: {name}")
+            if details:
+                print(f"   {details}")
+        else:
+            self.tests_failed += 1
+            print(f"❌ FAIL: {name}")
+            if details:
+                print(f"   {details}")
     
-    def cleanup(self) -> bool:
-        """Clean up all test data"""
-        print("\n=== CLEANUP: Removing Test Data ===")
-        success = True
+    def setup_test_data(self) -> bool:
+        """Create test members and ensure sample visits exist"""
+        print("\n=== SETUP: Preparing Test Data ===")
         
-        # Cancel/delete all test reservations
-        for res in self.test_data["reservations"]:
-            try:
-                resp = self.admin_session.delete(f"{BASE_URL}/reservations/{res['id']}")
-                if resp.status_code in [200, 404]:
-                    print(f"✓ Deleted reservation {res['id']}")
-                else:
-                    print(f"✗ Failed to delete reservation {res['id']}: {resp.status_code}")
-                    success = False
-            except Exception as e:
-                print(f"✗ Error deleting reservation {res['id']}: {e}")
-                success = False
-        
-        # Bulk delete test members by class
-        if self.test_data["members"]:
-            try:
-                resp = self.admin_session.post(f"{BASE_URL}/members/bulk-delete", json={"class_name": "XII IPA 1"})
-                if resp.status_code == 200:
-                    result = resp.json()
-                    print(f"✓ Bulk deleted members from XII IPA 1: {result.get('deleted', 0)} deleted")
-                elif resp.status_code == 404:
-                    print(f"✓ No members found in XII IPA 1 (already cleaned)")
-                else:
-                    print(f"✗ Failed to bulk delete members: {resp.status_code} {resp.text}")
-                    success = False
-            except Exception as e:
-                print(f"✗ Error bulk deleting members: {e}")
-                success = False
-        
-        # Delete test books if we created them
-        for book in self.test_data["books"]:
-            if "Test Book Round 7" in book.get("title", ""):
-                try:
-                    resp = self.admin_session.delete(f"{BASE_URL}/books/{book['id']}")
-                    if resp.status_code in [200, 404]:
-                        print(f"✓ Deleted test book {book['id']}")
-                    else:
-                        print(f"✗ Failed to delete book {book['id']}: {resp.status_code}")
-                        success = False
-                except Exception as e:
-                    print(f"✗ Error deleting book {book['id']}: {e}")
-                    success = False
-        
-        # Verify members count is 0
+        # Get existing members (Raka, Bima, Siti should exist from seed)
         try:
             resp = self.admin_session.get(f"{BASE_URL}/members")
             if resp.status_code == 200:
                 members = resp.json()
-                print(f"\n✓ Final members count: {len(members)}")
-                if len(members) != 0:
-                    print(f"⚠ WARNING: Expected 0 members, found {len(members)}")
-                    success = False
+                print(f"✓ Found {len(members)} existing members")
+                self.test_data["members"] = members
             else:
-                print(f"✗ Failed to verify members count: {resp.status_code}")
-                success = False
+                print(f"✗ Failed to get members: {resp.status_code}")
+                return False
         except Exception as e:
-            print(f"✗ Error verifying members count: {e}")
-            success = False
+            print(f"✗ Error getting members: {e}")
+            return False
+        
+        # Get existing books
+        try:
+            resp = self.admin_session.get(f"{BASE_URL}/books")
+            if resp.status_code == 200:
+                books = resp.json()
+                print(f"✓ Found {len(books)} existing books")
+                self.test_data["books"] = books
+                # Store original data for books we'll edit
+                for book in books[:2]:  # Store first 2 books
+                    self.test_data["original_books"][book["id"]] = {
+                        "title": book["title"],
+                        "author": book["author"],
+                        "category": book.get("category", "Umum"),
+                        "shelf": book["shelf"],
+                        "isbn": book.get("isbn", ""),
+                        "cover": book.get("cover", "")
+                    }
+            else:
+                print(f"✗ Failed to get books: {resp.status_code}")
+                return False
+        except Exception as e:
+            print(f"✗ Error getting books: {e}")
+            return False
+        
+        # Get existing shelves
+        try:
+            resp = self.admin_session.get(f"{BASE_URL}/shelves")
+            if resp.status_code == 200:
+                shelves = resp.json()
+                print(f"✓ Found {len(shelves)} existing shelves")
+                self.test_data["shelves"] = shelves
+            else:
+                print(f"✗ Failed to get shelves: {resp.status_code}")
+                return False
+        except Exception as e:
+            print(f"✗ Error getting shelves: {e}")
+            return False
+        
+        print(f"✓ Setup complete")
+        return True
+    
+    def cleanup(self) -> bool:
+        """Restore original data"""
+        print("\n=== CLEANUP: Restoring Original Data ===")
+        success = True
+        
+        # Restore edited books
+        for book_id, original in self.test_data["original_books"].items():
+            try:
+                resp = self.admin_session.put(f"{BASE_URL}/books/{book_id}", json=original)
+                if resp.status_code == 200:
+                    print(f"✓ Restored book {book_id}")
+                else:
+                    print(f"✗ Failed to restore book {book_id}: {resp.status_code}")
+                    success = False
+            except Exception as e:
+                print(f"✗ Error restoring book {book_id}: {e}")
+                success = False
+        
+        # Delete test shelves (those created during tests)
+        for shelf in self.test_data["shelves"]:
+            if shelf["id"].startswith("TEST-"):
+                try:
+                    # Move books if any
+                    resp = self.admin_session.get(f"{BASE_URL}/books")
+                    if resp.status_code == 200:
+                        books = resp.json()
+                        books_on_shelf = [b for b in books if b["shelf"] == shelf["id"]]
+                        if books_on_shelf:
+                            # Move to R-01
+                            resp = self.admin_session.delete(f"{BASE_URL}/shelves/{shelf['id']}", params={"move_to": "R-01"})
+                        else:
+                            resp = self.admin_session.delete(f"{BASE_URL}/shelves/{shelf['id']}")
+                        
+                        if resp.status_code in [200, 404]:
+                            print(f"✓ Deleted test shelf {shelf['id']}")
+                        else:
+                            print(f"✗ Failed to delete shelf {shelf['id']}: {resp.status_code}")
+                            success = False
+                except Exception as e:
+                    print(f"✗ Error deleting shelf {shelf['id']}: {e}")
+                    success = False
         
         return success
     
-    def run_tests(self) -> bool:
-        """Run all test scenarios"""
+    def test_leaderboard_backend(self):
+        """Test leaderboard API endpoints"""
         print("\n" + "="*70)
-        print("ROUND 7 BACKEND TESTS: Reservation with Member Selection")
+        print("TEST GROUP 1: Leaderboard Backend API")
+        print("="*70)
+        
+        # Test 1.1: GET /api/visits/leaderboard without month (current month)
+        print("\n--- Test 1.1: GET /api/visits/leaderboard (current month) ---")
+        try:
+            resp = self.admin_session.get(f"{BASE_URL}/visits/leaderboard")
+            self.test(
+                "Leaderboard returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                required_fields = ["month", "label", "total_visits", "active_students", "students", "classes", "months"]
+                has_all_fields = all(field in data for field in required_fields)
+                self.test(
+                    "Leaderboard has all required fields",
+                    has_all_fields,
+                    f"Fields: {list(data.keys())}"
+                )
+                
+                # Check students structure
+                if data.get("students"):
+                    student = data["students"][0]
+                    student_fields = ["rank", "name", "class_name", "visits", "days", "pct"]
+                    has_student_fields = all(field in student for field in student_fields)
+                    self.test(
+                        "Student entry has correct structure",
+                        has_student_fields,
+                        f"Fields: {list(student.keys())}"
+                    )
+                    
+                    # Siswa role should not see 'minutes' field
+                    self.test(
+                        "Admin sees 'minutes' field in student data",
+                        "minutes" in student,
+                        f"Has minutes: {'minutes' in student}"
+                    )
+                
+                # Check classes structure
+                if data.get("classes"):
+                    cls = data["classes"][0]
+                    class_fields = ["rank", "class_name", "visits", "members", "pct"]
+                    has_class_fields = all(field in cls for field in class_fields)
+                    self.test(
+                        "Class entry has correct structure",
+                        has_class_fields,
+                        f"Fields: {list(cls.keys())}"
+                    )
+        except Exception as e:
+            self.test("Leaderboard API call", False, f"Exception: {e}")
+        
+        # Test 1.2: GET /api/visits/leaderboard with specific month
+        print("\n--- Test 1.2: GET /api/visits/leaderboard?month=YYYY-MM ---")
+        try:
+            current_month = datetime.now().strftime("%Y-%m")
+            resp = self.admin_session.get(f"{BASE_URL}/visits/leaderboard", params={"month": current_month})
+            self.test(
+                "Leaderboard with month parameter returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                self.test(
+                    "Leaderboard month matches requested month",
+                    data.get("month") == current_month,
+                    f"Requested: {current_month}, Got: {data.get('month')}"
+                )
+        except Exception as e:
+            self.test("Leaderboard with month parameter", False, f"Exception: {e}")
+        
+        # Test 1.3: Invalid month format returns 400
+        print("\n--- Test 1.3: GET /api/visits/leaderboard?month=invalid ---")
+        try:
+            resp = self.admin_session.get(f"{BASE_URL}/visits/leaderboard", params={"month": "invalid"})
+            self.test(
+                "Invalid month format returns 400",
+                resp.status_code == 400,
+                f"Status: {resp.status_code}"
+            )
+        except Exception as e:
+            self.test("Invalid month format", False, f"Exception: {e}")
+        
+        # Test 1.4: Siswa can access leaderboard (no minutes field)
+        print("\n--- Test 1.4: Siswa GET /api/visits/leaderboard ---")
+        try:
+            resp = self.siswa_session.get(f"{BASE_URL}/visits/leaderboard")
+            self.test(
+                "Siswa can access leaderboard",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("students"):
+                    student = data["students"][0]
+                    self.test(
+                        "Siswa does NOT see 'minutes' field",
+                        "minutes" not in student,
+                        f"Has minutes: {'minutes' in student}"
+                    )
+        except Exception as e:
+            self.test("Siswa leaderboard access", False, f"Exception: {e}")
+        
+        # Test 1.5: Export leaderboard PDF (staff only)
+        print("\n--- Test 1.5: GET /api/reports/export.pdf?type=peringkat ---")
+        try:
+            current_month = datetime.now().strftime("%Y-%m")
+            resp = self.admin_session.get(f"{BASE_URL}/reports/export.pdf", params={"type": "peringkat", "period": current_month})
+            self.test(
+                "Export leaderboard PDF returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}, Content-Type: {resp.headers.get('Content-Type')}"
+            )
+            
+            self.test(
+                "PDF has correct content type",
+                resp.headers.get("Content-Type") == "application/pdf",
+                f"Content-Type: {resp.headers.get('Content-Type')}"
+            )
+        except Exception as e:
+            self.test("Export leaderboard PDF", False, f"Exception: {e}")
+        
+        # Test 1.6: Export leaderboard Excel (staff only)
+        print("\n--- Test 1.6: GET /api/reports/export.xlsx?type=peringkat ---")
+        try:
+            current_month = datetime.now().strftime("%Y-%m")
+            resp = self.admin_session.get(f"{BASE_URL}/reports/export.xlsx", params={"type": "peringkat", "period": current_month})
+            self.test(
+                "Export leaderboard Excel returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+            
+            self.test(
+                "Excel has correct content type",
+                "spreadsheet" in resp.headers.get("Content-Type", ""),
+                f"Content-Type: {resp.headers.get('Content-Type')}"
+            )
+        except Exception as e:
+            self.test("Export leaderboard Excel", False, f"Exception: {e}")
+    
+    def test_edit_book(self):
+        """Test book editing functionality"""
+        print("\n" + "="*70)
+        print("TEST GROUP 2: Edit Book")
+        print("="*70)
+        
+        if not self.test_data["books"]:
+            print("⚠ SKIP: No books available for testing")
+            return
+        
+        book = self.test_data["books"][0]
+        book_id = book["id"]
+        
+        # Test 2.1: Edit book with valid data
+        print(f"\n--- Test 2.1: PUT /api/books/{book_id} (valid edit) ---")
+        try:
+            edit_data = {
+                "title": book["title"] + " (Edited)",
+                "author": book["author"],
+                "category": book.get("category", "Umum"),
+                "shelf": book["shelf"],
+                "isbn": book.get("isbn", ""),
+                "cover": book.get("cover", "")
+            }
+            resp = self.admin_session.put(f"{BASE_URL}/books/{book_id}", json=edit_data)
+            self.test(
+                "Edit book returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 200:
+                updated = resp.json()
+                self.test(
+                    "Book title updated correctly",
+                    updated["title"] == edit_data["title"],
+                    f"Expected: {edit_data['title']}, Got: {updated['title']}"
+                )
+        except Exception as e:
+            self.test("Edit book", False, f"Exception: {e}")
+        
+        # Test 2.2: Edit book with invalid shelf
+        print(f"\n--- Test 2.2: PUT /api/books/{book_id} (invalid shelf) ---")
+        try:
+            edit_data = {
+                "title": book["title"],
+                "author": book["author"],
+                "category": book.get("category", "Umum"),
+                "shelf": "INVALID-SHELF-999",
+                "isbn": book.get("isbn", ""),
+                "cover": book.get("cover", "")
+            }
+            resp = self.admin_session.put(f"{BASE_URL}/books/{book_id}", json=edit_data)
+            self.test(
+                "Invalid shelf returns 400",
+                resp.status_code == 400,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 400:
+                error = resp.json().get("detail", "")
+                self.test(
+                    "Error message mentions 'Rak tidak ditemukan'",
+                    "Rak tidak ditemukan" in error,
+                    f"Error: {error}"
+                )
+        except Exception as e:
+            self.test("Invalid shelf validation", False, f"Exception: {e}")
+        
+        # Test 2.3: Edit book with duplicate title+author
+        print(f"\n--- Test 2.3: PUT /api/books/{book_id} (duplicate title+author) ---")
+        if len(self.test_data["books"]) >= 2:
+            try:
+                other_book = self.test_data["books"][1]
+                edit_data = {
+                    "title": other_book["title"],
+                    "author": other_book["author"],
+                    "category": book.get("category", "Umum"),
+                    "shelf": book["shelf"],
+                    "isbn": book.get("isbn", ""),
+                    "cover": book.get("cover", "")
+                }
+                resp = self.admin_session.put(f"{BASE_URL}/books/{book_id}", json=edit_data)
+                self.test(
+                    "Duplicate title+author returns 400",
+                    resp.status_code == 400,
+                    f"Status: {resp.status_code}"
+                )
+                
+                if resp.status_code == 400:
+                    error = resp.json().get("detail", "")
+                    self.test(
+                        "Error message mentions duplicate",
+                        "sudah ada" in error.lower(),
+                        f"Error: {error}"
+                    )
+            except Exception as e:
+                self.test("Duplicate title+author validation", False, f"Exception: {e}")
+        else:
+            print("⚠ SKIP: Need at least 2 books for duplicate test")
+        
+        # Test 2.4: Siswa cannot edit book (403)
+        print(f"\n--- Test 2.4: Siswa PUT /api/books/{book_id} (forbidden) ---")
+        try:
+            edit_data = {
+                "title": book["title"],
+                "author": book["author"],
+                "category": book.get("category", "Umum"),
+                "shelf": book["shelf"],
+                "isbn": book.get("isbn", ""),
+                "cover": book.get("cover", "")
+            }
+            resp = self.siswa_session.put(f"{BASE_URL}/books/{book_id}", json=edit_data)
+            self.test(
+                "Siswa cannot edit book (403)",
+                resp.status_code == 403,
+                f"Status: {resp.status_code}"
+            )
+        except Exception as e:
+            self.test("Siswa edit book forbidden", False, f"Exception: {e}")
+        
+        # Restore original book data
+        print(f"\n--- Restoring original book data ---")
+        try:
+            original = self.test_data["original_books"][book_id]
+            resp = self.admin_session.put(f"{BASE_URL}/books/{book_id}", json=original)
+            if resp.status_code == 200:
+                print(f"✓ Restored book {book_id} to original state")
+        except Exception as e:
+            print(f"✗ Failed to restore book: {e}")
+    
+    def test_shelves_crud(self):
+        """Test shelf CRUD operations"""
+        print("\n" + "="*70)
+        print("TEST GROUP 3: Shelves CRUD")
+        print("="*70)
+        
+        # Test 3.1: Create new shelf
+        print("\n--- Test 3.1: POST /api/shelves (create) ---")
+        test_shelf_id = "TEST-01"
+        try:
+            shelf_data = {
+                "id": test_shelf_id,
+                "name": "Test Shelf",
+                "capacity": 100,
+                "color": "azure"
+            }
+            resp = self.admin_session.post(f"{BASE_URL}/shelves", json=shelf_data)
+            self.test(
+                "Create shelf returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 200:
+                created = resp.json()
+                self.test_data["shelves"].append(created)
+                self.test(
+                    "Shelf created with correct ID",
+                    created["id"] == test_shelf_id,
+                    f"Expected: {test_shelf_id}, Got: {created['id']}"
+                )
+        except Exception as e:
+            self.test("Create shelf", False, f"Exception: {e}")
+        
+        # Test 3.2: Create shelf with duplicate ID (should fail)
+        print("\n--- Test 3.2: POST /api/shelves (duplicate ID) ---")
+        try:
+            shelf_data = {
+                "id": test_shelf_id,
+                "name": "Duplicate Shelf",
+                "capacity": 50,
+                "color": "mint"
+            }
+            resp = self.admin_session.post(f"{BASE_URL}/shelves", json=shelf_data)
+            self.test(
+                "Duplicate shelf ID returns 400",
+                resp.status_code == 400,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 400:
+                error = resp.json().get("detail", "")
+                self.test(
+                    "Error message mentions duplicate",
+                    "sudah dipakai" in error.lower(),
+                    f"Error: {error}"
+                )
+        except Exception as e:
+            self.test("Duplicate shelf ID validation", False, f"Exception: {e}")
+        
+        # Test 3.3: Edit shelf (rename code)
+        print(f"\n--- Test 3.3: PUT /api/shelves/{test_shelf_id} (rename code) ---")
+        new_shelf_id = "TEST-02"
+        try:
+            shelf_data = {
+                "id": new_shelf_id,
+                "name": "Test Shelf Renamed",
+                "capacity": 120,
+                "color": "amber"
+            }
+            resp = self.admin_session.put(f"{BASE_URL}/shelves/{test_shelf_id}", json=shelf_data)
+            self.test(
+                "Edit shelf returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 200:
+                updated = resp.json()
+                self.test(
+                    "Shelf code updated correctly",
+                    updated["id"] == new_shelf_id,
+                    f"Expected: {new_shelf_id}, Got: {updated['id']}"
+                )
+                # Update test_shelf_id for cleanup
+                test_shelf_id = new_shelf_id
+        except Exception as e:
+            self.test("Edit shelf", False, f"Exception: {e}")
+        
+        # Test 3.4: Delete empty shelf
+        print(f"\n--- Test 3.4: DELETE /api/shelves/{test_shelf_id} (empty shelf) ---")
+        try:
+            resp = self.admin_session.delete(f"{BASE_URL}/shelves/{test_shelf_id}")
+            self.test(
+                "Delete empty shelf returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+        except Exception as e:
+            self.test("Delete empty shelf", False, f"Exception: {e}")
+        
+        # Test 3.5: Cannot delete last shelf
+        print("\n--- Test 3.5: DELETE last shelf (should fail) ---")
+        try:
+            # Get all shelves
+            resp = self.admin_session.get(f"{BASE_URL}/shelves")
+            if resp.status_code == 200:
+                shelves = resp.json()
+                if len(shelves) == 1:
+                    last_shelf = shelves[0]
+                    resp = self.admin_session.delete(f"{BASE_URL}/shelves/{last_shelf['id']}")
+                    self.test(
+                        "Cannot delete last shelf (400)",
+                        resp.status_code == 400,
+                        f"Status: {resp.status_code}"
+                    )
+                else:
+                    print(f"⚠ SKIP: More than 1 shelf exists ({len(shelves)}), cannot test last shelf deletion")
+        except Exception as e:
+            self.test("Delete last shelf validation", False, f"Exception: {e}")
+        
+        # Test 3.6: Siswa cannot create/edit/delete shelves (403)
+        print("\n--- Test 3.6: Siswa shelf operations (forbidden) ---")
+        try:
+            shelf_data = {"id": "TEST-SISWA", "name": "Siswa Shelf", "capacity": 50, "color": "azure"}
+            resp = self.siswa_session.post(f"{BASE_URL}/shelves", json=shelf_data)
+            self.test(
+                "Siswa cannot create shelf (403)",
+                resp.status_code == 403,
+                f"Status: {resp.status_code}"
+            )
+        except Exception as e:
+            self.test("Siswa create shelf forbidden", False, f"Exception: {e}")
+    
+    def test_regression(self):
+        """Test that existing features still work"""
+        print("\n" + "="*70)
+        print("TEST GROUP 4: Regression Tests")
+        print("="*70)
+        
+        # Test 4.1: Visitor scan still works
+        print("\n--- Test 4.1: POST /api/visits/scan (visitor check-in) ---")
+        if self.test_data["members"]:
+            try:
+                member = self.test_data["members"][0]
+                resp = self.admin_session.post(f"{BASE_URL}/visits/scan", json={"code": member["id"]})
+                self.test(
+                    "Visitor scan returns 200",
+                    resp.status_code == 200,
+                    f"Status: {resp.status_code}"
+                )
+                
+                if resp.status_code == 200:
+                    result = resp.json()
+                    self.test(
+                        "Scan result has action field",
+                        "action" in result,
+                        f"Action: {result.get('action')}"
+                    )
+            except Exception as e:
+                self.test("Visitor scan", False, f"Exception: {e}")
+        else:
+            print("⚠ SKIP: No members available for visitor scan test")
+        
+        # Test 4.2: Circulation (borrow/return) still works
+        print("\n--- Test 4.2: POST /api/transactions (circulation) ---")
+        if self.test_data["members"] and self.test_data["books"]:
+            try:
+                member = self.test_data["members"][0]
+                book = next((b for b in self.test_data["books"] if b.get("available", 0) > 0), None)
+                
+                if book:
+                    # Try to borrow
+                    resp = self.admin_session.post(f"{BASE_URL}/transactions", json={
+                        "member_id": member["id"],
+                        "book_id": book["id"],
+                        "action": "pinjam"
+                    })
+                    
+                    # May fail if already borrowed, that's ok
+                    if resp.status_code == 200:
+                        self.test("Circulation borrow works", True, "Successfully borrowed book")
+                        
+                        # Try to return
+                        resp = self.admin_session.post(f"{BASE_URL}/transactions", json={
+                            "member_id": member["id"],
+                            "book_id": book["id"],
+                            "action": "kembali"
+                        })
+                        self.test(
+                            "Circulation return works",
+                            resp.status_code == 200,
+                            f"Status: {resp.status_code}"
+                        )
+                    elif resp.status_code == 400:
+                        print(f"⚠ INFO: Cannot borrow (already borrowed or no stock): {resp.json().get('detail')}")
+                    else:
+                        self.test("Circulation borrow", False, f"Status: {resp.status_code}")
+                else:
+                    print("⚠ SKIP: No available books for circulation test")
+            except Exception as e:
+                self.test("Circulation", False, f"Exception: {e}")
+        else:
+            print("⚠ SKIP: No members or books available for circulation test")
+        
+        # Test 4.3: Visit stats still works
+        print("\n--- Test 4.3: GET /api/visits/stats (statistics) ---")
+        try:
+            resp = self.admin_session.get(f"{BASE_URL}/visits/stats", params={"period": "7hari"})
+            self.test(
+                "Visit stats returns 200",
+                resp.status_code == 200,
+                f"Status: {resp.status_code}"
+            )
+            
+            if resp.status_code == 200:
+                stats = resp.json()
+                required_fields = ["period", "total", "per_day", "per_class", "per_hour"]
+                has_fields = all(field in stats for field in required_fields)
+                self.test(
+                    "Stats has required fields",
+                    has_fields,
+                    f"Fields: {list(stats.keys())}"
+                )
+        except Exception as e:
+            self.test("Visit stats", False, f"Exception: {e}")
+    
+    def run_tests(self) -> bool:
+        """Run all test groups"""
+        print("\n" + "="*70)
+        print("ROUND 8 BACKEND TESTS: Leaderboard, Edit Book, Shelves, Text Rename")
         print("="*70)
         
         # Login
         if not self.login(self.admin_session, ADMIN_CREDS):
+            return False
+        if not self.login(self.petugas_session, PETUGAS_CREDS):
             return False
         if not self.login(self.siswa_session, SISWA_CREDS):
             return False
@@ -201,208 +689,30 @@ class TestSession:
         if not self.setup_test_data():
             return False
         
-        # Get member IDs
-        andi_id = self.test_data["members"][0]["id"]
-        budi_id = self.test_data["members"][1]["id"]
-        book1_id = self.test_data["books"][0]["id"]
-        book2_id = self.test_data["books"][1]["id"]
-        
-        print(f"\nTest IDs:")
-        print(f"  ANDI_ID: {andi_id}")
-        print(f"  BUDI_ID: {budi_id}")
-        print(f"  BOOK1_ID: {book1_id}")
-        print(f"  BOOK2_ID: {book2_id}")
-        
-        all_passed = True
-        
-        # TEST 1: Siswa creates reservation with member_id for Andi
-        print("\n--- TEST 1: Siswa POST /api/reservations with member_id (Andi) ---")
-        try:
-            resp = self.siswa_session.post(f"{BASE_URL}/reservations", json={
-                "book_id": book1_id,
-                "member_id": andi_id
-            })
-            if resp.status_code == 200:
-                reservation = resp.json()
-                self.test_data["reservations"].append(reservation)
-                andi_res_id = reservation["id"]
-                
-                # Verify member_name and class_name
-                if reservation.get("member_name") == "Andi" and reservation.get("class_name") == "XII IPA 1":
-                    print(f"✅ PASS: Reservation created with member_name='{reservation['member_name']}', class_name='{reservation['class_name']}'")
-                    print(f"   Reservation ID: {andi_res_id}")
-                else:
-                    print(f"❌ FAIL: Expected member_name='Andi', class_name='XII IPA 1'")
-                    print(f"   Got: member_name='{reservation.get('member_name')}', class_name='{reservation.get('class_name')}'")
-                    all_passed = False
-            else:
-                print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
-                all_passed = False
-                andi_res_id = None
-        except Exception as e:
-            print(f"❌ FAIL: Exception: {e}")
-            all_passed = False
-            andi_res_id = None
-        
-        # TEST 2: Admin GET /api/reservations shows Andi's reservation
-        print("\n--- TEST 2: Admin GET /api/reservations (verify Andi's reservation) ---")
-        try:
-            resp = self.admin_session.get(f"{BASE_URL}/reservations")
-            if resp.status_code == 200:
-                reservations = resp.json()
-                andi_res = next((r for r in reservations if r.get("id") == andi_res_id), None)
-                if andi_res:
-                    if andi_res.get("member_name") == "Andi" and andi_res.get("class_name") == "XII IPA 1":
-                        print(f"✅ PASS: Admin sees reservation with member_name='Andi', class_name='XII IPA 1'")
-                    else:
-                        print(f"❌ FAIL: Expected member_name='Andi', class_name='XII IPA 1'")
-                        print(f"   Got: member_name='{andi_res.get('member_name')}', class_name='{andi_res.get('class_name')}'")
-                        all_passed = False
-                else:
-                    print(f"❌ FAIL: Reservation {andi_res_id} not found in admin's list")
-                    all_passed = False
-            else:
-                print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
-                all_passed = False
-        except Exception as e:
-            print(f"❌ FAIL: Exception: {e}")
-            all_passed = False
-        
-        # TEST 3: GET /api/reservations/mine with member_id filtering
-        print("\n--- TEST 3: Siswa GET /api/reservations/mine?member_id filtering ---")
-        try:
-            # 3a: Get Andi's reservations
-            resp = self.siswa_session.get(f"{BASE_URL}/reservations/mine?member_id={andi_id}")
-            if resp.status_code == 200:
-                andi_reservations = resp.json()
-                if len(andi_reservations) > 0 and any(r.get("id") == andi_res_id for r in andi_reservations):
-                    print(f"✅ PASS: GET /api/reservations/mine?member_id={andi_id} returns Andi's reservation")
-                else:
-                    print(f"❌ FAIL: Andi's reservation not found in member_id={andi_id} query")
-                    all_passed = False
-            else:
-                print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
-                all_passed = False
-            
-            # 3b: Get Budi's reservations (should not contain Andi's)
-            resp = self.siswa_session.get(f"{BASE_URL}/reservations/mine?member_id={budi_id}")
-            if resp.status_code == 200:
-                budi_reservations = resp.json()
-                if not any(r.get("id") == andi_res_id for r in budi_reservations):
-                    print(f"✅ PASS: GET /api/reservations/mine?member_id={budi_id} does NOT contain Andi's reservation")
-                else:
-                    print(f"❌ FAIL: Andi's reservation incorrectly appears in Budi's query")
-                    all_passed = False
-            else:
-                print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
-                all_passed = False
-        except Exception as e:
-            print(f"❌ FAIL: Exception: {e}")
-            all_passed = False
-        
-        # TEST 4: Siswa creates reservation for Budi
-        print("\n--- TEST 4: Siswa POST /api/reservations with member_id (Budi) ---")
-        try:
-            resp = self.siswa_session.post(f"{BASE_URL}/reservations", json={
-                "book_id": book2_id,
-                "member_id": budi_id
-            })
-            if resp.status_code == 200:
-                reservation = resp.json()
-                self.test_data["reservations"].append(reservation)
-                budi_res_id = reservation["id"]
-                
-                if reservation.get("member_name") == "Budi" and reservation.get("class_name") == "XII IPA 1":
-                    print(f"✅ PASS: Reservation created with member_name='Budi', class_name='XII IPA 1'")
-                    print(f"   Reservation ID: {budi_res_id}")
-                else:
-                    print(f"❌ FAIL: Expected member_name='Budi', class_name='XII IPA 1'")
-                    print(f"   Got: member_name='{reservation.get('member_name')}', class_name='{reservation.get('class_name')}'")
-                    all_passed = False
-            else:
-                print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
-                all_passed = False
-                budi_res_id = None
-        except Exception as e:
-            print(f"❌ FAIL: Exception: {e}")
-            all_passed = False
-            budi_res_id = None
-        
-        # TEST 5: DELETE with member_id validation
-        print("\n--- TEST 5: Siswa DELETE /api/reservations with member_id validation ---")
-        if andi_res_id:
-            try:
-                # 5a: Try to delete Andi's reservation with Budi's member_id (should fail 403)
-                resp = self.siswa_session.delete(f"{BASE_URL}/reservations/{andi_res_id}?member_id={budi_id}")
-                if resp.status_code == 403:
-                    print(f"✅ PASS: DELETE with wrong member_id returns 403 (member mismatch)")
-                else:
-                    print(f"❌ FAIL: Expected 403, got {resp.status_code}: {resp.text}")
-                    all_passed = False
-                
-                # 5b: Delete Andi's reservation with correct member_id (should succeed)
-                resp = self.siswa_session.delete(f"{BASE_URL}/reservations/{andi_res_id}?member_id={andi_id}")
-                if resp.status_code == 200:
-                    print(f"✅ PASS: DELETE with correct member_id returns 200 (cancelled)")
-                    
-                    # Verify status is Dibatalkan
-                    resp = self.admin_session.get(f"{BASE_URL}/reservations")
-                    if resp.status_code == 200:
-                        reservations = resp.json()
-                        andi_res = next((r for r in reservations if r.get("id") == andi_res_id), None)
-                        if andi_res and andi_res.get("status") == "Dibatalkan":
-                            print(f"✅ PASS: Reservation status is 'Dibatalkan'")
-                        else:
-                            print(f"❌ FAIL: Expected status 'Dibatalkan', got '{andi_res.get('status') if andi_res else 'NOT FOUND'}'")
-                            all_passed = False
-                else:
-                    print(f"❌ FAIL: Expected 200, got {resp.status_code}: {resp.text}")
-                    all_passed = False
-            except Exception as e:
-                print(f"❌ FAIL: Exception: {e}")
-                all_passed = False
-        else:
-            print("⚠ SKIP: Andi's reservation ID not available")
-            all_passed = False
-        
-        # TEST 6: Backward compatibility - POST without member_id
-        print("\n--- TEST 6: Backward compatibility - POST /api/reservations without member_id ---")
-        try:
-            # First, check if siswa account has a member record
-            resp = self.siswa_session.get(f"{BASE_URL}/account/member")
-            if resp.status_code == 200:
-                siswa_member = resp.json()
-                print(f"   Siswa account member: {siswa_member}")
-            
-            # Try to create reservation without member_id
-            resp = self.siswa_session.post(f"{BASE_URL}/reservations", json={
-                "book_id": book1_id  # Reuse book1 (Andi's reservation was cancelled)
-            })
-            
-            if resp.status_code == 200:
-                reservation = resp.json()
-                self.test_data["reservations"].append(reservation)
-                print(f"✅ PASS: POST without member_id returns 200 (backward compat)")
-                print(f"   Recorded under member: {reservation.get('member_name')} (ID: {reservation.get('member_id')})")
-            elif resp.status_code == 404:
-                print(f"✅ PASS: POST without member_id returns 404 (siswa has no member record - acceptable)")
-            else:
-                print(f"⚠ INFO: POST without member_id returned {resp.status_code}: {resp.text}")
-                # This is acceptable per requirements - just report the outcome
-        except Exception as e:
-            print(f"⚠ INFO: Exception during backward compat test: {e}")
+        # Run test groups
+        self.test_leaderboard_backend()
+        self.test_edit_book()
+        self.test_shelves_crud()
+        self.test_regression()
         
         # Cleanup
         cleanup_success = self.cleanup()
         
+        # Summary
         print("\n" + "="*70)
-        if all_passed and cleanup_success:
+        print("TEST SUMMARY")
+        print("="*70)
+        print(f"✅ Passed: {self.tests_passed}")
+        print(f"❌ Failed: {self.tests_failed}")
+        print(f"📊 Total: {self.tests_passed + self.tests_failed}")
+        print(f"🧹 Cleanup: {'✓ Success' if cleanup_success else '✗ Failed'}")
+        print("="*70)
+        
+        if self.tests_failed == 0 and cleanup_success:
             print("✅ ALL TESTS PASSED")
-            print("="*70)
             return True
         else:
             print("❌ SOME TESTS FAILED")
-            print("="*70)
             return False
 
 def main():
