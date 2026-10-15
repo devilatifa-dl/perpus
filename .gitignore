@@ -76,7 +76,7 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 
-memory/test_credentials.md
+# memory/test_credentials.md (diperlukan untuk pengujian)
 
 # Mobile development
 android-sdk/
@@ -89,3 +89,10 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+frontend/node_modules/.cache/default-development/1.pack
+frontend/node_modules/.cache/default-development/0.pack
+frontend/node_modules/.cache/default-development/5.pack
+frontend/node_modules/.cache/default-development/6.pack
+frontend/node_modules/.cache/default-development/2.pack
+frontend/node_modules/.cache/default-development/8.pack
+frontend/node_modules/.cache/default-development/11.pack
