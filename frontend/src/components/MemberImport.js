@@ -58,20 +58,11 @@ export function MemberImport({ close, onDone, notify }) {
   return <Modal title="Impor anggota massal" close={close}>
     <div className="import-box" data-testid="member-import">
       <p className="account-hint">Unggah berkas <b>Excel (.xlsx)</b> dengan kolom: <b>nama</b>, <b>nis</b>, <b>kelas</b>. Satu baris = satu anggota, dan boleh memuat banyak kelas sekaligus.</p>
- fitur/laporan-kartu-belakang-cetak-duplex
-      <button type="button" className="secondary" data-testid="download-template-button" onClick={downloadTemplate}><Download size={15}/> Unduh template Excel</button>
-      <label className="import-drop" data-testid="import-file-label" onClick={() => inputRef.current?.click()}>
-        <input ref={inputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-testid="import-file-input" onChange={(e) => { const f = e.target.files[0]; e.target.value = ""; if (f && !f.name.toLowerCase().endsWith(".xlsx")) { notify("Hanya berkas Excel (.xlsx) yang bisa diimpor"); return; } setFile(f); setResult(null); }} style={{ display: "none" }}/>
-        <FileSpreadsheet size={26}/>
-        <span>{file ? file.name : "Klik untuk memilih berkas Excel (.xlsx)"}</span>
-
-      <button type="button" className="secondary" data-testid="download-template-button" onClick={downloadTemplate} disabled={tplBusy}><Download size={15}/> {tplBusy ? "Menyiapkan..." : "Unduh template Excel"}</button>
-      <label className="import-drop" data-testid="import-file-label" onClick={() => inputRef.current?.click()}>
-        <input ref={inputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-testid="import-file-input" onChange={(e) => pick(e.target.files[0])} style={{ display: "none" }}/>
-        <FileSpreadsheet size={26}/>
-        <span>{file ? file.name : "Klik untuk memilih berkas Excel"}</span>
- main
-      </label>
+<label className="import-drop" data-testid="import-file-label">
+          <input ref={inputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={pick} hidden />
+          <FileSpreadsheet size={26} />
+          <span>{file ? file.name : "Klik untuk memilih berkas Excel (.xlsx)"}</span>
+        </label>
       {result && <div className="import-result" data-testid="import-result">
         <b>Hasil impor</b>
         <span>Berhasil: {result.imported} · Dilewati: {result.skipped} · Total baris: {result.total}</span>
