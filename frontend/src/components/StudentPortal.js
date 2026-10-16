@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera, Trophy, Lock } from "lucide-react";
+import { BookOpen, Boxes, BookmarkPlus, ChevronRight } from "lucide-react";
 import { Leaderboard } from "./Leaderboard";
 import { fmtDate } from "../lib";
-import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
+import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib/api";
 import { Login } from "./Login";
 import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
@@ -11,7 +11,6 @@ import { Shelves } from "./Shelves";
 import { StudentProfile } from "./StudentProfile";
 import { uploadPhoto } from "../lib";
 import { Lock, UserCircle } from "lucide-react";
-
 const profileTab = ["profil", "Profil saya", UserCircle];
 const tabs = [["katalog", "Katalog buku", BookOpen], ["rak", "Rak buku", Boxes], ["pesanan", "Pesanan saya", ListChecks], ["peringkat", "Peringkat", Trophy]];
 
