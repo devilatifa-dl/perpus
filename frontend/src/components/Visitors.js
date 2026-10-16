@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
- fitur/laporan-kartu-belakang-cetak-duplex
-import { Camera, CameraOff, Clock, DoorClosed, DoorOpen, LogIn, LogOut, Maximize2, Pencil, ScanLine, Trash2, UserPlus, Users } from "lucide-react";
+import { AlertTriangle, Camera, CameraOff, CheckCircle2, Clock, DoorClosed, DoorOpen, LogIn, LogOut, ShieldAlert, UserCheck, Users, X } from "lucide-react";
 import { api } from "../lib";
 import { Modal } from "./Shared";
 import { CameraScanner } from "./CameraScanner";
-
-import { AlertTriangle, Camera, CameraOff, CheckCircle2, Clock, DoorClosed, DoorOpen, LogIn, LogOut, Maximize2, Pencil, ScanLine, Search, Trash2, UserPlus, Users, X } from "lucide-react";
-import { api } from "../lib";
-import { Modal } from "./Shared";
 import { beep, cameraError, createCamera, unlockAudio } from "../lib/camera";
 
 const COOLDOWN_MS = 1000;
- main
-
 const todayStr = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 export const fmtClock = (d) => d ? new Date(d).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : "-";
 export const fmtDur = (m) => m == null ? "-" : m >= 60 ? `${Math.floor(m / 60)} j ${m % 60} m` : `${m} menit`;
