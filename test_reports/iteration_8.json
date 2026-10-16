@@ -1,4 +1,5 @@
 {
+ fitur/laporan-kartu-belakang-cetak-duplex
   "summary": "Tested the new perpus-main features end-to-end. Backend: 19 pytest tests covering reports/summary (KPIs, series, invalid date 400, invalid group 400, siswa 403), settings/photo-upload toggle + persistence + siswa 403, uploads/photo (compression to <=1080px <500KB, PNG RGBA handling, invalid file 400, siswa 403 when toggle off, admin can always upload), /api/files auth-gated (401 w/o cookie), member account CRUD (create, duplicate-email 400, short password 400, delete 200/404, login works) and member photo ACL (linked member cannot change other member, non-/api/files URL 400, toggle off blocks siswa). All 19/19 passed. Frontend: Admin login OK, Laporan page renders report-overview with all KPI cards (kpi-books/members/active-loans/overdue/visits-today), presets ro-preset-7/30/bulan/tahun, date inputs, ro-group-day/month toggles, ro-top-books/members lists, ro-export-csv downloads 'laporan-ringkasan-...csv', ro-print-pdf present. Pengaturan photo-upload-switch toggles Dibuka<->Ditutup correctly. Anggota -> account-member-*-button opens modal with member-account-email/password-input and save-member-account-button. Pengunjung page: visit-camera-toggle starts camera (data-status=live) in fake-media headless, manual code MB-2024001 via visit-code-input + Enter records visit, toast 'Kunjungan tercatat · Bima Pratama' shown, visit-result-name shows 'Bima Pratama', camera on/off/on doesn't crash. Sirkulasi scan-member-button opens QRScanner with qr-camera, qr-manual-input, qr-manual-submit; manual MB-2024001 correctly selects circulation-member-select. Student portal /siswa: Siti login lands on student-profile-tab, profile-photo-box + save-profile-photo-button + student-history visible. Photo-upload toggle left ON at end as instructed.",
   "backend_issues": {"critical": [], "minor": []},
   "frontend_issues": {
@@ -27,4 +28,76 @@
   "should_main_agent_self_test": true,
   "context_for_next_testing_agent": "All new features working. Photo-upload toggle is left ON as instructed. If re-running backend tests, test_short_password creates member 'TEST_Alpha' with student_id 99998 and test_create_update_delete_account creates 'TEST_Zeta User' 99999 (both cleaned up in finally). HEIC conversion not tested due to lack of sample HEIC; backend uses pillow_heif which is installed and registered. Camera scanner was tested with Chromium fake media (default in automation env); real device test on phone/laptop should also be validated manually by main agent since 'open on phone/laptop + front/back switch' is a UX point.",
   "rca of the issue": "No bugs found during testing."
+
+  "summary": "Completed Round 9 testing: Visitor name search, camera toggle stability, and visitor list filtering. Backend: 27/27 tests passed. Frontend: 25/26 tests passed (1 critical issue with rapid camera toggle causing unhandled rejection error overlay).",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "critical_bugs": [
+      {
+        "component": "LiveScanner (camera.js)",
+        "issue": "Rapid camera toggle (on/off 5 times quickly) causes unhandled rejection error overlay: 'The play() request was interrupted because the media was removed from the document'",
+        "file": "/app/frontend/src/lib/camera.js",
+        "fix_priority": "HIGH",
+        "details": "The error guard in camera.js lines 14-19 exists but doesn't prevent the Emergent error overlay from showing. The html5-qrcode library calls video.play() without handling the promise, and rapid toggling interrupts the play request. This violates the requirement that rapid camera toggle must NOT produce error overlay/unhandled rejection.",
+        "workaround": "Single camera toggle works fine. Only rapid toggling (< 100ms between clicks) triggers the error."
+      }
+    ]
+  },
+  "passed_tests": [
+    "Backend: GET /api/visits/member-search?q=bim returns Bima Pratama with correct fields",
+    "Backend: GET /api/visits/member-search?q=siti returns Siti Rahma",
+    "Backend: Search by NIS '24001' finds Bima",
+    "Backend: Search by member code 'MB-2024002' finds Siti",
+    "Backend: Query < 2 chars returns empty array",
+    "Backend: Empty query returns empty array",
+    "Backend: Siswa role gets 403 (staff only)",
+    "Backend: Petugas can access member-search",
+    "Backend: Member 'inside' field = true after check-in",
+    "Backend: GET /api/visits returns correct structure",
+    "Backend: POST /api/visits/guest adds guest successfully",
+    "Backend: GET /api/visits/config returns checkout_time",
+    "Backend: GET /api/visits/stats returns 200",
+    "Backend: GET /api/visits/leaderboard returns 200",
+    "Frontend: Admin login successful",
+    "Frontend: Pengunjung page loads with [data-testid='visitors-page']",
+    "Frontend: Search input found with label 'Nama siswa / kode kartu / NIS'",
+    "Frontend: Typing 'bim' shows suggestion dropdown with Bima Pratama",
+    "Frontend: Suggestion shows badge 'Catat masuk' and NIS 24001",
+    "Frontend: Typing 'siti' shows Siti Rahma in suggestions",
+    "Frontend: Clicking suggestion records visit and clears input",
+    "Frontend: Keyboard navigation - Enter key records visit",
+    "Frontend: Visitor list search filters by name correctly",
+    "Frontend: Clear button [data-testid='visit-list-search-clear'] works",
+    "Frontend: Empty message 'Tidak ada pengunjung bernama...' displays correctly",
+    "Frontend: Camera toggle single click works, status appears",
+    "Frontend: Guest form opens, submits, and closes successfully",
+    "Frontend: Date filter changes date and reloads data",
+    "Frontend: Checkout button works for inside visitors",
+    "Frontend: Delete button removes visitor from list",
+    "Frontend: Mobile (390x800) - Pengunjung page loads",
+    "Frontend: Mobile - Search input visible and usable",
+    "Frontend: Mobile - Suggestion dropdown usable",
+    "Frontend: Mobile - List search full width (320px)",
+    "Frontend: Mobile - Camera toggle visible"
+  ],
+  "test_report_links": [
+    "/app/backend_test.py"
+  ],
+  "success_percentage": {
+    "backend": "100% (27/27 tests passed)",
+    "frontend": "96% (25/26 tests passed - 1 critical issue with rapid camera toggle)"
+  },
+  "updated_files": [
+    "/app/backend_test.py"
+  ],
+  "action_item_for_main_agent": "CRITICAL: Fix camera toggle rapid on/off error. The error guard in /app/frontend/src/lib/camera.js (lines 14-19) exists but doesn't prevent Emergent error overlay from showing when camera is toggled rapidly (< 100ms between clicks). The html5-qrcode library's video.play() promise rejection needs better handling. Requirement states: 'turning on/off rapidly multiple times must NOT produce any error overlay / unhandled rejection / red screen.' Current behavior: Shows 'Unhandled rejection' error overlay with message 'The play() request was interrupted because the media was removed from the document.' Single toggle works fine.",
+  "should_call_test_agent_after_fix": "true",
+  "should_main_agent_test_itself": "false"
+ main
 }

@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=False)
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File
 from starlette.middleware.cors import CORSMiddleware
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import os, re, uuid, bcrypt, jwt, io, csv, json
+import os, re, uuid, bcrypt, jwt, io, csv, json, logging
 from openpyxl import load_workbook
 from media import init_storage, photo_upload_allowed, build_router as media_router
 from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx
@@ -20,6 +20,7 @@ db = client[os.environ["DB_NAME"]]
 app = FastAPI(title="Perpustakaan SMA Negeri 1 Abung Tengah")
 api = APIRouter(prefix="/api")
 JWT_SECRET = os.environ["JWT_SECRET"]
+ADMIN_NAME = "Devi Latifa, S.I.Pust"
 if len(JWT_SECRET) < 32:
     raise RuntimeError("JWT_SECRET must contain at least 32 characters")
 
@@ -224,7 +225,11 @@ async def current_user(request: Request):
 async def seed():
     if await db.users.count_documents({}) == 0:
         users = [
+ fitur/laporan-kartu-belakang-cetak-duplex
             {"id":"u-admin","name":"Devi Latifa, S.I.Pust","email":"admin@smansa.sch.id","role":"admin","password_hash":password_hash("admin123")},
+
+            {"id":"u-admin","name":ADMIN_NAME,"email":"admin@smansa.sch.id","role":"admin","password_hash":password_hash("admin123")},
+ main
             {"id":"u-petugas","name":"Pustakawan","email":"petugas@smansa.sch.id","role":"petugas","password_hash":password_hash("petugas123")},
             {"id":"u-siswa","name":"Bima Pratama","email":"siswa@smansa.sch.id","role":"siswa","student_id":"24001","password_hash":password_hash("siswa123")},
         ]
@@ -241,11 +246,15 @@ async def seed():
                 {"id":"BK-1044","title":"Matematika Dasar SMA","author":"D. Kurniawan","category":"Pelajaran","shelf":"R-01","isbn":"9786027654321","cover":"https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=400&q=70","status":"Tersedia","created_at":now_iso()},
                 {"id":"BK-1045","title":"Bumi Manusia","author":"Pramoedya Ananta Toer","category":"Sastra","shelf":"R-03","isbn":"9789799731234","cover":"https://images.unsplash.com/photo-1476275466078-4007374efbbe?auto=format&fit=crop&w=400&q=70","status":"Tersedia","created_at":now_iso()},
             ])
+            # Data contoh langsung memakai format stok (hanya menyentuh buku contoh yang baru dimasukkan)
+            for bid, borrowed in (("BK-1042", 0), ("BK-1043", 1), ("BK-1044", 0), ("BK-1045", 0)):
+                await db.books.update_one({"id": bid}, {"$set": compute_state({"stock": 1, "borrowed": borrowed, "lost": 0})})
         if await db.members.count_documents({}) == 0:
             await db.members.insert_many([{"id":"MB-2024001","name":"Bima Pratama","student_id":"24001","class_name":"XI IPA 2","photo":""},{"id":"MB-2024002","name":"Siti Rahma","student_id":"24002","class_name":"X IPS 1","photo":""},{"id":"MB-2024003","name":"Raka Wijaya","student_id":"24003","class_name":"XII IPA 1","photo":""}])
         if await db.transactions.count_documents({}) == 0:
             await db.transactions.insert_many([{ "id":"TRX-001","member_id":"MB-2024001","member_name":"Bima Pratama","book_id":"BK-1043","book_title":"Ensiklopedia Sains Remaja","action":"pinjam","date":(datetime.now(timezone.utc)-timedelta(days=10)).isoformat()},{"id":"TRX-002","member_id":"MB-2024002","member_name":"Siti Rahma","book_id":"BK-1042","book_title":"Laskar Pelangi","action":"kembali","date":now_iso()}])
         await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
+ fitur/laporan-kartu-belakang-cetak-duplex
     await db.members.update_many({}, {"$unset": {"email": "", "phone": ""}})
     await db.users.update_one({"id": "u-admin", "name": {"$in": ["Administrator", "Devi Latifa"]}}, {"$set": {"name": "Devi Latifa, S.I.Pust"}})
     await db.users.update_one({"id": "u-petugas", "name": "Rina Pustakawan"}, {"$set": {"name": "Pustakawan"}})
@@ -255,14 +264,45 @@ async def seed():
     await normalize_books()
     await db.users.update_one({"id":"u-siswa","student_id":{"$exists":False}},{"$set":{"student_id":"24001"}})
 
+    # Migrasi data lama — dijalankan SEKALI saja (tidak menyentuh data produksi di setiap restart)
+    if not await db.meta.find_one({"id": "legacy-migrations-v1"}):
+        await db.members.update_many({}, {"$unset": {"email": "", "phone": ""}})
+        await db.users.update_one({"id": "u-petugas", "name": "Rina Pustakawan"}, {"$set": {"name": "Pustakawan"}})
+        for coll, field in (("incoming", "recorded_by"), ("missing", "reported_by"), ("reservations", "processed_by"), ("visits", "recorded_by"), ("visits", "checkout_by"), ("stocktake", "officer")):
+            await db[coll].update_many({field: "Rina Pustakawan"}, {"$set": {field: "Pustakawan"}})
+        await db.settings.update_many({"card_school_name": "SMA 1 NEGERI ABUNG TENGAH"}, {"$set": {"card_school_name": "SMA NEGERI 1 ABUNG TENGAH"}})
+        # (penggabungan buku ganda hanya lewat pemulihan cadangan, tidak otomatis saat start)
+        await db.users.update_one({"id":"u-siswa","student_id":{"$exists":False}},{"$set":{"student_id":"24001"}})
+        await db.meta.update_one({"id": "legacy-migrations-v1"}, {"$set": {"id": "legacy-migrations-v1", "done": True}}, upsert=True)
+    await db.users.update_one({"id": "u-admin", "name": "Administrator"}, {"$set": {"name": "Devi Latifa"}})
+    # Gelar admin: "Devi Latifa" → "Devi Latifa, S.I.Pust" (sekali saja, juga di catatan petugas)
+    if not await db.meta.find_one({"id": "admin-title-v1"}):
+        await db.users.update_one({"id": "u-admin", "name": "Devi Latifa"}, {"$set": {"name": ADMIN_NAME}})
+        for coll, field in (("incoming", "recorded_by"), ("missing", "reported_by"), ("reservations", "processed_by"), ("visits", "recorded_by"), ("visits", "checkout_by"), ("stocktake", "officer")):
+            await db[coll].update_many({field: "Devi Latifa"}, {"$set": {field: ADMIN_NAME}})
+        await db.meta.update_one({"id": "admin-title-v1"}, {"$set": {"id": "admin-title-v1", "done": True}}, upsert=True)
+
+async def ensure_indexes():
+    try:
+        await db.visits.create_index("check_in"); await db.visits.create_index("date"); await db.visits.create_index("member_id")
+        await db.members.create_index("id"); await db.members.create_index("student_id")
+        await db.books.create_index("id"); await db.transactions.create_index("member_id"); await db.transactions.create_index("book_id")
+    except Exception as e:  # indeks hanya untuk kecepatan, jangan gagalkan start
+        logging.getLogger(__name__).warning("Gagal membuat indeks: %s", e)
+ main
+
 @app.on_event("startup")
 async def startup():
     await seed()
+ fitur/laporan-kartu-belakang-cetak-duplex
     await db.users.create_index("email", unique=True)
     try:
         init_storage()
     except Exception as e:
         print(f"Storage init failed: {e}")
+
+    await ensure_indexes()
+ main
 
 @api.get("/")
 async def root(): return {"message":"Perpustakaan SMA Negeri 1 Abung Tengah aktif"}
@@ -372,6 +412,7 @@ async def set_my_photo(data: PhotoInput, user=Depends(current_user)):
         raise HTTPException(403, "Hanya siswa yang dapat mengubah fotonya sendiri")
     await check_student_photo(user, data.photo)
     member = await db.members.find_one(own_member_filter(user), {"_id":0})
+    await check_student_photo_allowed(member)
     if member:
         await db.members.update_one({"id": member["id"]}, {"$set": {"photo": data.photo}})
         return await db.members.find_one({"id": member["id"]}, {"_id":0})
@@ -488,6 +529,53 @@ async def put_settings(data: SettingsInput, user=Depends(current_user)):
     await db.settings.update_one({"id":"main"}, {"$set": data.model_dump()}, upsert=True)
     return data.model_dump()
 
+# ===== Izin unggah foto oleh siswa (diatur admin/petugas) =====
+class StudentPhotoConfig(BaseModel):
+    enabled: bool = True
+    until: str = ""            # ISO datetime; kosong = tanpa batas waktu
+    allow_replace: bool = True # boleh mengganti foto yang sudah ada
+
+async def student_photo_config():
+    doc = await db.settings.find_one({"id": "student_photo"}, {"_id": 0, "id": 0}) or {}
+    cfg = {**StudentPhotoConfig().model_dump(), **doc}
+    open_now = bool(cfg["enabled"])
+    if open_now and cfg.get("until"):
+        try:
+            until = datetime.fromisoformat(cfg["until"].replace("Z", "+00:00"))
+            if until.tzinfo is None: until = until.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) >= until:
+                open_now = False
+        except ValueError:
+            pass
+    cfg["open"] = open_now
+    return cfg
+
+async def check_student_photo_allowed(member):
+    cfg = await student_photo_config()
+    if not cfg["open"]:
+        raise HTTPException(403, "Unggah foto sedang ditutup oleh petugas perpustakaan")
+    if member and member.get("photo") and not cfg["allow_replace"]:
+        raise HTTPException(403, "Foto anggota ini sudah ada. Hubungi petugas untuk menggantinya")
+
+@api.get("/settings/student-photo")
+async def get_student_photo(user=Depends(current_user)):
+    return await student_photo_config()
+
+@api.put("/settings/student-photo")
+async def put_student_photo(data: StudentPhotoConfig, user=Depends(current_user)):
+    staff_only(user)
+    doc = data.model_dump()
+    if doc["until"]:
+        try:
+            u = datetime.fromisoformat(doc["until"].replace("Z", "+00:00"))
+            if u.tzinfo is None: u = u.replace(tzinfo=timezone.utc)
+            doc["until"] = u.astimezone(timezone.utc).isoformat()
+        except ValueError:
+            raise HTTPException(400, "Format batas waktu tidak valid")
+    doc["updated_by"] = user["name"]; doc["updated_at"] = now_iso()
+    await db.settings.update_one({"id": "student_photo"}, {"$set": doc}, upsert=True)
+    return await student_photo_config()
+
 @api.get("/books")
 async def books(user=Depends(current_user)):
     rows = await db.books.find({}, {"_id":0}).sort("created_at", -1).to_list(500)
@@ -595,6 +683,13 @@ async def add_member(data: MemberInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah anggota")
     doc=data.model_dump(); doc.update({"id":"MB-"+str(uuid.uuid4())[:8].upper()}); await db.members.insert_one(doc); return public(doc)
 
+def _cell_text(c):
+    if c is None:
+        return ""
+    if isinstance(c, float) and c.is_integer():
+        c = int(c)
+    return str(c).strip()
+
 def _parse_member_rows(filename: str, content: bytes):
     name_l = (filename or "").lower()
     rows = []
@@ -607,7 +702,11 @@ def _parse_member_rows(filename: str, content: bytes):
         headers = None
         for row in ws.iter_rows(values_only=True):
             if headers is None:
-                headers = [str(c).strip().lower() if c is not None else "" for c in row]
+                cand = [str(c).strip().lower() if c is not None else "" for c in row]
+                # Lewati baris judul/petunjuk sampai menemukan baris kolom "nama"
+                if not ({"nama", "name", "nama lengkap", "nama_lengkap"} & set(cand)):
+                    continue
+                headers = cand
                 continue
             d = {}
             for i, c in enumerate(row):
@@ -615,9 +714,49 @@ def _parse_member_rows(filename: str, content: bytes):
                     d[headers[i]] = "" if c is None else (str(int(c)) if isinstance(c, float) and c.is_integer() else str(c).strip())
             if any(d.values()):
                 rows.append(d)
+        if headers is None:
+            raise HTTPException(400, "Kolom 'nama' tidak ditemukan. Gunakan template Excel dari tombol Unduh template.")
+    elif name_l.endswith(".xls"):
+        raise HTTPException(400, "Format .xls lama belum didukung. Di Excel pilih Simpan Sebagai → Excel Workbook (.xlsx).")
     else:
         raise HTTPException(400, "Format tidak didukung. Gunakan berkas Excel (.xlsx)")
     return rows
+
+@api.get("/members/import-template.xlsx")
+async def member_import_template(user=Depends(current_user)):
+    staff_only(user)
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+    wb = Workbook(); ws = wb.active; ws.title = "Anggota"
+    thin = Side(style="thin", color="CBD5E1"); border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    headers = ["nama", "nis", "kelas"]
+    for j, h in enumerate(headers, start=1):
+        c = ws.cell(row=1, column=j, value=h)
+        c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745")
+        c.alignment = Alignment(horizontal="center", vertical="center"); c.border = border
+    samples = [("Budi Santoso", "24100", "X IPA 1"), ("Siti Aminah", "24101", "X IPA 1"), ("Rudi Hartono", "24102", "X IPS 2")]
+    for i, r in enumerate(samples, start=2):
+        for j, v in enumerate(r, start=1):
+            c = ws.cell(row=i, column=j, value=v); c.border = border
+            if j == 2: c.number_format = "@"
+    for row in range(2, 2002):
+        ws.cell(row=row, column=2).number_format = "@"  # NIS sebagai teks (angka 0 di depan tidak hilang)
+    ws.column_dimensions["A"].width = 32; ws.column_dimensions["B"].width = 16; ws.column_dimensions["C"].width = 14
+    ws.row_dimensions[1].height = 22; ws.freeze_panes = "A2"
+    info = wb.create_sheet("Petunjuk")
+    for i, t in enumerate([
+        "PETUNJUK IMPOR ANGGOTA — PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH",
+        "1. Isi data di lembar 'Anggota'. Jangan ubah judul kolom: nama, nis, kelas.",
+        "2. Satu baris = satu anggota. Boleh banyak kelas dalam satu berkas.",
+        "3. Hapus 3 baris contoh (Budi, Siti, Rudi) sebelum mengimpor.",
+        "4. NIS yang sudah terdaftar akan dilewati otomatis.",
+        "5. Simpan sebagai .xlsx lalu unggah di menu Anggota → Impor.",
+    ], start=1):
+        c = info.cell(row=i, column=1, value=t)
+        if i == 1: c.font = Font(bold=True, color="0F2745", size=12)
+    info.column_dimensions["A"].width = 80
+    buf = io.BytesIO(); wb.save(buf)
+    return Response(content=buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": 'attachment; filename="template-anggota.xlsx"'})
 
 def _pick(d, *keys):
     for k in keys:
@@ -687,6 +826,8 @@ async def set_member_photo(member_id: str, data: PhotoInput, user=Depends(curren
     await check_student_photo(user, data.photo, member_id)
     member = await db.members.find_one({"id": member_id}, {"_id":0})
     if not member: raise HTTPException(404, "Anggota tidak ditemukan")
+    if user["role"] == "siswa":
+        await check_student_photo_allowed(member)
     await db.members.update_one({"id": member_id}, {"$set": {"photo": data.photo}})
     return await db.members.find_one({"id": member_id}, {"_id":0})
 
@@ -779,7 +920,9 @@ async def restore_data(file: UploadFile = File(...), user=Depends(current_user))
         if clean:
             await db[name].insert_many(clean)
         restored[name] = len(clean)
-    await normalize_books()
+    # Cadangan format lama (buku per eksemplar tanpa angka stok) digabung menjadi satu judul
+    if await db.books.count_documents({"stock": {"$exists": False}}) > 0:
+        await normalize_books()
     await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
     return {"ok": True, "restored": restored}
 
@@ -962,7 +1105,9 @@ from summary import build_router as summary_router
 api.include_router(media_router(db, current_user))
 api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
 app.include_router(api)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[os.environ["FRONTEND_URL"]], allow_methods=["*"], allow_headers=["*"])
+_cors = [o.strip() for o in (os.environ.get("FRONTEND_URL", "") + "," + os.environ.get("CORS_ORIGINS", "")).split(",") if o.strip() and o.strip() != "*"]
+# Frontend & API berada di domain yang sama (preview / domain sendiri .my.id), CORS hanya untuk asal tambahan
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_origin_regex=r"https://([a-z0-9-]+\.)*(emergentagent\.com|emergent\.host|my\.id)", allow_methods=["*"], allow_headers=["*"])
 
 @app.on_event("shutdown")
 async def shutdown(): client.close()

@@ -1,11 +1,20 @@
 {
+ fitur/laporan-kartu-belakang-cetak-duplex
   "summary": "Verified three new changes in iteration 11: (1) Visitor search-by-name with suggestion dropdown + keyboard nav + raw-code fallback + no-result message; (2) Visitor CameraScanner reaches live status with cooldown/lock logic; (3) PhotoCropper (portal) opens before upload with correct scoped close behavior (cancel/Escape/backdrop close ONLY the cropper, not outer edit modal) and uploads cropped JPEG at 6:7 aspect ratio.",
   "backend_issues": {"critical": [], "minor": []},
+
+  "summary": "Completed comprehensive testing of photo cropper feature for member photos. All core functionality working correctly: cropper opens for member photos (admin & student portals), zoom/rotate/pan controls work, outputs correct 600×700px for large images, no upscaling for small images (257×300px from 300x300 source), re-crop functionality works, non-member uploads (book covers) correctly skip cropper and auto-resize instead, Escape key behavior correct.",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+ main
   "frontend_issues": {
     "ui_bugs": [],
     "integration_issues": [],
     "design_issues": []
   },
+ fitur/laporan-kartu-belakang-cetak-duplex
   "test_results": {
     "visitor_search_by_name": {
       "suggestions_dropdown": "PASS - visit-name-suggestions shown with Bima Pratama (MB-2024001) + class XI IPA 2 + NIS 24001",
@@ -50,4 +59,49 @@
   "main_agent_can_self_test": true,
   "context_for_next_testing_agent": "All three requested features (visitor name search, camera cooldown feedback, photo cropper) verified end-to-end in headless browser. Camera visual feedback overlay (data-state=ok) could not be verified via QR injection; verified code-level logic only.",
   "rca of the issue": "N/A - no bugs found"
+
+  "passed_tests": [
+    "Big photo (4000x3000) upload opens cropper modal with all UI elements",
+    "Zoom controls work: buttons (in/out), slider (1-4 range), values update correctly",
+    "Rotation controls work: 90° left/right rotation",
+    "Reset button returns zoom to 1 and rotation to 0",
+    "Pan/drag works in crop stage (mouse drag moves image)",
+    "Apply button crops image, closes cropper, shows preview",
+    "Info text shows 'Dipotong pas kartu · 600×700px · 189 KB (asli 2,5 MB)'",
+    "Re-crop button appears after photo is set",
+    "Re-crop button reopens cropper with existing photo",
+    "Member saved with cropped photo, card preview shows photo correctly",
+    "Small photo (300x300) NOT upscaled: output 257×300px (correct 6:7 ratio)",
+    "Edit member form: re-crop button works, reopens cropper from saved photo",
+    "Escape key closes cropper only, underlying modal stays open (correct behavior)",
+    "Non-member upload (book cover) does NOT open cropper",
+    "Book cover shows 'Diperkecil otomatis 2,5 MB → 348 KB · 1000×750px' (auto-resize, not crop)",
+    "Student portal: photo upload opens cropper",
+    "Student portal: cropper controls work (zoom, rotate, pan, apply)",
+    "Student portal: info shows 'Dipotong pas kartu · 600×700px · 165 KB (asli 2,5 MB)'",
+    "Student portal: card preview shows cropped photo",
+    "No console errors related to cropper functionality"
+  ],
+  "test_report_links": [
+    "/root/.emergent/automation_output/20261015_095612/console_20261015_095612.log",
+    "/root/.emergent/automation_output/20261015_095824/console_20261015_095824.log",
+    "/root/.emergent/automation_output/20261015_100104/console_20261015_100104.log"
+  ],
+  "success_percentage": {
+    "frontend": "100%",
+    "backend": "N/A (frontend-only testing)",
+    "integration": "100%"
+  },
+  "updated_files": [],
+  "action_item_for_main_agent": "",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false,
+  "notes": {
+    "mobile_viewport": "Mobile responsive CSS confirmed in App.css (@media max-width 560px: full-screen cropper, sticky actions). Full mobile navigation test skipped due to collapsed sidebar navigation complexity, but cropper UI is mobile-ready.",
+    "pinch_zoom": "Pinch-zoom by touch cannot be tested via Playwright (as noted in requirements). Buttons and slider work as alternatives.",
+    "test_data_cleanup": "Test members 'Uji Potong' and 'Test Kecil' were created and deleted during testing. No seed data was modified.",
+    "cropper_library": "Uses react-easy-crop with custom 6:7 aspect ratio overlay (oval face guide + shoulder guide)",
+    "image_processing": "prepareForCrop creates 1800px working copy, cropToDataUrl outputs 600×700px (no upscaling for small images), JPEG quality 0.92-0.84 steps to target 300KB"
+  }
+ main
 }

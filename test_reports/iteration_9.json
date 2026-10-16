@@ -1,11 +1,20 @@
 {
+ fitur/laporan-kartu-belakang-cetak-duplex
   "summary": "Tested the two new features: (1) xlsx-only bulk member import and (2) editable card-back design + web text. Backend: 8 pytest tests covering GET /api/settings exposes card_back_title/rules/web with defaults and persists via PUT; empty web persists; template.xlsx has headers nama,nis,kelas and is 403 for siswa; CSV upload to /api/members/import -> 400 with Indonesian message mentioning Excel/.xlsx; valid xlsx import inserts members and numeric NIS cells (99092/99093 as floats) are stored as plain string without '.0'; siswa POST import -> 403. All 8/8 passed. Frontend: Admin login OK. Impor modal shows 'Excel (.xlsx)' copy; download-template-button downloads 'template-anggota.xlsx'; selecting a .csv is rejected client-side (toast + label resets, no file set); uploading a prepared xlsx with 2 TEST_ rows shows import-result 'Berhasil: 2 · Dilewati: 0 · Total baris: 2' and list refreshes to 5 members. member-card-side-switch toggles front/back; back shows card-back-title, 6 numbered rules (one per \\n), and card-back-web. CardDesigner (design-card-button): designer-side-belakang shows designer-card-back; typing in card-back-title-input / card-back-rules-input / card-back-web-input live-updates preview (title 'TEST ATURAN FE', 3 rules, web 'test-fe.sch.id'); save-card-design-button persists and after reload the back card displays the saved text; emptying card-back-web-input hides card-back-web in preview; preset buttons restyle the back card (class includes theme-/font-/size-/layout-). BulkCardPrint: bulk-side-select='belakang' renders 5 bulk-card-back-<id> items and shows bulk-back-hint; switching back to 'depan' removes bulk-card-back-* and renders normal cards. Defaults restored at end; TEST_FE members cleaned up via API.",
   "backend_issues": {"critical": [], "minor": []},
+
+  "summary": "Completed testing for admin name update ('Devi Latifa, S.I.Pust') and member import Excel feature (.xlsx only). All backend APIs and frontend UI tests passed successfully.",
+  "backend_issues": {
+    "critical_bugs": [],
+    "flaky_endpoints": []
+  },
+ main
   "frontend_issues": {
     "ui_bugs": [],
     "integration_issues": [],
     "design_issues": []
   },
+ fitur/laporan-kartu-belakang-cetak-duplex
   "test_report_links": [
     "/app/backend/tests/test_iteration9.py",
     "/app/test_reports/pytest/iteration9.xml"
@@ -28,4 +37,37 @@
   "should_main_agent_self_test": true,
   "context_for_next_testing_agent": "All iteration-9 features working. test_iteration9.py builds xlsx in-memory with openpyxl (installed in backend venv). For UI tests, prebuild xlsx via /root/.venv/bin/python since node-side playwright env lacks openpyxl.",
   "rca of the issue": "No bugs found."
+
+  "passed_tests": [
+    "Admin login returns name 'Devi Latifa, S.I.Pust' (backend & frontend)",
+    "Topbar user chip displays 'Devi Latifa, S.I.Pust' with 'admin' role",
+    "Overview greeting 'Selamat datang, Devi.' works correctly",
+    "Mobile layout (390px) renders without overflow",
+    "GET /api/members/import-template.xlsx returns valid xlsx with 'Anggota' and 'Petunjuk' sheets",
+    "Template has correct headers: nama, nis, kelas with 3 sample rows",
+    "Siswa role gets 403 on template download (staff-only endpoint)",
+    "Import xlsx with numeric NIS (99001, 99002) works correctly - no .0 suffix",
+    "Re-import with duplicate NIS shows 'NIS sudah terdaftar' skipped message",
+    "POST /api/members/import with .xls returns 400 with Indonesian error message",
+    "xlsx without 'nama' column returns 400 'Kolom nama tidak ditemukan'",
+    "PDF report export returns 200 (officer name embedded in signature)",
+    "UI shows 'Unduh template Excel' button (no CSV text anywhere)",
+    "File input accepts .xlsx only",
+    "Template downloads as template-anggota.xlsx",
+    "Import modal displays Excel (.xlsx) format instructions"
+  ],
+  "test_report_links": [
+    "/app/backend/backend_test.py"
+  ],
+  "success_percentage": {
+    "backend": "100% (8/8 tests passed)",
+    "frontend": "100% (all UI elements verified)"
+  },
+  "updated_files": [
+    "/app/backend/backend_test.py"
+  ],
+  "action_item_for_main_agent": "",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+ main
 }

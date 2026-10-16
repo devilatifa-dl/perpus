@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+ fitur/laporan-kartu-belakang-cetak-duplex
 import { Camera, Crop, Upload, X } from "lucide-react";
 import { PhotoCropper } from "./PhotoCropper";
 import { readFile } from "../lib";
+
+import { Camera, Crop, Loader2, Sparkles, Upload, X } from "lucide-react";
+import { fmtSize, optimizeImage, prepareForCrop } from "../lib/image";
+import { PhotoCropper } from "./PhotoCropper";
+ main
 
 export function Modal({ title, close, children, wide }) {
   const closeRef = useRef(close); closeRef.current = close; const boxRef = useRef(null);
@@ -11,6 +17,7 @@ export function Modal({ title, close, children, wide }) {
   </div>;
 }
 
+ fitur/laporan-kartu-belakang-cetak-duplex
 const canDecode = (url) => new Promise((res) => { const i = new Image(); i.onload = () => res(true); i.onerror = () => res(false); i.src = url; });
 
 export function PhotoBox({ value, onChange, label = "Foto", testId, compact, upload, onError }) {
@@ -28,9 +35,45 @@ export function PhotoBox({ value, onChange, label = "Foto", testId, compact, upl
   const closeCrop = () => { if (cropSrc.startsWith("blob:")) URL.revokeObjectURL(cropSrc); setCropSrc(""); };
   const saveCrop = async (file) => {
     try { const r = await upload(file); onChange(r.url); closeCrop(); } catch (err) { fail(err); }
+
+const kindOf = (label, kind) => kind || (/logo/i.test(label) ? "logo" : /sampul|cover/i.test(label) ? "cover" : "photo");
+
+export function PhotoBox({ value, onChange, label = "Foto", testId, compact, kind }) {
+  const inputRef = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState(null);
+  const [err, setErr] = useState("");
+  const [cropSrc, setCropSrc] = useState("");
+  const original = useRef({ src: "", before: 0 });
+  const k = kindOf(label, kind);
+  const canCrop = k === "photo";
+
+  const pick = async (e) => {
+    const file = e.target.files?.[0]; e.target.value = "";
+    if (!file) return;
+    setBusy(true); setErr("");
+    try {
+      if (canCrop) {
+        const prep = await prepareForCrop(file);
+        original.current = prep;
+        setCropSrc(prep.src);
+      } else {
+        const { dataUrl, info: i } = await optimizeImage(file, k);
+        onChange(dataUrl); setInfo(i);
+      }
+    } catch (er) { setErr(er.message || "Gambar tidak dapat diproses"); }
+    finally { setBusy(false); }
+ main
   };
+  const recrop = () => setCropSrc(original.current.src || value);
+  const done = ({ dataUrl, info: i }) => { onChange(dataUrl); setInfo({ ...i, before: original.current.before }); setCropSrc(""); };
+
+  const infoText = (i) => i.cropped
+    ? `Dipotong pas kartu · ${i.width}×${i.height}px · ${fmtSize(i.after)}${i.before ? ` (asli ${fmtSize(i.before)})` : ""}`
+    : i.changed ? `Diperkecil otomatis ${fmtSize(i.before)} → ${fmtSize(i.after)} · ${i.width}×${i.height}px` : `Ukuran sudah pas (${fmtSize(i.after)}) · tidak diubah`;
+
   return <div className={compact ? "photo-box compact" : "photo-box"} data-testid={testId}>
-    <div className="photo-preview">{value ? <img src={value} alt={label}/> : <Camera size={28}/>}</div>
+    <div className={canCrop ? "photo-preview card-ratio" : "photo-preview"}>{busy ? <Loader2 size={24} className="spin"/> : value ? <img src={value} alt={label}/> : <Camera size={28}/>}</div>
     <div className="photo-actions">
       <button type="button" className="secondary" disabled={busy} data-testid={`${testId}-upload-button`} onClick={() => inputRef.current?.click()}><Upload size={14}/> {busy ? "Membaca foto..." : `Unggah ${label.toLowerCase()}`}</button>
       {value && !busy && upload && <button type="button" className="text-button" data-testid={`${testId}-recrop-button`} onClick={() => setCropSrc(value)}><Crop size={13}/> Atur posisi</button>}

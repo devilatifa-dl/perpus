@@ -83,3 +83,32 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - P2: Reservasi buku online dari portal siswa
 - P2: Notifikasi pengingat kembali
 - P2: Pecah App.js lebih lanjut (Books/Members/Reports/Circulation ke components/)
+
+### 15 Okt 2026 — Pengunjung: cari nama & kamera HP
+- Kolom "Nama siswa / kode kartu / NIS": ketik nama → saran anggota (GET /api/visits/member-search?q=, maks 8, ada tanda Catat masuk/keluar). Klik / panah + Enter untuk mencatat. Kode/NIS + Enter tetap bisa.
+- Kolom "Cari nama pengunjung..." menyaring daftar pengunjung (nama, kelas, asal, NIS).
+- Kamera (lib/camera.js): kamera belakang otomatis, kotak pindai responsif, tiap kamera punya elemen sendiri (perbaikan error "play() interrupted" / kamera dobel), berhenti aman. Setelah scan: layar hijau BERHASIL + nama, bunyi + getar, jeda 1 detik lalu siap scan berikutnya. Kartu yang sama diabaikan 5 detik. Input tidak difokuskan saat kamera aktif (keyboard HP tidak menutupi kamera). QRScanner sirkulasi memakai helper yang sama.
+
+### 15 Okt 2026 — Gelar admin & template Excel
+- Nama admin → "Devi Latifa, S.I.Pust" (konstanta ADMIN_NAME; migrasi sekali via meta `admin-title-v1`, termasuk catatan petugas lama).
+- Impor anggota: template CSV diganti template Excel (GET /api/members/import-template.xlsx: lembar Anggota + Petunjuk, NIS format teks). UI hanya menerima .xlsx; NIS angka tidak jadi "24100.0"; baris judul sebelum kolom "nama" dilewati; .xls lama ditolak dengan pesan jelas.
+
+### 15 Okt 2026 — Foto otomatis diperkecil
+- `frontend/src/lib/image.js` optimizeImage(file, kind): foto anggota maks 900px, sampul 1000px, logo 600px (logo transparan tetap PNG). Perkecil bertahap + smoothing "high", JPEG 0.92 (turun ke 0.84 hanya bila perlu, target ±350/400/300 KB). Gambar yang sudah kecil tidak diubah. Input hingga 25 MB, rotasi EXIF HP ikut benar.
+- PhotoBox (Shared.js) dipakai di semua unggahan (anggota, portal siswa, buku, buku masuk, logo kartu) dan menampilkan "Diperkecil otomatis X → Y · W×H px". Batas 900KB lama dihapus.
+
+### 15 Okt 2026 — Potong & geser foto anggota
+- `components/PhotoCropper.js` (react-easy-crop, portal ke body): rasio 6:7 sesuai kotak foto kartu, geser (drag/1 jari), zoom (slider/tombol/cubit/scroll 1–4×), putar 90°, atur ulang, panduan oval wajah. Escape hanya menutup jendela potong. Layar penuh di HP.
+- Hasil 600×700px JPEG kualitas tinggi (≤300KB); foto kecil tidak diperbesar. Salinan kerja maks 1800px (lancar di HP). Tombol "Potong / geser" untuk mengatur ulang dari foto asli.
+- Berlaku untuk semua "Foto anggota" (tambah/edit anggota admin, portal siswa). Sampul & logo tetap hanya diperkecil otomatis.
+
+### 15 Okt 2026 — Aktif/nonaktif unggah foto siswa
+- Pengaturan disimpan di `settings` id `student_photo`: enabled, until (tutup otomatis, ISO UTC), allow_replace. GET/PUT /api/settings/student-photo (PUT staff only). Respon menyertakan `open` (aktif & belum lewat batas waktu).
+- Penjagaan backend: POST /members/{id}/photo & /account/photo oleh siswa ditolak 403 bila ditutup, atau bila foto sudah ada dan penggantian tidak diizinkan. Admin/petugas selalu boleh.
+- UI admin: tombol "Foto siswa: Aktif/Nonaktif" di toolbar Anggota → modal switch, tutup otomatis (1 jam/2 jam/14:00/tanpa batas), centang "boleh mengganti foto". Portal siswa: tombol berubah "Unggah foto ditutup" (kunci), pemberitahuan bila foto sudah ada & tidak boleh diganti. Status dicek ulang tiap 60 detik.
+
+### 15 Okt 2026 — Siap deploy (domain .my.id)
+- Deployment check PASS. Migrasi lama di startup kini sekali jalan (meta `legacy-migrations-v1`); normalize_books tidak lagi otomatis saat start (hanya saat restore cadangan format lama). Buku contoh langsung format stok.
+- CORS: FRONTEND_URL + CORS_ORIGINS (opsional) + regex emergentagent.com / emergent.host / *.my.id. load_dotenv(override=False). Indeks Mongo dibuat saat start.
+- Statistik pengunjung disaring di database per periode (lebih cepat). .gitignore tidak lagi mengabaikan .env & test_credentials.md.
+- Catatan: preview DB sempat di-reset oleh sesi tes (tombol reset data admin); data contoh sudah dipulihkan.

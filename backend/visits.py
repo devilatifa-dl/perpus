@@ -95,7 +95,14 @@ async def visit_stats(period: str = "7hari"):
     if period not in STAT_PERIODS:
         raise HTTPException(400, "Periode tidak valid")
     now = datetime.now(WIB)
-    rows = [r for r in await _db.visits.find({}, {"_id": 0}).to_list(50000) if in_visit_period(r.get("check_in"), period, now)]
+    q = {}
+    bounds = {"harian": 0, "7hari": 6, "30hari": 29}
+    if period in bounds or period == "bulanan":
+        start_day = now.date().replace(day=1) if period == "bulanan" else now.date() - timedelta(days=bounds[period])
+        start_dt = datetime(start_day.year, start_day.month, start_day.day, tzinfo=WIB) - timedelta(days=1)  # longgar 1 hari, disaring tepat di bawah
+        q = {"check_in": {"$gte": start_dt.astimezone(timezone.utc).isoformat()}}
+    proj = {"_id": 0, "photo": 0}
+    rows = [r for r in await _db.visits.find(q, proj).sort("check_in", -1).limit(50000).to_list(50000) if in_visit_period(r.get("check_in"), period, now)]
     total = len(rows)
     pct = lambda n: round(n * 100 / total, 1) if total else 0.0
 
@@ -181,7 +188,7 @@ async def visit_leaderboard(month: Optional[str] = None, limit: int = 10):
     else:
         y, m = now.year, now.month
     key = f"{y:04d}-{m:02d}"
-    rows = [r for r in await _db.visits.find({"kind": "anggota", "date": {"$regex": f"^{key}"}}, {"_id": 0}).to_list(50000)]
+    rows = [r for r in await _db.visits.find({"kind": "anggota", "date": {"$regex": f"^{key}"}}, {"_id": 0, "photo": 0}).limit(50000).to_list(50000)]
     students, classes = {}, {}
     for r in rows:
         mid = r.get("member_id") or r.get("name")
@@ -239,6 +246,28 @@ def build_router(db, current_user, staff_only, now_iso):
                 "tamu": sum(1 for v in rows if v.get("kind") == "tamu"),
             },
         }
+
+    @r.get("/visits/member-search")
+    async def member_search(q: str = "", user=Depends(current_user)):
+        """Cari anggota berdasarkan nama / NIS / kode kartu / kelas untuk dicatat kunjungannya."""
+        staff_only(user)
+        q = (q or "").strip()
+        if len(q) < 2:
+            return []
+        await visits_auto_close()
+        rx = {"$regex": re.escape(q), "$options": "i"}
+        rows = await db.members.find(
+            {"$or": [{"name": rx}, {"student_id": rx}, {"id": rx}, {"class_name": rx}]},
+            {"_id": 0, "id": 1, "name": 1, "class_name": 1, "student_id": 1, "photo": 1},
+        ).limit(40).to_list(40)
+        ql = q.lower()
+        rows.sort(key=lambda m: (not (m.get("name", "").lower().startswith(ql)), m.get("name", "").lower()))
+        rows = rows[:8]
+        ids = [m["id"] for m in rows]
+        inside = {v["member_id"] for v in await db.visits.find({"member_id": {"$in": ids}, "check_out": None}, {"_id": 0, "member_id": 1}).to_list(100)}
+        for m in rows:
+            m["inside"] = m["id"] in inside
+        return rows
 
     @r.post("/visits/scan")
     async def scan_visit(data: ScanInput, user=Depends(current_user)):
