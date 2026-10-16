@@ -5,7 +5,7 @@ import { Leaderboard } from "./Leaderboard";
 import { fmtDate } from "../lib";
 import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { Login } from "./Login";
-import { Modal, PhotoBox } from "./Shared";
+import { Modal, PhotoBox } from "./Shared.js";
 import { MemberCard } from "./MemberCard";
 import { Shelves } from "./Shelves";
 import { StudentProfile } from "./StudentProfile";
