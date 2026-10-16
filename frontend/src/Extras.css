@@ -13,21 +13,21 @@ textarea{border:1px solid #cbd5e1;border-radius:8px;padding:10px 13px;font:inher
 .bulk-actions{display:flex;align-items:center;gap:12px}
 .bulk-actions label{flex-direction:row;align-items:center;gap:8px}
 .bulk-actions select{height:40px}
-.print-sheet{width:210mm;min-height:297mm;margin:20px auto;background:#fff;padding:6mm;display:grid;grid-template-columns:repeat(2,85.6mm);grid-auto-rows:54mm;gap:3mm;justify-content:center;align-content:start;box-shadow:0 10px 30px #0f172a22}
-.print-sheet.portrait{grid-template-columns:repeat(3,54mm);grid-auto-rows:85.6mm;gap:4mm}
-.print-slot{width:85.6mm;height:54mm;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
-.print-sheet.portrait .print-slot{width:54mm;height:85.6mm}
-.print-slot .id-card{width:470px;height:300px;margin:0;box-shadow:none;border-radius:14px;zoom:.687;display:flex;flex-direction:column;justify-content:space-between}
-.print-slot .id-card.layout-portrait{width:320px;height:508px;zoom:.638}
+.print-sheet{width:210mm;min-height:297mm;margin:20px auto;background:#fff;padding:6mm;display:grid;grid-template-columns:repeat(2,86mm);grid-auto-rows:56mm;gap:1.5mm 3mm;justify-content:center;align-content:start;box-shadow:0 10px 30px #0f172a22}
+.print-sheet.portrait{grid-template-columns:repeat(3,56mm);grid-auto-rows:86mm;gap:4mm}
+.print-slot{width:86mm;height:56mm;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
+.print-sheet.portrait .print-slot{width:56mm;height:86mm}
+.print-slot .id-card{width:470px;height:306px;margin:0;box-shadow:none;border-radius:14px;zoom:.6916;display:flex;flex-direction:column;justify-content:space-between}
+.print-slot .id-card.layout-portrait{width:320px;height:491px;zoom:.6614}
 .print-slot .id-card-body{flex:1}
 .print-slot .layout-portrait .id-card-body{justify-content:center}
 @media print{
   @page{size:A4;margin:0}
-  body.bulk-mode .app-frame>*:not(.bulk-print){display:none!important}
+  body.bulk-mode>*:not(.bulk-print){display:none!important}
   body.bulk-mode .toast{display:none!important}
   .bulk-print{position:static;background:#fff;overflow:visible;display:block}
   .bulk-toolbar{display:none!important}
-  .print-sheet{margin:0;box-shadow:none;width:auto;min-height:0;padding:6mm;row-gap:3mm}
+  .print-sheet{margin:0;box-shadow:none;width:auto;min-height:0;padding:5mm 6mm;row-gap:1.5mm}
   .print-slot .id-card{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 .download-row{display:flex;gap:8px}

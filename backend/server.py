@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os, re, uuid, bcrypt, jwt, io, csv, json
 from openpyxl import load_workbook
+from media import init_storage, photo_upload_allowed, build_router as media_router
 from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx
 
 ROOT_DIR = Path(__file__).parent
@@ -116,6 +117,9 @@ class SettingsInput(BaseModel):
     card_library_logo_pos: str = "kanan"
     card_photo_pos: str = "kiri"
     card_qr_pos: str = "atas"
+    card_back_title: str = Field("PERATURAN & TATA TERTIB PERPUSTAKAAN", max_length=120)
+    card_back_rules: str = Field("Kartu ini wajib dibawa setiap meminjam dan mengembalikan buku.\nKembalikan buku tepat waktu sesuai tanggal yang ditentukan petugas.\nJaga buku tetap bersih; dilarang melipat, mencoret, atau merobek.\nBuku yang hilang atau rusak wajib diganti dengan judul yang sama.\nKartu tidak boleh dipinjamkan kepada orang lain.\nJika kartu ini ditemukan, mohon kembalikan ke Perpustakaan SMANSA.", max_length=2000)
+    card_back_web: str = Field("perpustakaan.sman1abungtengah.sch.id", max_length=150)
 
 DEFAULT_SETTINGS = SettingsInput().model_dump()
 
@@ -220,7 +224,7 @@ async def current_user(request: Request):
 async def seed():
     if await db.users.count_documents({}) == 0:
         users = [
-            {"id":"u-admin","name":"Devi Latifa","email":"admin@smansa.sch.id","role":"admin","password_hash":password_hash("admin123")},
+            {"id":"u-admin","name":"Devi Latifa, S.I.Pust","email":"admin@smansa.sch.id","role":"admin","password_hash":password_hash("admin123")},
             {"id":"u-petugas","name":"Pustakawan","email":"petugas@smansa.sch.id","role":"petugas","password_hash":password_hash("petugas123")},
             {"id":"u-siswa","name":"Bima Pratama","email":"siswa@smansa.sch.id","role":"siswa","student_id":"24001","password_hash":password_hash("siswa123")},
         ]
@@ -243,7 +247,7 @@ async def seed():
             await db.transactions.insert_many([{ "id":"TRX-001","member_id":"MB-2024001","member_name":"Bima Pratama","book_id":"BK-1043","book_title":"Ensiklopedia Sains Remaja","action":"pinjam","date":(datetime.now(timezone.utc)-timedelta(days=10)).isoformat()},{"id":"TRX-002","member_id":"MB-2024002","member_name":"Siti Rahma","book_id":"BK-1042","book_title":"Laskar Pelangi","action":"kembali","date":now_iso()}])
         await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
     await db.members.update_many({}, {"$unset": {"email": "", "phone": ""}})
-    await db.users.update_one({"id": "u-admin", "name": "Administrator"}, {"$set": {"name": "Devi Latifa"}})
+    await db.users.update_one({"id": "u-admin", "name": {"$in": ["Administrator", "Devi Latifa"]}}, {"$set": {"name": "Devi Latifa, S.I.Pust"}})
     await db.users.update_one({"id": "u-petugas", "name": "Rina Pustakawan"}, {"$set": {"name": "Pustakawan"}})
     for coll, field in (("incoming", "recorded_by"), ("missing", "reported_by"), ("reservations", "processed_by"), ("visits", "recorded_by"), ("visits", "checkout_by"), ("stocktake", "officer")):
         await db[coll].update_many({field: "Rina Pustakawan"}, {"$set": {field: "Pustakawan"}})
@@ -254,6 +258,11 @@ async def seed():
 @app.on_event("startup")
 async def startup():
     await seed()
+    await db.users.create_index("email", unique=True)
+    try:
+        init_storage()
+    except Exception as e:
+        print(f"Storage init failed: {e}")
 
 @api.get("/")
 async def root(): return {"message":"Perpustakaan SMA Negeri 1 Abung Tengah aktif"}
@@ -342,6 +351,7 @@ async def overdue(user=Depends(current_user)):
     return {"days": OVERDUE_DAYS, "items": await overdue_loans()}
 
 def own_member_filter(user):
+    if user.get("member_id"): return {"id": user["member_id"]}
     return {"$or": [{"student_id": user.get("student_id", "__none__")}, {"name": {"$regex": f"^{re.escape(user['name'])}$", "$options": "i"}}]}
 
 @api.get("/account/member")
@@ -350,10 +360,17 @@ async def my_member(user=Depends(current_user)):
         return None
     return await db.members.find_one(own_member_filter(user), {"_id":0})
 
+async def check_student_photo(user, photo, member_id=None):
+    if user["role"] != "siswa": return
+    if not await photo_upload_allowed(db): raise HTTPException(403, "Upload foto sedang ditutup admin")
+    if photo and not photo.startswith("/api/files/"): raise HTTPException(400, "Foto harus diunggah melalui tombol unggah")
+    if member_id and user.get("member_id") and user["member_id"] != member_id: raise HTTPException(403, "Kamu hanya dapat mengubah fotomu sendiri")
+
 @api.post("/account/photo")
 async def set_my_photo(data: PhotoInput, user=Depends(current_user)):
     if user["role"] != "siswa":
         raise HTTPException(403, "Hanya siswa yang dapat mengubah fotonya sendiri")
+    await check_student_photo(user, data.photo)
     member = await db.members.find_one(own_member_filter(user), {"_id":0})
     if member:
         await db.members.update_one({"id": member["id"]}, {"$set": {"photo": data.photo}})
@@ -379,7 +396,7 @@ async def reservations(user=Depends(current_user)):
 
 @api.get("/reservations/mine")
 async def my_reservations(member_id: str = "", user=Depends(current_user)):
-    if member_id:
+    if member_id and not user.get("member_id"):
         member = await db.members.find_one({"id": member_id}, {"_id":0})
     else:
         member = await db.members.find_one(own_member_filter(user), {"_id":0})
@@ -388,7 +405,7 @@ async def my_reservations(member_id: str = "", user=Depends(current_user)):
 
 @api.post("/reservations")
 async def reserve(data: ReservationInput, user=Depends(current_user)):
-    if data.member_id:
+    if data.member_id and not user.get("member_id"):
         member = await db.members.find_one({"id": data.member_id}, {"_id":0})
     else:
         member = await db.members.find_one(own_member_filter(user), {"_id":0})
@@ -408,7 +425,7 @@ async def cancel_reservation(res_id: str, member_id: str = "", user=Depends(curr
     res = await db.reservations.find_one({"id": res_id}, {"_id":0})
     if not res: raise HTTPException(404, "Pesanan tidak ditemukan")
     if user["role"] == "siswa":
-        if member_id:
+        if member_id and not user.get("member_id"):
             if member_id != res["member_id"]: raise HTTPException(403, "Bukan pesanan anggota ini")
         else:
             member = await db.members.find_one(own_member_filter(user), {"_id":0})
@@ -454,7 +471,16 @@ async def stocktake_save(data: StocktakeInput, user=Depends(current_user)):
 @api.get("/settings")
 async def get_settings(user=Depends(current_user)):
     doc = await db.settings.find_one({"id":"main"}, {"_id":0,"id":0})
-    return {**DEFAULT_SETTINGS, **(doc or {})}
+    return {**DEFAULT_SETTINGS, "member_photo_upload": True, **(doc or {})}
+
+class PhotoToggleInput(BaseModel):
+    enabled: bool
+
+@api.put("/settings/photo-upload")
+async def put_photo_upload(data: PhotoToggleInput, user=Depends(current_user)):
+    staff_only(user)
+    await db.settings.update_one({"id":"main"}, {"$set": {"member_photo_upload": data.enabled}}, upsert=True)
+    return {"member_photo_upload": data.enabled}
 
 @api.put("/settings")
 async def put_settings(data: SettingsInput, user=Depends(current_user)):
@@ -572,12 +598,7 @@ async def add_member(data: MemberInput, user=Depends(current_user)):
 def _parse_member_rows(filename: str, content: bytes):
     name_l = (filename or "").lower()
     rows = []
-    if name_l.endswith(".csv"):
-        text = content.decode("utf-8-sig", errors="replace")
-        reader = csv.DictReader(io.StringIO(text))
-        for r in reader:
-            rows.append({(k or "").strip().lower(): (str(v).strip() if v is not None else "") for k, v in r.items()})
-    elif name_l.endswith(".xlsx"):
+    if name_l.endswith(".xlsx"):
         try:
             wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         except Exception:
@@ -591,11 +612,11 @@ def _parse_member_rows(filename: str, content: bytes):
             d = {}
             for i, c in enumerate(row):
                 if i < len(headers) and headers[i]:
-                    d[headers[i]] = str(c).strip() if c is not None else ""
+                    d[headers[i]] = "" if c is None else (str(int(c)) if isinstance(c, float) and c.is_integer() else str(c).strip())
             if any(d.values()):
                 rows.append(d)
     else:
-        raise HTTPException(400, "Format tidak didukung. Gunakan berkas .csv atau .xlsx")
+        raise HTTPException(400, "Format tidak didukung. Gunakan berkas Excel (.xlsx)")
     return rows
 
 def _pick(d, *keys):
@@ -603,6 +624,21 @@ def _pick(d, *keys):
         if d.get(k):
             return d[k]
     return ""
+
+@api.get("/members/import-template.xlsx")
+async def member_import_template(user=Depends(current_user)):
+    staff_only(user)
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill
+    wb = Workbook(); ws = wb.active; ws.title = "Anggota"
+    ws.append(["nama", "nis", "kelas"])
+    for r in [["Budi Santoso", "24100", "X IPA 1"], ["Siti Aminah", "24101", "X IPA 1"], ["Rudi Hartono", "24102", "X IPS 2"]]: ws.append(r)
+    for c in ws[1]: c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745")
+    for col, w in zip("ABC", (32, 14, 14)): ws.column_dimensions[col].width = w
+    for row in ws.iter_rows(min_row=2, max_row=500, min_col=2, max_col=2):
+        for c in row: c.number_format = "@"
+    buf = io.BytesIO(); wb.save(buf)
+    return Response(content=buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": 'attachment; filename="template-anggota.xlsx"'})
 
 @api.post("/members/import")
 async def import_members(file: UploadFile = File(...), user=Depends(current_user)):
@@ -648,6 +684,7 @@ async def update_member(member_id: str, data: MemberInput, user=Depends(current_
 
 @api.post("/members/{member_id}/photo")
 async def set_member_photo(member_id: str, data: PhotoInput, user=Depends(current_user)):
+    await check_student_photo(user, data.photo, member_id)
     member = await db.members.find_one({"id": member_id}, {"_id":0})
     if not member: raise HTTPException(404, "Anggota tidak ditemukan")
     await db.members.update_one({"id": member_id}, {"$set": {"photo": data.photo}})
@@ -676,6 +713,7 @@ async def bulk_delete_members(data: BulkDeleteInput, user=Depends(current_user))
     if not ids: raise HTTPException(404, "Tidak ada anggota pada kelas tersebut")
     await db.reservations.update_many({"member_id": {"$in": ids}, "status": "Menunggu"}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
     result = await db.members.delete_many({"id": {"$in": ids}})
+    await db.users.delete_many({"member_id": {"$in": ids}, "role": "siswa"})
     return {"ok": True, "deleted": result.deleted_count, "class_name": data.class_name}
 
 @api.delete("/members/{member_id}")
@@ -683,6 +721,7 @@ async def delete_member(member_id: str, user=Depends(current_user)):
     staff_only(user)
     result = await db.members.delete_one({"id": member_id})
     if result.deleted_count == 0: raise HTTPException(404, "Anggota tidak ditemukan")
+    await db.users.delete_many({"member_id": member_id, "role": "siswa"})
     await db.reservations.update_many({"member_id": member_id, "status": "Menunggu"}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
     return {"ok": True}
 
@@ -690,6 +729,7 @@ async def delete_member(member_id: str, user=Depends(current_user)):
 async def reset_data(data: ResetInput, user=Depends(current_user)):
     if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mereset data")
     members = (await db.members.delete_many({})).deleted_count
+    await db.users.delete_many({"role": "siswa", "member_id": {"$exists": True}})
     transactions = (await db.transactions.delete_many({})).deleted_count
     incoming = (await db.incoming.delete_many({})).deleted_count
     missing = (await db.missing.delete_many({})).deleted_count
@@ -749,6 +789,54 @@ async def member_history(member_id: str, user=Depends(current_user)):
     staff_only(user)
     member = await db.members.find_one({"id":member_id}, {"_id":0})
     if not member: raise HTTPException(404, "Anggota tidak ditemukan")
+    return await history_for(member)
+
+@api.get("/account/history")
+async def my_history(user=Depends(current_user)):
+    if user["role"] != "siswa" or not user.get("member_id"): raise HTTPException(403, "Riwayat hanya untuk akun anggota")
+    member = await db.members.find_one({"id": user["member_id"]}, {"_id":0})
+    if not member: raise HTTPException(404, "Data anggota tidak ditemukan")
+    return await history_for(member)
+
+class MemberAccountInput(BaseModel):
+    email: str = Field(..., min_length=3, max_length=120)
+    password: str = Field("", max_length=100)
+
+@api.get("/members/{member_id}/account")
+async def get_member_account(member_id: str, user=Depends(current_user)):
+    staff_only(user)
+    acc = await db.users.find_one({"member_id": member_id, "role": "siswa"}, {"_id":0, "password_hash":0})
+    return acc
+
+@api.put("/members/{member_id}/account")
+async def set_member_account(member_id: str, data: MemberAccountInput, user=Depends(current_user)):
+    staff_only(user)
+    member = await db.members.find_one({"id": member_id}, {"_id":0})
+    if not member: raise HTTPException(404, "Anggota tidak ditemukan")
+    email = data.email.strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email): raise HTTPException(400, "Format email tidak valid")
+    acc = await db.users.find_one({"member_id": member_id, "role": "siswa"}, {"_id":0})
+    other = await db.users.find_one({"email": email}, {"_id":0})
+    if other and (not acc or other["id"] != acc["id"]): raise HTTPException(400, "Email sudah dipakai akun lain")
+    if data.password and len(data.password) < 6: raise HTTPException(400, "Kata sandi minimal 6 karakter")
+    upd = {"email": email, "name": member["name"], "student_id": member.get("student_id", ""), "class_name": member.get("class_name", "")}
+    if data.password: upd["password_hash"] = password_hash(data.password)
+    if acc:
+        await db.users.update_one({"id": acc["id"]}, {"$set": upd})
+    else:
+        if not data.password: raise HTTPException(400, "Kata sandi wajib diisi untuk akun baru")
+        await db.users.insert_one({"id": "u-" + str(uuid.uuid4())[:8], "role": "siswa", "member_id": member_id, **upd})
+    return await db.users.find_one({"member_id": member_id, "role": "siswa"}, {"_id":0, "password_hash":0})
+
+@api.delete("/members/{member_id}/account")
+async def delete_member_account(member_id: str, user=Depends(current_user)):
+    staff_only(user)
+    res = await db.users.delete_one({"member_id": member_id, "role": "siswa"})
+    if res.deleted_count == 0: raise HTTPException(404, "Anggota ini belum punya akun")
+    return {"ok": True}
+
+async def history_for(member):
+    member_id = member["id"]
     tx = await db.transactions.find({"member_id":member_id}, {"_id":0}).sort("date",1).to_list(300)
     history = []
     for t in tx:
@@ -870,6 +958,9 @@ async def export_report_xlsx(type: str = "transaksi", period: str = "semua", use
 
 from visits import build_router, visits_auto_close, visit_stats, in_visit_period, visit_leaderboard
 api.include_router(build_router(db, current_user, staff_only, now_iso))
+from summary import build_router as summary_router
+api.include_router(media_router(db, current_user))
+api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
 app.include_router(api)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[os.environ["FRONTEND_URL"]], allow_methods=["*"], allow_headers=["*"])
 

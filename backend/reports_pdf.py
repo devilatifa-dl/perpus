@@ -91,11 +91,11 @@ def table_rows(kind, rows):
         kinds = " · ".join(f"{k['label']}: {k['count']} ({k['pct']:.1f}%)" for k in st["kinds"])
         summary = f"Total pengunjung: {st['total']} · Rata-rata {st['avg_per_day']}/hari · {kinds} · Durasi rata-rata {st['avg_duration_min']} menit"
     elif kind == "peringkat":
-        lb = rows; header = ["Peringkat", "Nama Siswa", "Kelas", "Kunjungan", "Hari datang", "Total waktu", "Persentase"]
+        lb = rows; header = ["Peringkat", "Nama Siswa", "Kelas", "Pengunjung", "Hari datang", "Total waktu", "Persentase"]
         widths = [22 * mm, 70 * mm, 40 * mm, 30 * mm, 30 * mm, 34 * mm, 30 * mm]
         plain = [[s_["name"], s_["class_name"], str(s_["visits"]), str(s_["days"]), f"{s_.get('minutes', 0) // 60} j {s_.get('minutes', 0) % 60} m", f"{s_['pct']:.1f}%"] for s_ in lb["students"]]
         top_cls = lb["classes"][0]["class_name"] if lb["classes"] else "-"
-        summary = f"{lb['label']} · Total kunjungan anggota: {lb['total_visits']} · Siswa aktif: {lb['active_students']} · Kelas teraktif: {top_cls}"
+        summary = f"{lb['label']} · Total pengunjung anggota: {lb['total_visits']} · Siswa aktif: {lb['active_students']} · Kelas teraktif: {top_cls}"
     else:
         header = ["No", "Judul Buku", "Kode", "Catatan", "Tgl Lapor", "Status", "Ditemukan", "Pelapor"]
         widths = [10 * mm, 62 * mm, 24 * mm, 56 * mm, 30 * mm, 22 * mm, 30 * mm, 30 * mm]
@@ -135,7 +135,7 @@ def render_report_xlsx(kind, period, rows, settings, officer):
     if kind == "peringkat" and rows["classes"]:
         start = 7 + max(len(plain), 1) + 3
         ws.cell(row=start - 1, column=1, value="Peringkat kelas").font = Font(bold=True, color="0F2745")
-        for j, h in enumerate(["Peringkat", "Kelas", "Kunjungan", "Siswa berkunjung", "Persentase"], 1):
+        for j, h in enumerate(["Peringkat", "Kelas", "Pengunjung", "Siswa berkunjung", "Persentase"], 1):
             c = ws.cell(row=start, column=j, value=h); c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745"); c.border = border
         for i, cl in enumerate(rows["classes"], 1):
             for j, v in enumerate([cl["rank"], cl["class_name"], cl["visits"], cl["members"], f"{cl['pct']:.1f}%"], 1):
@@ -212,7 +212,7 @@ def render_report_pdf(kind, period, rows, settings, officer):
         dt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")), ("FONTSIZE", (0, 1), (-1, -1), 8.5), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
         extra = [Spacer(1, 12), Paragraph("Pengunjung per hari", ParagraphStyle("t2", parent=h1, fontSize=11)), Spacer(1, 4), dt]
     if kind == "peringkat" and rows["classes"]:
-        cbody = [[Paragraph(h, head) for h in ["Peringkat", "Kelas", "Kunjungan", "Siswa berkunjung", "Persentase"]]] + [[str(c["rank"]), c["class_name"], str(c["visits"]), str(c["members"]), f"{c['pct']:.1f}%"] for c in rows["classes"]]
+        cbody = [[Paragraph(h, head) for h in ["Peringkat", "Kelas", "Pengunjung", "Siswa berkunjung", "Persentase"]]] + [[str(c["rank"]), c["class_name"], str(c["visits"]), str(c["members"]), f"{c['pct']:.1f}%"] for c in rows["classes"]]
         ct = Table(cbody, colWidths=[30 * mm, 70 * mm, 40 * mm, 50 * mm, 40 * mm], repeatRows=1)
         ct.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")), ("FONTSIZE", (0, 1), (-1, -1), 8.5), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
         extra = [Spacer(1, 12), Paragraph("Peringkat kelas", ParagraphStyle("t3", parent=h1, fontSize=11)), Spacer(1, 4), ct]

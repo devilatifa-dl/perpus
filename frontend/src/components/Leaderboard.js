@@ -22,19 +22,19 @@ export function Leaderboard({ mode = "admin", meId = "", download, downloading, 
   const order = [1, 0, 2].filter((i) => podium[i]);
   return <div className={`leaderboard ${mode}`} data-testid="leaderboard">
     <div className="lb-hero">
-      <div className="lb-hero-text"><p className="eyebrow light">PERINGKAT RAJIN BERKUNJUNG</p><h2>Siapa paling rajin ke perpustakaan bulan {lb.label}?</h2><p>{lb.total_visits} kunjungan anggota dari {lb.active_students} siswa. Scan kartumu setiap datang agar tercatat!</p></div>
+      <div className="lb-hero-text"><p className="eyebrow light">PERINGKAT RAJIN BERKUNJUNG</p><h2>Siapa paling rajin ke perpustakaan bulan {lb.label}?</h2><p>{lb.total_visits} pengunjung anggota dari {lb.active_students} siswa. Scan kartumu setiap datang agar tercatat!</p></div>
       <div className="lb-hero-actions">
         <select data-testid="leaderboard-month-select" value={month} onChange={(e) => setMonth(e.target.value)}>{lb.months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select>
         {mode === "admin" && download && <div className="download-row"><button className="primary" data-testid="leaderboard-download-pdf" disabled={!!downloading} onClick={() => download("pdf", "peringkat", lb.month)}><Download size={16}/> {downloading === "pdf" ? "Menyiapkan..." : "PDF"}</button><button className="secondary" data-testid="leaderboard-download-xlsx" disabled={!!downloading} onClick={() => download("xlsx", "peringkat", lb.month)}><FileSpreadsheet size={16}/> {downloading === "xlsx" ? "Menyiapkan..." : "Excel"}</button></div>}
       </div>
     </div>
-    {mode === "siswa" && meId && <div className={`lb-me ${me ? "in" : ""}`} data-testid="leaderboard-me">{me ? <><Award size={18}/> Hebat! Kamu peringkat <b>#{me.rank}</b> bulan ini dengan {me.visits} kunjungan.</> : <><Trophy size={18}/> Kamu belum masuk 10 besar bulan ini — ayo lebih sering berkunjung!</>}</div>}
-    {lb.students.length === 0 ? <div className="panel lb-empty" data-testid="leaderboard-empty"><Trophy size={34}/><b>Belum ada kunjungan anggota di bulan {lb.label}</b><span>Peringkat muncul setelah siswa scan kartu di menu Pengunjung.</span></div> : <>
+    {mode === "siswa" && meId && <div className={`lb-me ${me ? "in" : ""}`} data-testid="leaderboard-me">{me ? <><Award size={18}/> Hebat! Kamu peringkat <b>#{me.rank}</b> bulan ini dengan {me.visits} pengunjung.</> : <><Trophy size={18}/> Kamu belum masuk 10 besar bulan ini — ayo lebih sering berkunjung!</>}</div>}
+    {lb.students.length === 0 ? <div className="panel lb-empty" data-testid="leaderboard-empty"><Trophy size={34}/><b>Belum ada pengunjung anggota di bulan {lb.label}</b><span>Peringkat muncul setelah siswa scan kartu di menu Pengunjung.</span></div> : <>
       <div className="lb-podium" data-testid="leaderboard-podium">{order.map((i) => { const s = podium[i]; return <div key={s.member_id || s.name} className={`lb-step ${MEDAL[i]} ${s.member_id === meId ? "me" : ""}`} data-testid={`leaderboard-rank-${s.rank}`}>
         <div className="lb-medal">{i === 0 ? <Crown size={18}/> : <Medal size={16}/>}<span>#{s.rank}</span></div>
         <Avatar s={s} size={i === 0 ? 76 : 62}/>
         <b>{s.name}{s.member_id === meId ? " (kamu)" : ""}</b><small>{s.class_name}</small>
-        <div className="lb-score"><strong>{s.visits}</strong><span>kunjungan · {s.days} hari</span></div>
+        <div className="lb-score"><strong>{s.visits}</strong><span>pengunjung · {s.days} hari</span></div>
         <div className="lb-block"><span>{i + 1}</span></div>
       </div>; })}</div>
       <div className="lb-grid">
@@ -48,7 +48,7 @@ export function Leaderboard({ mode = "admin", meId = "", download, downloading, 
         </div>
         <div className="panel" data-testid="leaderboard-classes"><div className="panel-title"><div><p className="eyebrow">PERINGKAT KELAS</p><h3>{lb.classes[0] ? <>Kelas teraktif: {lb.classes[0].class_name}</> : "-"}</h3></div><Trophy size={18} color="#d97706"/></div>
           <div className="class-bars">{lb.classes.map((c, i) => <div className="class-bar" key={c.class_name} data-testid={`leaderboard-class-${c.rank}`}>
-            <div className="class-bar-label"><b>{c.rank <= 3 ? ["🥇", "🥈", "🥉"][c.rank - 1] + " " : `${c.rank}. `}{c.class_name}</b><span>{c.visits} kunjungan · {c.members} siswa</span></div>
+            <div className="class-bar-label"><b>{c.rank <= 3 ? ["🥇", "🥈", "🥉"][c.rank - 1] + " " : `${c.rank}. `}{c.class_name}</b><span>{c.visits} pengunjung · {c.members} siswa</span></div>
             <div className="class-bar-track"><div style={{ width: `${(c.visits / maxCls) * 100}%`, background: ["#d97706", "#64748b", "#b45309"][i] || "#0284c7" }}/></div>
             <em>{c.pct}%</em>
           </div>)}</div>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
 import { Camera, CameraOff, Clock, DoorClosed, DoorOpen, LogIn, LogOut, Maximize2, Pencil, ScanLine, Trash2, UserPlus, Users } from "lucide-react";
 import { api } from "../lib";
 import { Modal } from "./Shared";
+import { CameraScanner } from "./CameraScanner";
 
 const todayStr = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 export const fmtClock = (d) => d ? new Date(d).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : "-";
@@ -18,30 +18,8 @@ function beep(ok = true) {
   } catch (e) { /* audio tidak tersedia */ }
 }
 
-function LiveScanner({ onCode, active }) {
-  const ref = useRef(null); const last = useRef({ code: "", at: 0 }); const cb = useRef(onCode);
-  const [err, setErr] = useState("");
-  cb.current = onCode;
-  useEffect(() => {
-    if (!active) return undefined;
-    let stopped = false; setErr("");
-    const scanner = new Html5Qrcode("visit-qr-reader", { verbose: false }); ref.current = scanner;
-    Html5Qrcode.getCameras().then((cams) => {
-      if (stopped) return;
-      if (!cams.length) { setErr("Kamera tidak ditemukan. Gunakan alat pemindai atau ketik kode."); return; }
-      const back = cams.find((c) => /back|belakang|rear/i.test(c.label)) || cams[0];
-      scanner.start(back.id, { fps: 10, qrbox: { width: 210, height: 210 } }, (text) => {
-        const now = Date.now();
-        if (text === last.current.code && now - last.current.at < 5000) return;
-        last.current = { code: text, at: now }; cb.current(text);
-      }, () => {}).catch((e) => setErr("Gagal mengakses kamera: " + e));
-    }).catch(() => setErr("Izin kamera ditolak atau kamera tidak tersedia."));
-    return () => { stopped = true; scanner.stop().then(() => scanner.clear()).catch(() => {}); };
-  }, [active]);
-  return <div className="visit-cam" data-testid="visit-camera">
-    <div id="visit-qr-reader" className="visit-qr-reader"/>
-    {err && <div className="error" data-testid="visit-camera-error">{err}</div>}
-  </div>;
+function LiveScanner({ onCode }) {
+  return <div className="visit-cam" data-testid="visit-camera"><CameraScanner onCode={onCode} testId="visit-camera-scanner"/></div>;
 }
 
 export function Visitors({ notify }) {
@@ -55,15 +33,32 @@ export function Visitors({ notify }) {
   useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, [load]);
   useEffect(() => { if (isToday) inputRef.current?.focus(); }, [isToday]);
   const flash = (r) => { setResult(r); clearTimeout(resultTimer.current); resultTimer.current = setTimeout(() => setResult(null), 6000); };
+  const [members, setMembers] = useState([]); const [hi, setHi] = useState(0); const [sugOpen, setSugOpen] = useState(false);
+  useEffect(() => { api.get("/members/options").then((r) => setMembers(r.data)).catch(() => {}); }, []);
+  const q = code.trim().toLowerCase();
+  const suggestions = q.length >= 2 ? members.filter((m) => m.name.toLowerCase().includes(q) || (m.student_id || "").toLowerCase().startsWith(q) || m.id.toLowerCase() === q).slice(0, 8) : [];
+  const looksLikeCode = (v) => /^mb-/i.test(v.trim()) || /^\d+$/.test(v.trim());
+  const busyRef = useRef(false);
   const submitCode = async (raw) => {
-    const c = (raw || "").trim(); if (!c || busy) return;
-    setBusy(true);
+    const c = (raw || "").trim(); if (!c || busyRef.current) return null;
+    busyRef.current = true; setBusy(true); setSugOpen(false);
     try {
       const { data: r } = await api.post("/visits/scan", { code: c });
       beep(r.action === "masuk" || r.action === "keluar"); flash(r); load();
-    } catch (e) { beep(false); flash({ action: "error", message: e.response?.data?.detail || "Gagal memproses kode" }); }
-    finally { setBusy(false); setCode(""); inputRef.current?.focus(); }
+      const name = r.member?.name || "Pengunjung";
+      if (r.action === "masuk") { notify(`Pengunjung tercatat · ${name}`); return { ok: true, title: name, sub: "Berhasil · tercatat masuk" }; }
+      if (r.action === "keluar") { notify(`${name} tercatat keluar`); return { ok: true, title: name, sub: "Berhasil · tercatat keluar" }; }
+      return { ok: true, title: name, sub: r.action === "sudah_masuk" ? "Sudah tercatat masuk" : "Sudah tercatat keluar" };
+    } catch (e) { beep(false); const msg = e.response?.data?.detail || "Gagal memproses kode"; flash({ action: "error", message: msg }); return { ok: false, title: "Gagal", sub: msg }; }
+    finally { busyRef.current = false; setBusy(false); setCode(""); setHi(0); inputRef.current?.focus(); }
   };
+  const onCodeKey = (e) => {
+    if (!suggestions.length || !sugOpen) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => (h + 1) % suggestions.length); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((h) => (h - 1 + suggestions.length) % suggestions.length); }
+    else if (e.key === "Escape") setSugOpen(false);
+  };
+  const submitForm = (e) => { e.preventDefault(); if (sugOpen && suggestions.length && !looksLikeCode(code)) submitCode(suggestions[Math.min(hi, suggestions.length - 1)].id); else submitCode(code); };
   const addGuest = async (e) => {
     e.preventDefault();
     try { const { data: v } = await api.post("/visits/guest", guestForm); setGuest(false); setGuestForm({ name: "", origin: "", purpose: "Membaca" }); flash({ action: "masuk", visit: v, member: { name: v.name, class_name: v.origin || "Tamu" } }); load(); }
@@ -82,12 +77,18 @@ export function Visitors({ notify }) {
         <div className="panel-title"><div><p className="eyebrow">BUKU TAMU DIGITAL</p><h3>Scan kartu saat masuk &amp; keluar</h3></div><button className="icon-button" title="Layar penuh" data-testid="visit-fullscreen-button" onClick={fullscreen}><Maximize2 size={17}/></button></div>
         <div className="visit-kiosk-body">
           <div className="visit-scan-area">
-            {camOn ? <LiveScanner active={camOn} onCode={submitCode}/> : <div className="visit-scan-idle"><ScanLine size={44}/><b>Siap memindai</b><span>Arahkan alat pemindai QR ke kartu anggota, atau nyalakan kamera.</span></div>}
+            {camOn ? <LiveScanner onCode={submitCode}/> : <div className="visit-scan-idle"><ScanLine size={44}/><b>Siap memindai</b><span>Arahkan alat pemindai QR ke kartu anggota, atau nyalakan kamera.</span></div>}
             <button className={camOn ? "secondary full" : "primary full"} data-testid="visit-camera-toggle" onClick={() => setCamOn(!camOn)}>{camOn ? <><CameraOff size={16}/> Matikan kamera</> : <><Camera size={16}/> Nyalakan kamera</>}</button>
           </div>
           <div className="visit-scan-side">
-            <form className="visit-code-form" onSubmit={(e) => { e.preventDefault(); submitCode(code); }}>
-              <label>Kode kartu / NIS<input ref={inputRef} data-testid="visit-code-input" placeholder="Scan atau ketik lalu Enter" value={code} onChange={(e) => setCode(e.target.value)} disabled={!isToday} autoComplete="off"/></label>
+            <form className="visit-code-form" onSubmit={submitForm}>
+              <label className="visit-search-label">Kode kartu / NIS / Nama
+                <input ref={inputRef} data-testid="visit-code-input" placeholder="Scan, ketik kode, atau cari nama" value={code} onChange={(e) => { setCode(e.target.value); setHi(0); setSugOpen(true); }} onKeyDown={onCodeKey} onBlur={() => setTimeout(() => setSugOpen(false), 150)} onFocus={() => setSugOpen(true)} disabled={!isToday} autoComplete="off"/>
+                {sugOpen && suggestions.length > 0 && <ul className="visit-suggest" data-testid="visit-name-suggestions" role="listbox">{suggestions.map((m, i) => <li key={m.id} role="option" aria-selected={i === hi}><button type="button" className={i === hi ? "active" : ""} data-testid={`visit-suggest-${m.id}`} onMouseDown={(e) => e.preventDefault()} onClick={() => submitCode(m.id)} onMouseEnter={() => setHi(i)}>
+                  <span className="sug-avatar">{m.photo ? <img src={m.photo} alt=""/> : m.name[0]}</span><span className="sug-text"><b>{m.name}</b><small>{m.class_name} · NIS {m.student_id}</small></span><LogIn size={14}/>
+                </button></li>)}</ul>}
+                {sugOpen && q.length >= 2 && !suggestions.length && !looksLikeCode(code) && <div className="visit-suggest empty" data-testid="visit-name-no-result">Nama tidak ditemukan</div>}
+              </label>
               <button className="primary" data-testid="visit-code-submit" disabled={busy || !isToday}><LogIn size={16}/> {busy ? "Memproses..." : "Catat"}</button>
             </form>
             <div className={`visit-result ${res ? res.action : "idle"}`} data-testid="visit-result" aria-live="polite">
