@@ -50,11 +50,32 @@ Web perpustakaan sekolah dengan design modern & keren untuk SMA 1 NEGERI ABUNG T
 - Teks "kunjungan" → "Pengunjung" di UI & judul PDF (opsi keperluan tamu "Kunjungan dinas" tetap).
 - Modal kini bisa ditutup dengan tombol Escape.
 
+### Okt 2026 — "lanjutkan projek ini" (Fase 1)
+- Scan QR diperbaiki: komponen baru `CameraScanner` (start/stop kamera berurutan, jadi tidak bentrok di React StrictMode atau saat ganti kamera; tombol ganti kamera depan/belakang; pesan izin/kamera tidak ada/HTTPS + tombol Coba lagi). Dipakai di Pengunjung dan modal QRScanner (+ input kode manual). Notifikasi "Kunjungan tercatat".
+- Saklar izin upload foto anggota (menu Pengaturan sudah dihapus; sekarang hanya lewat tombol "Foto siswa" di halaman Anggota) → PUT /api/settings/photo-upload (`member_photo_upload`). Saat ditutup, server menolak unggahan dari siswa dan tombol di portal siswa dikunci. Admin/petugas selalu bisa.
+- Foto anggota disimpan di Emergent Object Storage (`backend/media.py`): POST /api/uploads/photo → otomatis dikompres (Pillow + pillow-heif, orientasi EXIF dibetulkan, sisi terpanjang 1080 px, JPEG q90→60 sampai ≤500KB). GET /api/files/{path} hanya untuk pengguna yang sudah login. member.photo = "/api/files/...".
+- Laporan → tab "Ringkasan & grafik" (`backend/summary.py` GET /api/reports/summary?start&end&group=day|month): kartu angka, grafik sirkulasi & pengunjung, buku terpopuler, anggota paling aktif, ekspor CSV, Cetak/PDF.
+- Akun login anggota: admin membuatnya di Anggota → ikon kunci (GET/PUT/DELETE /api/members/{id}/account). Akun anggota masuk ke /siswa lalu membuka tab "Profil saya" (kartu, upload foto, riwayat pinjam lewat GET /api/account/history). Akun siswa bersama tetap bisa dipakai.
+
+### Okt 2026 — Impor Excel & kartu bagian belakang
+- Impor anggota massal sekarang hanya menerima Excel (.xlsx); CSV ditolak. Template Excel tersedia dari GET /api/members/import-template.xlsx, dan NIS angka tidak berubah jadi ".0".
+- Bagian belakang kartu anggota (`MemberCardBack`): judul, daftar peraturan/syarat & ketentuan (satu baris = satu poin), dan teks web. Semuanya bisa diedit di Desain kartu (settings card_back_title/card_back_rules/card_back_web). Tersedia tombol Depan/Belakang di pratinjau, dan cetak massal bisa memilih sisi belakang dengan kolom dicerminkan untuk cetak bolak-balik.
+- Ukuran kartu cetak massal 86 × 56 mm (8,6 × 5,6 cm), 10 kartu per A4 (jarak baris 1,5 mm, margin 5 mm); potret 56 × 86 mm, 9 per A4.
+- Cetak dua sisi: Cetak massal → Sisi "Dua sisi (bolak-balik)". Halaman depan dan belakang disusun bergantian, satu halaman A4 per lembar, dan kolom sisi belakang dicerminkan. Bug cetak massal yang menghasilkan halaman kosong sudah diperbaiki (tampilan cetak sekarang dipasang langsung di body).
+- Pengunjung: kolom kode sekarang juga mencari nama/NIS dengan daftar saran (bisa diklik atau dipilih dengan panah + Enter).
+- Kamera QR: kalau kamera belakang gagal, otomatis mencoba kamera lain. Setelah scan muncul layar hijau "Berhasil" (atau merah kalau gagal) selama 1 detik, lalu siap scan lagi. Kode yang sama diabaikan selama 5 detik, dan pesan error menampilkan kodenya.
+- Tombol cepat "Foto siswa: Aktif/Nonaktif" di halaman Anggota untuk menyalakan atau mematikan izin upload foto siswa.
+- Potong foto (react-easy-crop, rasio 6:7): foto digeser/diperbesar dulu sebelum diunggah, dan ada tombol "Atur posisi" untuk foto yang sudah ada. Untuk HEIC yang tidak bisa dibuka browser, foto diunggah dulu lalu dipotong. Modal bertumpuk sekarang hanya menutup modal paling atas.
+
+## Backlog (berikutnya)
+- Fase 2: denda keterlambatan otomatis, notifikasi jatuh tempo, izin upload per anggota/berjadwal
+- Fase 3: cetak massal kartu ber-QR (sudah sebagian), reservasi lanjutan, laporan bulanan otomatis
+
 ## Tech stack
 Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind (preflight) + CSS kustom (App.css, Card.css, Portal.css). QR: html5-qrcode; QR gen: api.qrserver.com.
 
 ## Known constraints
-- Foto/logo disimpan base64 di MongoDB (maks 900KB).
+- Foto anggota di object storage; logo & sampul buku masih base64 di MongoDB (maks 900KB).
 - QR kamera perlu HTTPS + izin kamera.
 - Tandai hilang pakai window.prompt/confirm (dialog browser).
 

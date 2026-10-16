@@ -8,7 +8,11 @@ import { Login } from "./Login";
 import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
 import { Shelves } from "./Shelves";
+import { StudentProfile } from "./StudentProfile";
+import { uploadPhoto } from "../lib";
+import { Lock, UserCircle } from "lucide-react";
 
+const profileTab = ["profil", "Profil saya", UserCircle];
 const tabs = [["katalog", "Katalog buku", BookOpen], ["rak", "Rak buku", Boxes], ["pesanan", "Pesanan saya", ListChecks], ["peringkat", "Peringkat", Trophy]];
 
 export default function StudentPortal() {
@@ -26,8 +30,12 @@ export default function StudentPortal() {
   const loadMine = (id) => api.get("/reservations/mine", { params: id ? { member_id: id } : {} }).then((r) => setData((d) => ({ ...d, mine: r.data }))).catch(() => {});
   const load = () => Promise.all([api.get("/books"), api.get("/shelves"), api.get("/dashboard"), api.get("/settings")])
     .then(([b, s, d, c]) => setData((prev) => ({ ...prev, books: b.data, shelves: s.data, stats: d.data, settings: c.data })));
+ fitur/laporan-kartu-belakang-cetak-duplex
+  useEffect(() => { if (user && user.role === "siswa") { const own = user.member_id || meId; if (user.member_id) { setMeId(own); setTab("profil"); } load(); loadOptions(); loadMine(own); } }, [user]);
+
   useEffect(() => { if (user && user.role === "siswa") { load(); loadOptions(); loadMine(meId); loadPhotoCfg(); } }, [user]);
   useEffect(() => { if (!user || user.role !== "siswa") return undefined; const t = setInterval(loadPhotoCfg, 60000); return () => clearInterval(t); }, [user]);
+ main
   useEffect(() => { if (meId && !meQuery) { const m = options.find((o) => o.id === meId); if (m) setMeQuery(m.name); } }, [options, meId]);
   const meMatches = (meQuery.trim() ? options.filter((o) => `${o.name} ${o.class_name} ${o.student_id}`.toLowerCase().includes(meQuery.trim().toLowerCase())) : options).slice(0, 8);
   const onMeInput = (v) => { setMeQuery(v); setMeOpen(true); if (meId) { setMeId(""); localStorage.removeItem("perpus_me_id"); loadMine(""); } };
@@ -44,6 +52,7 @@ export default function StudentPortal() {
   if (checking) return <div className="loading">Membuka portal siswa...</div>;
   if (!user) return <Login onLogin={setUser} portal="siswa"/>;
   if (user.role !== "siswa") return <Navigate to="/admin" replace/>;
+  const linked = !!user.member_id; const photoAllowed = data.settings?.member_photo_upload !== false; const allTabs = linked ? [profileTab, ...tabs] : tabs;
   const logout = async () => { await api.post("/auth/logout"); setUser(null); };
   const filtered = data.books.filter((b) => (shelfFilter === "semua" || b.shelf === shelfFilter) && `${b.title} ${b.author} ${b.category} ${b.id}`.toLowerCase().includes(search.toLowerCase()));
   const shelfName = (id) => data.shelves.find((s) => s.id === id)?.name || "";
@@ -52,20 +61,24 @@ export default function StudentPortal() {
   return <div className="student-shell" data-testid="student-portal" data-user-role="siswa">
     <header className="student-top">
       <div className="student-brand"><img src={data.settings?.library_logo || LIBRARY_LOGO} alt="Logo perpustakaan"/><div><strong>RUANG BACA · PORTAL SISWA</strong><small>SMA NEGERI 1 ABUNG TENGAH</small></div></div>
-      <nav className="student-nav">{tabs.map(([id, label, Icon]) => <button key={id} data-testid={`student-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon size={16}/><span>{label}</span></button>)}</nav>
-      <div className="student-user"><img src={data.settings?.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/><div><b>MURID SMANSA</b><small>Hanya lihat data buku</small></div><button className="icon-button" data-testid="student-logout-button" title="Keluar" onClick={logout}><LogOut size={18}/></button></div>
+      <nav className="student-nav">{allTabs.map(([id, label, Icon]) => <button key={id} data-testid={`student-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon size={16}/><span>{label}</span></button>)}</nav>
+      <div className="student-user"><img src={data.settings?.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/><div><b>{linked ? user.name : "MURID SMANSA"}</b><small>{linked ? "Akun anggota" : "Hanya lihat data buku"}</small></div><button className="icon-button" data-testid="student-logout-button" title="Keluar" onClick={logout}><LogOut size={18}/></button></div>
     </header>
     <main className="student-main">
       <section className="student-hero">
         <div><p className="eyebrow light">HALO SISWA/SISWI SMANSA</p><h1>Buku apa yang ingin <em>kamu baca</em> hari ini?</h1><p>{fmt(available)} dari {fmt(data.stats.books)} eksemplar ({fmt(data.books.length)} judul) tersedia untuk dipinjam. Datangi petugas perpustakaan untuk meminjam.</p></div>
         <div className="student-profile" data-testid="student-profile">
           <div className="student-profile-avatar"><Camera size={26}/></div>
+ fitur/laporan-kartu-belakang-cetak-duplex
+          {linked ? <button className="reserve-btn" data-testid="open-profile-button" onClick={() => setTab("profil")}><UserCircle size={14}/> Profil saya</button> : photoAllowed ? <button className="reserve-btn" data-testid="open-photo-upload-button" onClick={openPhoto}><Camera size={14}/> Unggah foto anggota</button> : <button className="reserve-btn" disabled data-testid="photo-upload-locked-button" title="Upload foto sedang ditutup admin"><Lock size={14}/> Upload foto ditutup</button>}
+
           {photoCfg.open
             ? <button className="reserve-btn" data-testid="open-photo-upload-button" onClick={openPhoto}><Camera size={14}/> Unggah foto anggota</button>
             : <button className="reserve-btn locked" data-testid="open-photo-upload-button" aria-disabled="true" onClick={openPhoto} title="Dibuka kembali oleh petugas"><Lock size={14}/> Unggah foto ditutup</button>}
+ main
         </div>
       </section>
-      <div className="student-identity" data-testid="student-identity">
+      {!linked && <div className="student-identity" data-testid="student-identity">
         <span className="identity-label">Pesan buku atas nama:</span>
         <div className="identity-combo" data-testid="identity-combo">
           <input type="text" data-testid="identity-input" placeholder="Ketik namamu untuk mencari..." value={meQuery} onChange={(e) => onMeInput(e.target.value)} onFocus={() => setMeOpen(true)} onBlur={() => setTimeout(() => setMeOpen(false), 160)} autoComplete="off"/>
@@ -76,12 +89,13 @@ export default function StudentPortal() {
           </div>}
         </div>
         {meId ? <span className="identity-current" data-testid="identity-current">Halo, {options.find((o) => o.id === meId)?.name || ""} 👋</span> : <span className="identity-hint">Ketik dan pilih namamu agar petugas tahu siapa yang memesan</span>}
-      </div>
+      </div>}
       {tab === "katalog" && <>
         <div className="toolbar"><div className="searchbox"><Search size={17}/><input data-testid="student-book-search-input" placeholder="Cari judul, penulis, atau kategori..." value={search} onChange={(e) => setSearch(e.target.value)}/></div><span className="soft-badge">{filtered.length} buku</span></div>
         <div className="shelf-chips" data-testid="shelf-chips"><button data-testid="shelf-chip-semua" className={shelfFilter === "semua" ? "active" : ""} onClick={() => setShelfFilter("semua")}>Semua rak</button>{data.shelves.map((s) => <button key={s.id} data-testid={`shelf-chip-${s.id}`} className={shelfFilter === s.id ? "active" : ""} onClick={() => setShelfFilter(s.id)}><MapPin size={12}/> {s.id} · {s.name}</button>)}</div>
         <div className="catalog-grid">{filtered.map((b) => <div className="catalog-card" key={b.id} data-testid={`catalog-${b.id}`}><div className="catalog-cover">{b.cover ? <img src={b.cover} alt={b.title}/> : <BookOpen size={28}/>}</div><div className="catalog-info"><span className={`status ${b.status.toLowerCase()}`}>{b.status}</span><b>{b.title}</b><small>{b.author}</small><div className="catalog-stock" data-testid={`catalog-stock-${b.id}`}>Stok: <b>{b.available}</b> dari {b.stock} tersedia</div><div className="catalog-meta"><span>{b.category}</span><span>·</span><span>{b.id}</span></div><div className="catalog-shelf" data-testid={`catalog-shelf-${b.id}`}><MapPin size={13}/><span>Rak {b.shelf}{shelfName(b.shelf) ? ` · ${shelfName(b.shelf)}` : ""}</span><button data-testid={`goto-shelf-${b.id}`} onClick={() => goToShelf(b.shelf)}>Lihat rak</button></div>{b.stock > 0 && (waitingIds.has(b.id) ? <button className="reserve-btn" disabled data-testid={`reserved-${b.id}`}><ListChecks size={14}/> Sudah dipesan</button> : <button className="reserve-btn" data-testid={`reserve-${b.id}`} disabled={busy === b.id} onClick={() => reserve(b)}><BookmarkPlus size={14}/> Pesan buku{b.waiting ? ` · ${b.waiting} antre` : ""}</button>)}</div></div>)}{filtered.length === 0 && <p className="muted">Tidak ada buku yang cocok.</p>}</div>
       </>}
+      {tab === "profil" && linked && <StudentProfile settings={data.settings} notify={notify}/>}
       {tab === "rak" && <Shelves data={data} highlight={highlight}/>}
       {tab === "peringkat" && <Leaderboard mode="siswa" meId={meId}/>}
       {tab === "pesanan" && <div className="my-reservations" data-testid="my-reservations">
@@ -90,8 +104,13 @@ export default function StudentPortal() {
         {data.mine.map((r) => <div className="res-card" key={r.id} data-testid={`my-reservation-${r.id}`}><div className="activity-icon borrow"><BookOpen size={15}/></div><div><b>{r.book_title}</b><span>Rak {r.book_shelf} · dipesan {fmtDate(r.created_at)}{r.processed_by ? ` · diproses ${r.processed_by}` : ""}</span></div><span className={`status ${r.status.toLowerCase()}`}>{r.status}</span>{r.status === "Menunggu" && <button className="icon-button" title="Batalkan" data-testid={`cancel-reservation-${r.id}`} onClick={() => cancel(r)}><X size={16}/></button>}</div>)}
       </div>}
     </main>
+ fitur/laporan-kartu-belakang-cetak-duplex
+    {photoOpen && photoAllowed && <Modal title="Unggah / ganti foto anggota" close={() => { setPhotoOpen(false); setSelId(""); setDraftPhoto(""); }}>
+      <p className="account-hint" style={{ marginTop: 0 }}>Pilih nama anggota, lalu unggah atau ganti fotonya. Kartu anggota akan otomatis memakai foto terbaru.</p>
+
     {photoOpen && <Modal title="Unggah / ganti foto anggota" close={() => { setPhotoOpen(false); setSelId(""); setDraftPhoto(""); }}>
       <p className="account-hint" style={{ marginTop: 0 }}>Pilih nama anggota, lalu unggah {photoCfg.allow_replace ? "atau ganti " : ""}fotonya. Kartu anggota akan otomatis memakai foto terbaru.{photoCfg.until ? ` Unggah foto dibuka sampai ${new Date(photoCfg.until).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB.` : ""}</p>
+ main
       <label className="photo-member-select">Nama anggota
         <select data-testid="photo-member-select" value={selId} onChange={(e) => chooseMember(e.target.value)}>
           <option value="">— Pilih nama anggota —</option>
@@ -99,9 +118,14 @@ export default function StudentPortal() {
         </select>
       </label>
       {options.length === 0 && <p className="muted">Belum ada data anggota. Hubungi petugas perpustakaan.</p>}
+ fitur/laporan-kartu-belakang-cetak-duplex
+      {selId ? <>
+        <PhotoBox value={draftPhoto} onChange={setDraftPhoto} label="Foto anggota" testId="student-photo-box" upload={uploadPhoto} onError={notify}/>
+
       {selId && replaceBlocked ? <div className="photo-locked" data-testid="student-photo-replace-blocked"><Lock size={18}/><div><b>Foto anggota ini sudah ada</b>Penggantian foto sedang tidak diizinkan. Hubungi petugas perpustakaan bila foto perlu diganti.</div></div>
       : selId ? <>
         <PhotoBox value={draftPhoto} onChange={setDraftPhoto} label="Foto anggota" testId="student-photo-box"/>
+ main
         <div className="photo-card-preview"><p className="eyebrow">PRATINJAU KARTU</p><MemberCard member={{ ...options.find((o) => o.id === selId), photo: draftPhoto }} settings={data.settings}/></div>
         <button className="primary full" data-testid="save-student-photo-button" disabled={savingPhoto} onClick={savePhoto}>{savingPhoto ? "Menyimpan..." : "Simpan foto"}</button>
       </> : <p className="muted">Pilih nama anggota untuk mulai mengunggah foto.</p>}

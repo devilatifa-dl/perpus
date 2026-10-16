@@ -1,4 +1,38 @@
 {
+ fitur/laporan-kartu-belakang-cetak-duplex
+  "summary": "Frontend-only test of PhotoUploadChip on Anggota page. Chip visible for admin & petugas, toggles correctly with proper toasts, API /api/settings member_photo_upload stays in sync, Pengaturan photo-upload-switch/status mirrors the chip state, student portals (Siti profile shows photo-upload-locked; shared siswa shows photo-upload-locked-button) react correctly to Nonaktif. Mobile 390: chip stays on one line (white-space:nowrap, h=34). Final state left Aktif via petugas. Found one issue: mobile toolbar does not wrap and the primary 'Tambah anggota' button is cut off beyond the viewport.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Members toolbar (Anggota page)",
+        "issue": "At 390px width the toolbar buttons do NOT wrap. 'Tambah anggota' (data-testid=add-member-button) sits at x=372, right=421 (viewport=390), so it is clipped by ~31px. The task spec explicitly required: 'toolbar buttons wrap and are not cut off'. All four action buttons (Impor/Hapus massal/Naik kelas/Tambah anggota) are compressed to icon-only ~50px tiles on one row, with the primary overflowing to the right.",
+        "selector": "[data-testid=\"add-member-button\"]",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Anggota mobile 390", "issues": ["Toolbar buttons squeezed to icon-only tiles and overflow horizontally instead of wrapping to a new row below the chip."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Make the Members .toolbar-buttons flex-wrap on mobile (<=480px) or stack them in a second row below the title+chip block so 'Tambah anggota' is not clipped at 390px width. Verify at exactly 390px: all four buttons visible (either wrapped or scrollable with visible edges)."
+  ],
+  "critical_code_review_comments": [
+    "PhotoUploadChip.js: clean, uses data-testid for chip & status, correct state mapping (member_photo_upload !== false). No code-level issues.",
+    "App.js Members toolbar: the primary action 'Tambah anggota' is still inside the same row as three secondary buttons; needs responsive wrap rule at narrow widths."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "95%"},
+  "test_credentials": "admin@smansa.sch.id/admin123, petugas@smansa.sch.id/petugas123, siti@smansa.sch.id/siti123, siswa@smansa.sch.id/siswa123 — all working.",
+  "seed_data_creation": "none",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Chip itself works end-to-end across admin/petugas/siswa flows and syncs with Pengaturan. Only remaining concern is mobile toolbar overflow at 390px (Tambah anggota clipped). Final state of member_photo_upload is TRUE (Aktif) via petugas.",
+  "rca of the issue": "At 390px, .toolbar-buttons uses a non-wrapping flex row. With the chip added to the title column, the right-hand buttons column exceeds the remaining width, pushing 'Tambah anggota' past the viewport. Fix by adding flex-wrap:wrap (or stacking on a new row) in the mobile media query in Lanjutan.css for .toolbar / .toolbar-buttons."
+
   "summary": "Completed comprehensive testing of student photo upload feature toggle. Backend API (18/18 tests passed), Admin UI (all elements working), and Student Portal (enabled/disabled states verified) all functioning correctly.",
   "backend_issues": {
     "critical_bugs": [],
@@ -75,4 +109,5 @@
     },
     "config_restored": "✅ Config restored to {enabled:true, until:'', allow_replace:true} at end of backend tests"
   }
+ main
 }

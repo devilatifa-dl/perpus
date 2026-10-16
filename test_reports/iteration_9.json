@@ -1,14 +1,43 @@
 {
+ fitur/laporan-kartu-belakang-cetak-duplex
+  "summary": "Tested the two new features: (1) xlsx-only bulk member import and (2) editable card-back design + web text. Backend: 8 pytest tests covering GET /api/settings exposes card_back_title/rules/web with defaults and persists via PUT; empty web persists; template.xlsx has headers nama,nis,kelas and is 403 for siswa; CSV upload to /api/members/import -> 400 with Indonesian message mentioning Excel/.xlsx; valid xlsx import inserts members and numeric NIS cells (99092/99093 as floats) are stored as plain string without '.0'; siswa POST import -> 403. All 8/8 passed. Frontend: Admin login OK. Impor modal shows 'Excel (.xlsx)' copy; download-template-button downloads 'template-anggota.xlsx'; selecting a .csv is rejected client-side (toast + label resets, no file set); uploading a prepared xlsx with 2 TEST_ rows shows import-result 'Berhasil: 2 · Dilewati: 0 · Total baris: 2' and list refreshes to 5 members. member-card-side-switch toggles front/back; back shows card-back-title, 6 numbered rules (one per \\n), and card-back-web. CardDesigner (design-card-button): designer-side-belakang shows designer-card-back; typing in card-back-title-input / card-back-rules-input / card-back-web-input live-updates preview (title 'TEST ATURAN FE', 3 rules, web 'test-fe.sch.id'); save-card-design-button persists and after reload the back card displays the saved text; emptying card-back-web-input hides card-back-web in preview; preset buttons restyle the back card (class includes theme-/font-/size-/layout-). BulkCardPrint: bulk-side-select='belakang' renders 5 bulk-card-back-<id> items and shows bulk-back-hint; switching back to 'depan' removes bulk-card-back-* and renders normal cards. Defaults restored at end; TEST_FE members cleaned up via API.",
+  "backend_issues": {"critical": [], "minor": []},
+
   "summary": "Completed testing for admin name update ('Devi Latifa, S.I.Pust') and member import Excel feature (.xlsx only). All backend APIs and frontend UI tests passed successfully.",
   "backend_issues": {
     "critical_bugs": [],
     "flaky_endpoints": []
   },
+ main
   "frontend_issues": {
     "ui_bugs": [],
     "integration_issues": [],
     "design_issues": []
   },
+ fitur/laporan-kartu-belakang-cetak-duplex
+  "test_report_links": [
+    "/app/backend/tests/test_iteration9.py",
+    "/app/test_reports/pytest/iteration9.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/server.py _parse_member_rows uses str(int(c)) only when isinstance(c, float) and c.is_integer(); if NIS cell is formatted as integer in some templates openpyxl may still return it as int which already stringifies cleanly - current logic covers both. Consider explicitly handling very large NIS stored as scientific-notation floats (>1e16) which would overflow int conversion.",
+    "/api/members/import performs insert_many without transaction; partial failure (e.g., duplicate within batch) is already caught pre-insert, OK.",
+    "CardDesigner.js draft is initialized from settings but DEFAULT_SETTINGS spread first; if backend adds future card_back_* fields they'll show defaults correctly. Good.",
+    "MemberCardBack splits on \\n then trims+filters empty — blank lines are collapsed; current behavior desired for 'one line = one rule'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration9.py",
+    "/app/test_reports/iteration_9.json"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% of covered flows"},
+  "test_credentials": "admin@smansa.sch.id/admin123, siswa@smansa.sch.id/siswa123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Imported 2 members (TEST_FEOne 99101, TEST_FETwo 99102) via UI then deleted them via /api/members DELETE at end. Settings temporarily changed (card_back_title/rules/web) then restored to original defaults.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All iteration-9 features working. test_iteration9.py builds xlsx in-memory with openpyxl (installed in backend venv). For UI tests, prebuild xlsx via /root/.venv/bin/python since node-side playwright env lacks openpyxl.",
+  "rca of the issue": "No bugs found."
+
   "passed_tests": [
     "Admin login returns name 'Devi Latifa, S.I.Pust' (backend & frontend)",
     "Topbar user chip displays 'Devi Latifa, S.I.Pust' with 'admin' role",
@@ -40,4 +69,5 @@
   "action_item_for_main_agent": "",
   "should_call_test_agent_after_fix": false,
   "should_main_agent_test_itself": false
+ main
 }

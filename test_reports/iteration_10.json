@@ -1,4 +1,29 @@
 {
+ fitur/laporan-kartu-belakang-cetak-duplex
+  "summary": "Tested duplex (dua sisi / bolak-balik) bulk print flow in BulkCardPrint. Admin login OK. Created 11 TEST_DUPLEX members in class XTEST via POST /api/members, opened Anggota -> bulk-print-button-open; bulk-print-view is rendered as a React portal directly under <body>. bulk-side-select has 3 options (depan, belakang, dua). depan mode: 1 print-sheet with 11 bulk-card-*, no bulk-card-back-*; h3 shows '11 kartu · 2 halaman A4 · ukuran ID 85,6 × 54 mm'; button text 'Cetak 11 kartu'. belakang mode: 1 print-sheet.back-side (direction rtl) with 11 bulk-card-back-*; bulk-back-hint visible. dua mode: bulk-duplex-hint visible; h3 shows '11 kartu · 4 halaman A4 (2 lembar bolak-balik) · ukuran ID 85,6 × 54 mm'; button text 'Cetak dua sisi (4 halaman)'; duplex-sheets contains 4 sheets in correct order duplex-sheet-1-front, duplex-sheet-1-back, duplex-sheet-2-front, duplex-sheet-2-back; page 1 front/back carry same 10 member IDs, page 2 front/back carry same 1 member ID; back sheet has class back-side with computed direction rtl. Class filter XTEST works in dua mode. Under page.emulate_media(media='print'): duplex-page height = 1123px (≈297mm at 96dpi) with break-after:page and page-break-after:always; bulk-toolbar display:none; sheet-label display:none; all 7 non-bulk children of <body> hidden via body.bulk-mode>*:not(.bulk-print) rule. bulk-close-button removes bulk-print-view and sidebar/app re-appears. All 11 temp members cleaned up via DELETE /api/members/{id} (status 200 for all).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "BulkCardPrint.js is concise and uses createPortal(document.body) correctly so the fixed overlay is unaffected by ancestor stacking/overflow. Good.",
+    "Duplex page CSS forces height:297mm with overflow:hidden on print — if perPage math is wrong this would silently clip cards; current perPage=10 (landscape) matches .print-sheet grid (2 cols × 5 rows) perfectly. Portrait (9 per page, 3×3) also fits.",
+    "Sheet component uses index-based key ({i}) for the duplex wrapper div — fine here but preferable to key by chunk[0].id to avoid remount if list reorders.",
+    "window.print() is called synchronously; works but note some browsers debounce if the user is still mid-interaction with the <select>. Not an issue in testing."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% of covered duplex flows"},
+  "test_credentials": "admin@smansa.sch.id / admin123 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Created 11 members (TEST_DUPLEX_1..11, class XTEST) via POST /api/members then deleted via DELETE /api/members/{id} at end — all cleaned up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Duplex bulk print is fully functional. The admin login endpoint sets an httpOnly session cookie and returns no token in the response body — API-only testing must use credentials:'include'. For emulated-print DOM assertions use page.emulate_media(media='print') and read computed styles; duplex-page height ≈ 1123px at 96dpi because CSS uses 297mm.",
+  "rca of the issue": "No bugs found."
+
   "summary": "Completed testing of automatic client-side image downscaling feature. Core functionality verified: member photos resize to 900×675px, book covers to 1000×750px, small images kept unchanged. All tested uploads show correct info messages, proper JPEG/PNG format preservation, and no console errors.",
   "backend_issues": {
     "critical_bugs": [],
@@ -89,4 +114,5 @@
       "unchanged_images": "Images already small (<= target KB and within max side) kept at 100% original quality"
     }
   }
+ main
 }

@@ -3,17 +3,26 @@ import { Save } from "lucide-react";
 import { CARD_LAYOUTS, CARD_FONTS, CARD_FONT_SIZES, CARD_POS, CARD_PRESETS, DEFAULT_SETTINGS } from "../lib";
 import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
+import { MemberCardBack } from "./MemberCardBack";
 
 export function CardDesigner({ settings, member, onSave, close }) {
   const [draft, setDraft] = useState({ ...DEFAULT_SETTINGS, ...(settings || {}) });
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false); const [side, setSide] = useState("depan");
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
   const save = async () => { setSaving(true); try { await onSave(draft); close(); } finally { setSaving(false); } };
   const preview = member || { id: "MB-CONTOH01", name: "Nama Anggota", class_name: "XI IPA 1", student_id: "24000", photo: "" };
   return <Modal title="Desain kartu anggota" close={close} wide>
     <div className="designer" data-testid="card-designer">
-      <div className="designer-preview"><p className="eyebrow">PRATINJAU LANGSUNG</p><MemberCard member={preview} settings={draft}/></div>
+      <div className="designer-preview"><p className="eyebrow">PRATINJAU LANGSUNG</p>
+        <div className="mode-switch side-switch" data-testid="designer-side-switch">{[["depan", "Depan"], ["belakang", "Belakang"]].map(([id, l]) => <button key={id} type="button" data-testid={`designer-side-${id}`} className={side === id ? "selected" : ""} onClick={() => setSide(id)}>{l}</button>)}</div>
+        {side === "depan" ? <MemberCard member={preview} settings={draft}/> : <MemberCardBack settings={draft} testId="designer-card-back"/>}</div>
       <div className="designer-controls">
+        <div className="control-group back-controls" data-testid="card-back-controls"><span className="control-label">Bagian belakang kartu</span>
+          <label>Judul peraturan<input data-testid="card-back-title-input" maxLength={120} value={draft.card_back_title} onFocus={() => setSide("belakang")} onChange={(e) => set({ card_back_title: e.target.value.toUpperCase() })}/></label>
+          <label>Peraturan, syarat &amp; ketentuan <small className="muted">(satu baris = satu poin)</small><textarea data-testid="card-back-rules-input" rows={6} maxLength={2000} value={draft.card_back_rules} onFocus={() => setSide("belakang")} onChange={(e) => set({ card_back_rules: e.target.value })}/></label>
+          <label>Teks web<input data-testid="card-back-web-input" maxLength={150} placeholder="mis. perpustakaan.sekolah.sch.id" value={draft.card_back_web} onFocus={() => setSide("belakang")} onChange={(e) => set({ card_back_web: e.target.value })}/></label>
+          <small className="muted">Kosongkan teks web jika tidak ingin ditampilkan.</small>
+        </div>
         <div className="control-group"><span className="control-label">Template siap pakai</span>
           <div className="pill-options">{CARD_PRESETS.map(([id, label, preset]) => <button key={id} type="button" data-testid={`preset-${id}-button`} className="pill-option preset-pill" onClick={() => set(preset)}>{label}</button>)}</div>
           <small className="muted">Pilih template untuk mengatur tema, font, dan posisi sekaligus, lalu sesuaikan bila perlu dan tekan Simpan.</small>
