@@ -14,7 +14,6 @@ export function QRScanner({ onDetect, onClose }) {
         <input data-testid="qr-manual-input" placeholder="Atau ketik kode (MB-xxx / BK-xxx / NIS)" value={manual} onChange={(e) => setManual(e.target.value)}/>
         <button className="secondary" data-testid="qr-manual-submit">Pakai</button>
       </form>
-
 import { cameraError, createCamera } from "../lib/camera";
 
 export function QRScanner({ onDetect, onClose }) {
