@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from "react";
- fitur/laporan-kartu-belakang-cetak-duplex
-import { Camera, Crop, Upload, X } from "lucide-react";
-import { PhotoCropper } from "./PhotoCropper";
-import { readFile } from "../lib";
-
 import { Camera, Crop, Loader2, Sparkles, Upload, X } from "lucide-react";
-import { fmtSize, optimizeImage, prepareForCrop } from "../lib/image";
 import { PhotoCropper } from "./PhotoCropper";
- main
-
+import { fmtSize, optimizeImage, prepareForCrop } from "../lib";
+import { readFile } from "../lib";
 export function Modal({ title, close, children, wide }) {
   const closeRef = useRef(close); closeRef.current = close; const boxRef = useRef(null);
   useEffect(() => { const onKey = (e) => { if (e.key !== "Escape") return; const all = document.querySelectorAll(".modal-backdrop"); if (all[all.length - 1] === boxRef.current) closeRef.current?.(); }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []);
