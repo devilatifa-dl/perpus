@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera, Trophy } from "lucide-react";
+import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera, Trophy, Lock } from "lucide-react";
 import { Leaderboard } from "./Leaderboard";
 import { fmtDate } from "../lib";
 import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
@@ -18,21 +18,26 @@ export default function StudentPortal() {
   const [options, setOptions] = useState([]); const [photoOpen, setPhotoOpen] = useState(false); const [savingPhoto, setSavingPhoto] = useState(false); const [selId, setSelId] = useState(""); const [draftPhoto, setDraftPhoto] = useState("");
   const [meId, setMeId] = useState(() => localStorage.getItem("perpus_me_id") || "");
   const [meQuery, setMeQuery] = useState(""); const [meOpen, setMeOpen] = useState(false);
+  const [photoCfg, setPhotoCfg] = useState({ open: true, allow_replace: true, until: "" });
+  const loadPhotoCfg = () => api.get("/settings/student-photo").then((r) => { setPhotoCfg(r.data); return r.data; }).catch(() => null);
   const notify = (t) => { setToast(t); clearTimeout(window.__perpusToastS); window.__perpusToastS = setTimeout(() => setToast(""), 3200); };
   useEffect(() => { api.get("/auth/me").then((r) => setUser(r.data)).catch(() => {}).finally(() => setChecking(false)); }, []);
   const loadOptions = () => api.get("/members/options").then((r) => setOptions(r.data)).catch(() => {});
   const loadMine = (id) => api.get("/reservations/mine", { params: id ? { member_id: id } : {} }).then((r) => setData((d) => ({ ...d, mine: r.data }))).catch(() => {});
   const load = () => Promise.all([api.get("/books"), api.get("/shelves"), api.get("/dashboard"), api.get("/settings")])
     .then(([b, s, d, c]) => setData((prev) => ({ ...prev, books: b.data, shelves: s.data, stats: d.data, settings: c.data })));
-  useEffect(() => { if (user && user.role === "siswa") { load(); loadOptions(); loadMine(meId); } }, [user]);
+  useEffect(() => { if (user && user.role === "siswa") { load(); loadOptions(); loadMine(meId); loadPhotoCfg(); } }, [user]);
+  useEffect(() => { if (!user || user.role !== "siswa") return undefined; const t = setInterval(loadPhotoCfg, 60000); return () => clearInterval(t); }, [user]);
   useEffect(() => { if (meId && !meQuery) { const m = options.find((o) => o.id === meId); if (m) setMeQuery(m.name); } }, [options, meId]);
   const meMatches = (meQuery.trim() ? options.filter((o) => `${o.name} ${o.class_name} ${o.student_id}`.toLowerCase().includes(meQuery.trim().toLowerCase())) : options).slice(0, 8);
   const onMeInput = (v) => { setMeQuery(v); setMeOpen(true); if (meId) { setMeId(""); localStorage.removeItem("perpus_me_id"); loadMine(""); } };
   const pickMe = (o) => { setMeId(o.id); localStorage.setItem("perpus_me_id", o.id); setMeQuery(o.name); setMeOpen(false); loadMine(o.id); };
   const clearMe = () => { setMeId(""); setMeQuery(""); localStorage.removeItem("perpus_me_id"); setMeOpen(false); loadMine(""); };
-  const openPhoto = () => { loadOptions(); setSelId(meId || ""); setDraftPhoto((options.find((o) => o.id === meId) || {}).photo || ""); setPhotoOpen(true); };
+  const openPhoto = async () => { const c = await loadPhotoCfg(); if (c && !c.open) { notify("Unggah foto sedang ditutup oleh petugas perpustakaan"); return; } loadOptions(); setSelId(meId || ""); setDraftPhoto((options.find((o) => o.id === meId) || {}).photo || ""); setPhotoOpen(true); };
   const chooseMember = (id) => { setSelId(id); const m = options.find((o) => o.id === id); setDraftPhoto(m?.photo || ""); };
-  const savePhoto = async () => { if (!selId) { notify("Pilih nama anggota dulu"); return; } setSavingPhoto(true); try { await api.post(`/members/${selId}/photo`, { photo: draftPhoto }); await loadOptions(); notify("Foto disimpan — kartu anggota diperbarui"); } catch (e) { notify(e.response?.data?.detail || "Gagal menyimpan foto"); } finally { setSavingPhoto(false); } };
+  const savePhoto = async () => { if (!selId) { notify("Pilih nama anggota dulu"); return; } setSavingPhoto(true); try { await api.post(`/members/${selId}/photo`, { photo: draftPhoto }); await loadOptions(); notify("Foto disimpan — kartu anggota diperbarui"); } catch (e) { notify(e.response?.data?.detail || "Gagal menyimpan foto"); loadPhotoCfg(); } finally { setSavingPhoto(false); } };
+  const selMember = options.find((o) => o.id === selId);
+  const replaceBlocked = !photoCfg.allow_replace && !!selMember?.photo;
   const reserve = async (b) => { if (!meId) { notify("Pilih namamu dulu di bagian atas sebelum memesan"); return; } setBusy(b.id); try { await api.post("/reservations", { book_id: b.id, member_id: meId }); await Promise.all([load(), loadMine(meId)]); notify(`“${b.title}” masuk antrean pesanan`); } catch (e) { notify(e.response?.data?.detail || "Gagal memesan"); } finally { setBusy(""); } };
   const cancel = async (r) => { try { await api.delete(`/reservations/${r.id}`, { params: meId ? { member_id: meId } : {} }); await Promise.all([load(), loadMine(meId)]); notify("Pesanan dibatalkan"); } catch (e) { notify(e.response?.data?.detail || "Gagal membatalkan"); } };
   const waitingIds = new Set((data.mine || []).filter((r) => r.status === "Menunggu").map((r) => r.book_id));
@@ -55,7 +60,9 @@ export default function StudentPortal() {
         <div><p className="eyebrow light">HALO SISWA/SISWI SMANSA</p><h1>Buku apa yang ingin <em>kamu baca</em> hari ini?</h1><p>{fmt(available)} dari {fmt(data.stats.books)} eksemplar ({fmt(data.books.length)} judul) tersedia untuk dipinjam. Datangi petugas perpustakaan untuk meminjam.</p></div>
         <div className="student-profile" data-testid="student-profile">
           <div className="student-profile-avatar"><Camera size={26}/></div>
-          <button className="reserve-btn" data-testid="open-photo-upload-button" onClick={openPhoto}><Camera size={14}/> Unggah foto anggota</button>
+          {photoCfg.open
+            ? <button className="reserve-btn" data-testid="open-photo-upload-button" onClick={openPhoto}><Camera size={14}/> Unggah foto anggota</button>
+            : <button className="reserve-btn locked" data-testid="open-photo-upload-button" aria-disabled="true" onClick={openPhoto} title="Dibuka kembali oleh petugas"><Lock size={14}/> Unggah foto ditutup</button>}
         </div>
       </section>
       <div className="student-identity" data-testid="student-identity">
@@ -84,7 +91,7 @@ export default function StudentPortal() {
       </div>}
     </main>
     {photoOpen && <Modal title="Unggah / ganti foto anggota" close={() => { setPhotoOpen(false); setSelId(""); setDraftPhoto(""); }}>
-      <p className="account-hint" style={{ marginTop: 0 }}>Pilih nama anggota, lalu unggah atau ganti fotonya. Kartu anggota akan otomatis memakai foto terbaru.</p>
+      <p className="account-hint" style={{ marginTop: 0 }}>Pilih nama anggota, lalu unggah {photoCfg.allow_replace ? "atau ganti " : ""}fotonya. Kartu anggota akan otomatis memakai foto terbaru.{photoCfg.until ? ` Unggah foto dibuka sampai ${new Date(photoCfg.until).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB.` : ""}</p>
       <label className="photo-member-select">Nama anggota
         <select data-testid="photo-member-select" value={selId} onChange={(e) => chooseMember(e.target.value)}>
           <option value="">— Pilih nama anggota —</option>
@@ -92,7 +99,8 @@ export default function StudentPortal() {
         </select>
       </label>
       {options.length === 0 && <p className="muted">Belum ada data anggota. Hubungi petugas perpustakaan.</p>}
-      {selId ? <>
+      {selId && replaceBlocked ? <div className="photo-locked" data-testid="student-photo-replace-blocked"><Lock size={18}/><div><b>Foto anggota ini sudah ada</b>Penggantian foto sedang tidak diizinkan. Hubungi petugas perpustakaan bila foto perlu diganti.</div></div>
+      : selId ? <>
         <PhotoBox value={draftPhoto} onChange={setDraftPhoto} label="Foto anggota" testId="student-photo-box"/>
         <div className="photo-card-preview"><p className="eyebrow">PRATINJAU KARTU</p><MemberCard member={{ ...options.find((o) => o.id === selId), photo: draftPhoto }} settings={data.settings}/></div>
         <button className="primary full" data-testid="save-student-photo-button" disabled={savingPhoto} onClick={savePhoto}>{savingPhoto ? "Menyimpan..." : "Simpan foto"}</button>

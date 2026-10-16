@@ -6,20 +6,31 @@ import { Modal } from "./Shared";
 export function MemberImport({ close, onDone, notify }) {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [tplBusy, setTplBusy] = useState(false);
   const [result, setResult] = useState(null);
   const inputRef = useRef(null);
 
-  const downloadTemplate = () => {
-    const csv = "nama,nis,kelas\nBudi Santoso,24100,X IPA 1\nSiti Aminah,24101,X IPA 1\nRudi Hartono,24102,X IPS 2\n";
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "template-anggota.csv";
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  const downloadTemplate = async () => {
+    setTplBusy(true);
+    try {
+      const { data } = await api.get("/members/import-template.xlsx", { responseType: "blob" });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a"); a.href = url; a.download = "template-anggota.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (e) {
+      notify("Template Excel belum dapat diunduh");
+    } finally { setTplBusy(false); }
+  };
+
+  const pick = (f) => {
+    setResult(null);
+    if (f && !/\.xlsx$/i.test(f.name)) { setFile(null); notify("Pilih berkas Excel (.xlsx)"); return; }
+    setFile(f || null);
   };
 
   const upload = async () => {
-    if (!file) return notify("Pilih berkas .csv atau .xlsx dulu");
+    if (!file) return notify("Pilih berkas Excel (.xlsx) dulu");
     setBusy(true);
     try {
       const fd = new FormData(); fd.append("file", file);
@@ -34,12 +45,12 @@ export function MemberImport({ close, onDone, notify }) {
 
   return <Modal title="Impor anggota massal" close={close}>
     <div className="import-box" data-testid="member-import">
-      <p className="account-hint">Unggah berkas <b>.csv</b> atau <b>.xlsx</b> dengan kolom: <b>nama</b>, <b>nis</b>, <b>kelas</b>. Satu baris = satu anggota, dan boleh memuat banyak kelas sekaligus.</p>
-      <button type="button" className="secondary" data-testid="download-template-button" onClick={downloadTemplate}><Download size={15}/> Unduh template CSV</button>
+      <p className="account-hint">Unggah berkas <b>Excel (.xlsx)</b> dengan kolom: <b>nama</b>, <b>nis</b>, <b>kelas</b>. Satu baris = satu anggota, dan boleh memuat banyak kelas sekaligus.</p>
+      <button type="button" className="secondary" data-testid="download-template-button" onClick={downloadTemplate} disabled={tplBusy}><Download size={15}/> {tplBusy ? "Menyiapkan..." : "Unduh template Excel"}</button>
       <label className="import-drop" data-testid="import-file-label" onClick={() => inputRef.current?.click()}>
-        <input ref={inputRef} type="file" accept=".csv,.xlsx" data-testid="import-file-input" onChange={(e) => { setFile(e.target.files[0]); setResult(null); }} style={{ display: "none" }}/>
+        <input ref={inputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-testid="import-file-input" onChange={(e) => pick(e.target.files[0])} style={{ display: "none" }}/>
         <FileSpreadsheet size={26}/>
-        <span>{file ? file.name : "Klik untuk memilih berkas"}</span>
+        <span>{file ? file.name : "Klik untuk memilih berkas Excel"}</span>
       </label>
       {result && <div className="import-result" data-testid="import-result">
         <b>Hasil impor</b>
