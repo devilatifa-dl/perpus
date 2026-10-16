@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { BookOpen, Boxes, BookmarkPlus, ChevronRight } from "lucide-react";
 import { Leaderboard } from "./Leaderboard";
 import { fmtDate } from "../lib";
-import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib/api";
+import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { Login } from "./Login";
 import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
