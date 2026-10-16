@@ -2,7 +2,17 @@
   "version": 2,
   "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "cd frontend && CI=false npm run build",
+  "builds": [
+    {
+      "src": "backend/server.py",
+      "use": "@vercel/python"
+    }
+  ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/server.py"
+    },
     {
       "src": "/(.*)",
       "destination": "/frontend/build/$1"
