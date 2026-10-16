@@ -2,10 +2,6 @@
   "version": 2,
   "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "cd frontend && CI=false npm run build",
-  "routes": [
-    {
-      "src": "/(.*)",
-      "destination": "/frontend/build/$1"
-    }
-  ]
+  "outputDirectory": "frontend/build",
+  "framework": null
 }
