@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
+import { ThemeToggle } from "./ThemeToggle";
 
 const ACCOUNTS = { admin: ["admin@smansa.sch.id", "admin123"], petugas: ["petugas@smansa.sch.id", "petugas123"], siswa: ["siswa@smansa.sch.id", "siswa123"] };
 
@@ -12,6 +13,7 @@ export function Login({ onLogin, portal }) {
   const submit = async (e) => { e.preventDefault(); try { const { data } = await api.post("/auth/login", { email, password, portal }); onLogin(data); } catch (err) { setError(err.response?.data?.detail || "Email atau kata sandi salah"); } };
   const demo = (role) => { setEmail(ACCOUNTS[role][0]); setPassword(ACCOUNTS[role][1]); setError(""); };
   return <main className={student ? "login-shell student" : "login-shell"} data-testid={`login-page-${portal}`}>
+    <ThemeToggle variant="floating" testId="login-theme-toggle"/>
     <div className="login-visual">
       <div className="login-logos"><img src={SCHOOL_LOGO} alt="Logo SMA Negeri 1 Abung Tengah" data-testid="login-school-logo"/><img src={LIBRARY_LOGO} alt="Logo perpustakaan" data-testid="login-library-logo"/></div>
       <p className="overline">{student ? "PORTAL SISWA · PERPUSTAKAAN SEKOLAH" : "PORTAL PETUGAS & ADMIN · PERPUSTAKAAN SEKOLAH"}</p>
