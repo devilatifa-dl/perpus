@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Crop, Loader2, Sparkles, Upload, X } from "lucide-react";
-import { PhotoCropper } from "./PhotoCropper";
-import { fmtSize, optimizeImage, prepareForCrop, readFile } from "../lib";
+import { Photocropper } from "./Photocropper";
+import { fmtSize, optimizeImage, prepareForCrop, readFile } from "../utils/image";
 
 export function PhotoBox({ value, onChange, label = "Foto", upload, aspect = 1 }) {
   const inputRef = useRef(null);
@@ -17,38 +17,13 @@ export function PhotoBox({ value, onChange, label = "Foto", upload, aspect = 1 }
     setBusy(false);
   };
 
-  const pick = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-    setErr("");
-    
-    if (file.size > 25 * 1024 * 1024) {
-      return fail(new Error("Ukuran file maksimal 25MB"));
-    }
-
+  const saveCrop = async (croppedUrl) => {
     try {
       setBusy(true);
-      if (!upload) {
-        onChange(await readFile(file));
-        setBusy(false);
-        return;
-      }
-      
-      const local = URL.createObjectURL(file);
-      setCropSrc(local);
-      original.current = { src: local, before: file.size };
-      setBusy(false);
-    } catch (e) {
-      fail(e);
-    }
-  };
-
-  const saveCrop = async (file) => {
-    try {
-      setBusy(true);
-      const r = await upload(file);
-      onChange(r.url);
+      const res = await fetch(croppedUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "photo.jpg", { type: "image/jpeg" });
+      onChange(file);
       setCropSrc("");
       setBusy(false);
     } catch (e) {
@@ -57,16 +32,16 @@ export function PhotoBox({ value, onChange, label = "Foto", upload, aspect = 1 }
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <label className="text-sm font-medium">{label}</label>
       <div className="flex items-center gap-4">
         {value ? (
-          <div className="relative w-24 h-24 rounded-lg overflow-hidden border">
-            <img src={value} alt="Preview" className="w-full h-full object-cover" />
+          <div className="relative w-24 h-24 border rounded-lg overflow-hidden">
+            <img src={typeof value === "string" ? value : URL.createObjectURL(value)} alt="Preview" className="w-full h-full object-cover" />
             <button
               type="button"
               onClick={() => onChange("")}
-              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow hover:bg-red-600"
+              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 shadow"
             >
               <X size={14} />
             </button>
@@ -74,17 +49,29 @@ export function PhotoBox({ value, onChange, label = "Foto", upload, aspect = 1 }
         ) : (
           <div
             onClick={() => !busy && inputRef.current?.click()}
-            className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary text-muted-foreground"
+            className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400"
           >
             {busy ? <Loader2 className="animate-spin" size={20} /> : <Upload size={20} />}
             <span className="text-xs mt-1">Upload</span>
           </div>
         )}
-        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={pick} />
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            e.target.value = "";
+            setErr("");
+            setCropSrc(URL.createObjectURL(file));
+          }}
+        />
       </div>
       {err && <p className="text-xs text-red-500">{err}</p>}
       {cropSrc && (
-        <PhotoCropper
+        <Photocropper
           src={cropSrc}
           aspect={aspect}
           onCancel={() => setCropSrc("")}
@@ -93,7 +80,9 @@ export function PhotoBox({ value, onChange, label = "Foto", upload, aspect = 1 }
       )}
     </div>
   );
-  export function Modal({ isOpen, onClose, title, children }) {
+}
+
+export function Modal({ isOpen, onClose, title, children }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
