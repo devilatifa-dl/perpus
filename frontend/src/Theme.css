@@ -1,0 +1,177 @@
+/* =====================================================================
+   Tema "Modern · Terang · Ungu" — lapisan gaya terakhir (override).
+   Hanya mengubah tampilan; struktur & fungsi tetap. Desain kartu anggota
+   (.id-card di Card.css) sengaja tidak disentuh.
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root{
+  --v50:#f5f3ff;--v100:#ede9fe;--v200:#ddd6fe;--v300:#c4b5fd;--v400:#a78bfa;--v500:#8b5cf6;--v600:#7c3aed;--v700:#6d28d9;--v800:#5b21b6;--v900:#4c1d95;--v950:#2e1065;
+  --page:#f7f7fb;--line:#e9e8f3;--line-strong:#dcdbea;--ink:#16132b;--ink-2:#3b3854;--muted:#6b6880;--muted-2:#9a97ad;
+  --blue:var(--v600);--navy:var(--v950);
+  --r-sm:10px;--r-md:14px;--r-lg:18px;--r-xl:22px;
+  --sh-sm:0 1px 2px rgba(22,19,43,.05),0 1px 1px rgba(22,19,43,.03);
+  --sh-md:0 12px 28px -16px rgba(46,16,101,.28);
+  --sh-lg:0 30px 70px -30px rgba(46,16,101,.45);
+  --grad:linear-gradient(125deg,#4c1d95 0%,#6d28d9 45%,#8b5cf6 100%);
+}
+
+/* ---------- Dasar ---------- */
+body{background:var(--page);color:var(--ink);font-family:"Plus Jakarta Sans",Inter,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3,strong,b{font-family:"Plus Jakarta Sans",Outfit,Inter,sans-serif;letter-spacing:-.01em}
+h1,h2{font-weight:800;letter-spacing:-.025em}
+h3,strong,b{font-weight:700}
+.eyebrow,.overline{color:var(--v600);letter-spacing:.14em;font-weight:800}
+.eyebrow.light{color:var(--v200)}
+.muted{color:var(--muted)}
+::selection{background:var(--v200);color:var(--v950)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--v600);outline-offset:2px}
+.loading{background:var(--page);color:var(--v600)}
+
+/* ---------- Tombol ---------- */
+.primary{background:var(--v600);border-radius:var(--r-sm);box-shadow:0 10px 20px -12px rgba(124,58,237,.7);transition:background .2s,transform .2s,box-shadow .2s}
+.primary:hover{background:var(--v700);transform:translateY(-1px);box-shadow:0 16px 28px -14px rgba(109,40,217,.7)}
+.primary:active{transform:translateY(0)}
+.primary:disabled{opacity:.6;transform:none;box-shadow:none}
+.secondary{background:#fff;border:1px solid var(--line-strong);color:var(--ink-2);border-radius:var(--r-sm);transition:background .2s,border-color .2s,color .2s}
+.secondary:hover{background:var(--v50);border-color:var(--v200);color:var(--v800)}
+.text-button{color:var(--v600)}
+.text-button:hover{color:var(--v800)}
+.icon-button{border-radius:var(--r-sm)}
+.icon-button:hover{background:var(--v50);color:var(--v600)}
+
+/* ---------- Input ---------- */
+input,select,textarea{border:1px solid var(--line-strong);border-radius:var(--r-sm);transition:border-color .2s,box-shadow .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--v400);box-shadow:0 0 0 4px rgba(124,58,237,.12);outline:none}
+label{color:var(--ink-2)}
+.searchbox{border:1px solid var(--line-strong);border-radius:999px;background:#fff;padding:0 16px;transition:border-color .2s,box-shadow .2s}
+.searchbox:focus-within{border-color:var(--v400);box-shadow:0 0 0 4px rgba(124,58,237,.12)}
+.searchbox input:focus{box-shadow:none}
+.error{border-radius:var(--r-sm)}
+
+/* ---------- Sidebar terang ---------- */
+.sidebar{background:#fff;color:var(--ink-2);border-right:1px solid var(--line)}
+.side-brand{color:var(--ink)}
+.side-brand small{color:var(--v600)}
+.side-label{color:var(--muted-2)}
+.nav-item{color:var(--muted);border-radius:12px;font-weight:600;transition:background .2s,color .2s}
+.nav-item:hover{background:var(--v50);color:var(--v800)}
+.nav-item.active{background:var(--v600);color:#fff;box-shadow:0 10px 22px -12px rgba(124,58,237,.75)}
+.nav-item.active svg{color:#fff}
+.no-fine{background:var(--v50);border:1px solid var(--v100);color:var(--v700);border-radius:var(--r-md)}
+.no-fine b{color:var(--v900)}
+.no-fine small{color:var(--v700)}
+.logout{color:var(--muted);border-radius:12px}
+.logout:hover{background:#fef2f2;color:#b91c1c}
+
+/* ---------- Topbar ---------- */
+.topbar{background:#fff;border-bottom:1px solid var(--line)}
+.crumb b{color:var(--ink)}
+.avatar{background:var(--v100);color:var(--v800)}
+
+/* ---------- Banner sambutan / hero ---------- */
+.welcome-banner,.student-hero{background:var(--grad);border-radius:var(--r-xl);box-shadow:var(--sh-md);position:relative;overflow:hidden}
+.welcome-banner:after,.student-hero:after{content:"";position:absolute;right:-80px;top:-90px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.18),rgba(255,255,255,0) 70%);pointer-events:none}
+.welcome-banner > *,.student-hero > *{position:relative;z-index:1}
+.welcome-banner em,.student-hero h1 em,.login-visual h1 em{color:#f5d0fe}
+.welcome-banner p:not(.eyebrow),.student-hero p:not(.eyebrow){color:#ede9fe}
+.banner-button{background:#fff;color:var(--v700);border-radius:999px;padding:11px 18px;box-shadow:0 10px 24px -12px rgba(0,0,0,.4)}
+.banner-button:hover{transform:translateY(-1px)}
+.banner-art{color:#ede9fe}
+.banner-art:before,.banner-art:after,.art-line{border-color:rgba(255,255,255,.28)}
+.art-line{background:rgba(255,255,255,.28)}
+
+/* ---------- Kartu & panel ---------- */
+.stat-card,.panel{border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-sm)}
+.stat-card{transition:transform .2s,box-shadow .2s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
+.stat-card strong{letter-spacing:-.02em}
+.stat-icon{border-radius:12px}
+.stat-icon.blue{background:var(--v100);color:var(--v700)}
+.panel-title h3{color:var(--ink)}
+.shortcut{background:var(--page);border-radius:var(--r-md);border:1px solid transparent;transition:background .2s,border-color .2s}
+.shortcut:hover{background:var(--v50);border-color:var(--v100)}
+.shortcut-icon{background:var(--v100);color:var(--v700);border-radius:10px}
+.activity-icon.borrow{background:var(--v100);color:var(--v700)}
+
+/* ---------- Tabel ---------- */
+th{color:var(--muted-2);font-weight:700;border-bottom:1px solid var(--line)}
+td{border-bottom:1px solid #f1f0f7;color:var(--ink-2)}
+tbody tr{transition:background .15s}
+tbody tr:hover td{background:#faf9ff}
+.book-cover{background:var(--v100);color:var(--v600);border-radius:6px}
+
+/* ---------- Badge & status ---------- */
+.soft-badge{background:var(--v50);color:var(--v700);border:1px solid var(--v100)}
+.shelf-tag{background:var(--v50);color:var(--v700);border-radius:999px}
+.status{border-radius:999px}
+.status.kembali{background:var(--v100);color:var(--v800)}
+
+/* ---------- Tab & segmen ---------- */
+.report-tabs{border-bottom:1px solid var(--line);gap:4px}
+.report-tabs button{color:var(--muted);border-radius:10px 10px 0 0;transition:color .2s,background .2s}
+.report-tabs button:hover{color:var(--v700);background:var(--v50)}
+.report-tabs button.active{color:var(--v700);border-bottom-color:var(--v600)}
+.mode-switch,.student-nav{background:#f1f0f7;border-radius:12px}
+.mode-switch button,.student-nav button{border-radius:9px}
+.mode-switch button.selected,.student-nav button.active{background:#fff;color:var(--v700);box-shadow:0 1px 2px rgba(22,19,43,.08),0 4px 10px -6px rgba(46,16,101,.25)}
+.member-row.selected{background:var(--v50);border-bottom-color:var(--v200)}
+
+/* ---------- Modal & notifikasi ---------- */
+.modal-backdrop{background:rgba(22,19,43,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.modal{border-radius:var(--r-xl);border:1px solid var(--line);box-shadow:var(--sh-lg);animation:themeModalIn .18s ease-out}
+.modal-head h3{color:var(--ink)}
+.toast{background:var(--v950);border-radius:var(--r-md);box-shadow:var(--sh-lg)}
+@keyframes themeModalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+
+/* ---------- Login ---------- */
+.login-visual{background:linear-gradient(135deg,rgba(46,16,101,.93),rgba(124,58,237,.76)),url('https://images.unsplash.com/photo-1544185310-0b3cf501672b?auto=format&fit=crop&w=1400&q=80') center/cover}
+.login-shell.student .login-visual{background:linear-gradient(135deg,rgba(76,29,149,.93),rgba(139,92,246,.74)),url('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1400&q=80') center/cover}
+.login-visual .overline,.login-shell.student .overline{color:#e9d5ff}
+.login-copy,.login-address,.login-shell.student .login-copy,.login-shell.student .login-address{color:#ede9fe}
+.login-panel{background:#fff}
+.login-panel h2{letter-spacing:-.02em}
+.brand-mark,.logo-box{background:var(--v600);box-shadow:0 10px 20px -8px rgba(124,58,237,.6)}
+.demo-login button{background:var(--v50);color:var(--v700);border:1px solid var(--v100)}
+.portal-switch a{color:var(--v600)}
+
+/* ---------- Pemilih portal (terang) ---------- */
+.chooser{background:radial-gradient(900px 500px at 15% 0%,#ede9fe 0,rgba(237,233,254,0) 60%),radial-gradient(800px 500px at 100% 100%,#f3e8ff 0,rgba(243,232,255,0) 60%),var(--page);color:var(--ink)}
+.chooser-head .overline{color:var(--v600)}
+.chooser-head h1{color:var(--ink);letter-spacing:-.03em}
+.chooser-head h1 em{color:var(--v600)}
+.chooser-head .login-copy{color:var(--muted)}
+.chooser-head img{box-shadow:0 8px 20px -10px rgba(46,16,101,.4);border:1px solid var(--line)}
+.chooser-card{border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--sh-sm)}
+.chooser-card:hover{box-shadow:var(--sh-lg);border-color:var(--v200)}
+.chooser-card h2{font-family:"Plus Jakarta Sans",Outfit,sans-serif;font-weight:800;color:var(--v700)}
+.chooser-card.student h2,.chooser-card b,.chooser-card.student b{color:var(--v600)}
+.chooser-icon,.chooser-card.student .chooser-icon{background:var(--v100);color:var(--v700);border-radius:14px}
+.chooser-foot{color:var(--muted-2)}
+
+/* ---------- Portal siswa ---------- */
+.student-shell{background:var(--page)}
+.student-top{background:#fff;border-bottom:1px solid var(--line)}
+.student-brand strong{color:var(--ink)}
+.student-hero-badge{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.35);color:#fff}
+.catalog-card{border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-sm)}
+.catalog-card:hover{transform:translateY(-3px);box-shadow:var(--sh-md);border-color:var(--v200)}
+.catalog-cover{background:var(--v50);color:var(--v500)}
+.shelf-chips button{border-color:var(--line-strong);border-radius:999px}
+.shelf-chips button:hover{border-color:var(--v300);color:var(--v700)}
+.shelf-chips button.active{background:var(--v600);color:#fff;border-color:var(--v600)}
+.reserve-btn{border-color:var(--v600);color:var(--v700);border-radius:var(--r-sm)}
+.reserve-btn:hover{background:var(--v600);color:#fff}
+.student-foot{border-top:1px solid var(--line);color:var(--muted-2)}
+
+@media (prefers-reduced-motion:reduce){
+  .primary,.secondary,.stat-card,.catalog-card,.chooser-card,.nav-item,.modal{transition:none!important;animation:none!important;transform:none!important}
+}
+
+/* ---------- Menu samping di HP ---------- */
+.sidebar-backdrop{display:none}
+@media(max-width:640px){
+  .sidebar{box-shadow:var(--sh-lg)}
+  .sidebar-backdrop{display:block;position:fixed;inset:0;background:rgba(22,19,43,.45);z-index:2;animation:themeFade .15s ease-out}
+}
+@keyframes themeFade{from{opacity:0}to{opacity:1}}

@@ -49,7 +49,7 @@ export function Leaderboard({ mode = "admin", meId = "", download, downloading, 
         <div className="panel" data-testid="leaderboard-classes"><div className="panel-title"><div><p className="eyebrow">PERINGKAT KELAS</p><h3>{lb.classes[0] ? <>Kelas teraktif: {lb.classes[0].class_name}</> : "-"}</h3></div><Trophy size={18} color="#d97706"/></div>
           <div className="class-bars">{lb.classes.map((c, i) => <div className="class-bar" key={c.class_name} data-testid={`leaderboard-class-${c.rank}`}>
             <div className="class-bar-label"><b>{c.rank <= 3 ? ["🥇", "🥈", "🥉"][c.rank - 1] + " " : `${c.rank}. `}{c.class_name}</b><span>{c.visits} pengunjung · {c.members} siswa</span></div>
-            <div className="class-bar-track"><div style={{ width: `${(c.visits / maxCls) * 100}%`, background: ["#d97706", "#64748b", "#b45309"][i] || "#0284c7" }}/></div>
+            <div className="class-bar-track"><div style={{ width: `${(c.visits / maxCls) * 100}%`, background: ["#d97706", "#64748b", "#b45309"][i] || "#7c3aed" }}/></div>
             <em>{c.pct}%</em>
           </div>)}</div>
         </div>

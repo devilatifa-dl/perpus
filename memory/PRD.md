@@ -125,3 +125,9 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 
 ### 17 Okt 2026 — Chip "Foto siswa" dihapus
 - PhotoUploadChip (chip kecil di bawah "x anggota terdaftar") dihapus. Tombol "Foto siswa" di toolbar (StudentPhotoSwitch, settings id=student_photo) jadi satu-satunya pengatur izin unggah foto siswa: media.photo_upload_allowed, StudentPortal & StudentProfile kini hanya mengikuti pengaturan ini (flag lama member_photo_upload tidak dipakai lagi).
+
+### 17 Okt 2026 — Tampilan baru "modern · terang · ungu"
+- Theme.css (dimuat terakhir di App.js): font Plus Jakarta Sans, sidebar putih dengan menu aktif ungu, banner/hero gradasi ungu, kartu & panel membulat, tombol/input/tab ungu, pemilih portal terang, login dengan lapisan ungu, portal siswa ungu.
+- Warna biru/hijau-portal di CSS lama & warna grafik diganti ungu. Desain kartu anggota (Card.css) TIDAK diubah.
+- HP: latar gelap di belakang menu samping (ketuk untuk menutup).
+- Belum di-push ke GitHub.
