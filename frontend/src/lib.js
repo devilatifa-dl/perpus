@@ -21,7 +21,6 @@ export const CARD_PRESETS = [
   ["hitam-emas", "Hitam Emas", { card_theme: "midnight", card_layout: "classic", card_font: "elegan", card_font_size: "besar", card_school_logo_pos: "kiri", card_library_logo_pos: "kanan", card_photo_pos: "kanan", card_qr_pos: "atas" }],
   ["putih-minimal", "Putih Minimalis", { card_theme: "light", card_layout: "modern", card_font: "mono", card_font_size: "kecil", card_school_logo_pos: "kiri", card_library_logo_pos: "kiri", card_photo_pos: "kiri", card_qr_pos: "bawah" }],
 ];
- fitur/laporan-kartu-belakang-cetak-duplex
 
 export const uploadPhoto = async (file) => {
   if (file.size > 25 * 1024 * 1024) throw new Error("Ukuran foto maksimal 25MB");
@@ -35,5 +34,3 @@ export const readFile = (file) => new Promise((resolve, reject) => {
   if (file.size > 900 * 1024) return reject(new Error("Ukuran maksimal 900KB"));
   const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(file);
 });
-
- main

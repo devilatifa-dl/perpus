@@ -6,7 +6,13 @@ import { MemberCard } from "./MemberCard";
 
 export function StudentProfile({ settings, notify }) {
   const [member, setMember] = useState(null); const [hist, setHist] = useState(null); const [draft, setDraft] = useState(""); const [saving, setSaving] = useState(false);
-  const allowed = settings?.member_photo_upload !== false;
+  const [cfg, setCfg] = useState({ open: true, allow_replace: true });
+  useEffect(() => {
+    const load = () => api.get("/settings/student-photo").then((r) => setCfg(r.data)).catch(() => {});
+    load(); const t = setInterval(load, 60000); return () => clearInterval(t);
+  }, []);
+  const replaceBlocked = !cfg.allow_replace && !!member?.photo;
+  const allowed = cfg.open && !replaceBlocked;
   useEffect(() => {
     api.get("/account/member").then((r) => { setMember(r.data); setDraft(r.data?.photo || ""); }).catch(() => {});
     api.get("/account/history").then((r) => setHist(r.data)).catch(() => setHist({ history: [], total: 0, active: 0 }));
@@ -26,7 +32,7 @@ export function StudentProfile({ settings, notify }) {
         {allowed ? <>
           <PhotoBox value={draft} onChange={setDraft} label="Foto profil" testId="profile-photo-box" upload={uploadPhoto} onError={notify}/>
           <button className="primary full" data-testid="save-profile-photo-button" disabled={saving || draft === (member.photo || "")} onClick={save}>{saving ? "Menyimpan..." : "Simpan foto"}</button>
-        </> : <div className="photo-locked" data-testid="photo-upload-locked"><Lock size={16}/> Upload foto sedang ditutup admin</div>}
+        </> : <div className="photo-locked" data-testid="photo-upload-locked"><Lock size={16}/> {cfg.open ? "Foto sudah ada — penggantian foto sedang tidak diizinkan petugas" : "Upload foto sedang ditutup petugas perpustakaan"}</div>}
       </div>
     </div>
     <div className="panel" data-testid="student-history">

@@ -18,15 +18,16 @@ export function AccountManager({ user, close, notify }) {
   const backup = async () => {
     setBusyData("backup");
     try {
-      const res = await api.get("/admin/backup");
-      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
+      const res = await api.get("/admin/backup.zip", { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
-      a.href = url; a.download = `backup-perpustakaan-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-      notify("Cadangan data berhasil diunduh");
+      a.href = url; a.download = `backup-perpustakaan-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1500);
+      notify("Cadangan data + semua laporan berhasil diunduh");
     } catch (err) {
-      notify(err.response?.data?.detail || "Gagal mengunduh cadangan");
+      let msg = "Gagal mengunduh cadangan";
+      try { msg = JSON.parse(await err.response.data.text()).detail || msg; } catch (e) { /* bukan JSON */ }
+      notify(msg);
     } finally { setBusyData(""); }
   };
 
@@ -114,10 +115,11 @@ export function AccountManager({ user, close, notify }) {
       {isAdmin && <div className="account-users" data-testid="data-maintenance">
         <div className="account-section-head"><Database size={16}/> <span>Data &amp; pemeliharaan</span></div>
         <p className="account-hint">Unduh cadangan seluruh data, pulihkan dari berkas cadangan, atau reset data perpustakaan.</p>
+        <p className="account-hint" data-testid="backup-contents-hint"><b>Unduh cadangan</b> menghasilkan satu berkas ZIP: data untuk pemulihan + semua laporan (Excel &amp; PDF) — transaksi, buku masuk, buku hilang, pengunjung, dan peringkat rajin berkunjung per bulan.</p>
         <div className="data-actions">
-          <button type="button" className="secondary" data-testid="backup-data-button" disabled={busyData !== ""} onClick={backup}><Download size={15}/> {busyData === "backup" ? "Menyiapkan..." : "Unduh cadangan"}</button>
+          <button type="button" className="secondary" data-testid="backup-data-button" disabled={busyData !== ""} onClick={backup}><Download size={15}/> {busyData === "backup" ? "Menyiapkan cadangan & laporan..." : "Unduh cadangan"}</button>
           <button type="button" className="secondary" data-testid="restore-data-button" disabled={busyData !== ""} onClick={() => restoreRef.current?.click()}><Upload size={15}/> {busyData === "restore" ? "Memulihkan..." : "Pulihkan data"}</button>
-          <input ref={restoreRef} type="file" accept="application/json,.json" hidden data-testid="restore-file-input" onChange={restore}/>
+          <input ref={restoreRef} type="file" accept="application/json,.json,application/zip,.zip" hidden data-testid="restore-file-input" onChange={restore}/>
         </div>
         <div className="data-reset-zone">
           <label className="reset-books-check"><input type="checkbox" data-testid="reset-include-books" checked={resetBooks} onChange={e => setResetBooks(e.target.checked)}/> Ikut hapus koleksi buku</label>

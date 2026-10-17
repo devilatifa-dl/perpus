@@ -11,7 +11,7 @@ from pathlib import Path
 import os, re, uuid, bcrypt, jwt, io, csv, json, logging
 from openpyxl import load_workbook
 from media import init_storage, photo_upload_allowed, build_router as media_router
-from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx
+from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx, fmt_long
 
 ROOT_DIR = Path(__file__).parent
 mongo_url = os.environ["MONGO_URL"]
@@ -225,11 +225,7 @@ async def current_user(request: Request):
 async def seed():
     if await db.users.count_documents({}) == 0:
         users = [
- fitur/laporan-kartu-belakang-cetak-duplex
-            {"id":"u-admin","name":"Devi Latifa, S.I.Pust","email":"admin@smansa.sch.id","role":"admin","password_hash":password_hash("admin123")},
-
             {"id":"u-admin","name":ADMIN_NAME,"email":"admin@smansa.sch.id","role":"admin","password_hash":password_hash("admin123")},
- main
             {"id":"u-petugas","name":"Pustakawan","email":"petugas@smansa.sch.id","role":"petugas","password_hash":password_hash("petugas123")},
             {"id":"u-siswa","name":"Bima Pratama","email":"siswa@smansa.sch.id","role":"siswa","student_id":"24001","password_hash":password_hash("siswa123")},
         ]
@@ -254,16 +250,6 @@ async def seed():
         if await db.transactions.count_documents({}) == 0:
             await db.transactions.insert_many([{ "id":"TRX-001","member_id":"MB-2024001","member_name":"Bima Pratama","book_id":"BK-1043","book_title":"Ensiklopedia Sains Remaja","action":"pinjam","date":(datetime.now(timezone.utc)-timedelta(days=10)).isoformat()},{"id":"TRX-002","member_id":"MB-2024002","member_name":"Siti Rahma","book_id":"BK-1042","book_title":"Laskar Pelangi","action":"kembali","date":now_iso()}])
         await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
- fitur/laporan-kartu-belakang-cetak-duplex
-    await db.members.update_many({}, {"$unset": {"email": "", "phone": ""}})
-    await db.users.update_one({"id": "u-admin", "name": {"$in": ["Administrator", "Devi Latifa"]}}, {"$set": {"name": "Devi Latifa, S.I.Pust"}})
-    await db.users.update_one({"id": "u-petugas", "name": "Rina Pustakawan"}, {"$set": {"name": "Pustakawan"}})
-    for coll, field in (("incoming", "recorded_by"), ("missing", "reported_by"), ("reservations", "processed_by"), ("visits", "recorded_by"), ("visits", "checkout_by"), ("stocktake", "officer")):
-        await db[coll].update_many({field: "Rina Pustakawan"}, {"$set": {field: "Pustakawan"}})
-    await db.settings.update_many({"card_school_name": "SMA 1 NEGERI ABUNG TENGAH"}, {"$set": {"card_school_name": "SMA NEGERI 1 ABUNG TENGAH"}})
-    await normalize_books()
-    await db.users.update_one({"id":"u-siswa","student_id":{"$exists":False}},{"$set":{"student_id":"24001"}})
-
     # Migrasi data lama — dijalankan SEKALI saja (tidak menyentuh data produksi di setiap restart)
     if not await db.meta.find_one({"id": "legacy-migrations-v1"}):
         await db.members.update_many({}, {"$unset": {"email": "", "phone": ""}})
@@ -289,20 +275,16 @@ async def ensure_indexes():
         await db.books.create_index("id"); await db.transactions.create_index("member_id"); await db.transactions.create_index("book_id")
     except Exception as e:  # indeks hanya untuk kecepatan, jangan gagalkan start
         logging.getLogger(__name__).warning("Gagal membuat indeks: %s", e)
- main
 
 @app.on_event("startup")
 async def startup():
     await seed()
- fitur/laporan-kartu-belakang-cetak-duplex
     await db.users.create_index("email", unique=True)
     try:
         init_storage()
     except Exception as e:
         print(f"Storage init failed: {e}")
-
     await ensure_indexes()
- main
 
 @api.get("/")
 async def root(): return {"message":"Perpustakaan SMA Negeri 1 Abung Tengah aktif"}
@@ -402,7 +384,7 @@ async def my_member(user=Depends(current_user)):
 
 async def check_student_photo(user, photo, member_id=None):
     if user["role"] != "siswa": return
-    if not await photo_upload_allowed(db): raise HTTPException(403, "Upload foto sedang ditutup admin")
+    if not await photo_upload_allowed(db): raise HTTPException(403, "Unggah foto sedang ditutup oleh petugas perpustakaan")
     if photo and not photo.startswith("/api/files/"): raise HTTPException(400, "Foto harus diunggah melalui tombol unggah")
     if member_id and user.get("member_id") and user["member_id"] != member_id: raise HTTPException(403, "Kamu hanya dapat mengubah fotomu sendiri")
 
@@ -711,7 +693,7 @@ def _parse_member_rows(filename: str, content: bytes):
             d = {}
             for i, c in enumerate(row):
                 if i < len(headers) and headers[i]:
-                    d[headers[i]] = "" if c is None else (str(int(c)) if isinstance(c, float) and c.is_integer() else str(c).strip())
+                    d[headers[i]] = _cell_text(c)
             if any(d.values()):
                 rows.append(d)
         if headers is None:
@@ -763,21 +745,6 @@ def _pick(d, *keys):
         if d.get(k):
             return d[k]
     return ""
-
-@api.get("/members/import-template.xlsx")
-async def member_import_template(user=Depends(current_user)):
-    staff_only(user)
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill
-    wb = Workbook(); ws = wb.active; ws.title = "Anggota"
-    ws.append(["nama", "nis", "kelas"])
-    for r in [["Budi Santoso", "24100", "X IPA 1"], ["Siti Aminah", "24101", "X IPA 1"], ["Rudi Hartono", "24102", "X IPS 2"]]: ws.append(r)
-    for c in ws[1]: c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745")
-    for col, w in zip("ABC", (32, 14, 14)): ws.column_dimensions[col].width = w
-    for row in ws.iter_rows(min_row=2, max_row=500, min_col=2, max_col=2):
-        for c in row: c.number_format = "@"
-    buf = io.BytesIO(); wb.save(buf)
-    return Response(content=buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": 'attachment; filename="template-anggota.xlsx"'})
 
 @api.post("/members/import")
 async def import_members(file: UploadFile = File(...), user=Depends(current_user)):
@@ -895,12 +862,70 @@ async def backup_data(user=Depends(current_user)):
         dump[name] = await db[name].find({}, {"_id": 0}).to_list(100000)
     return {"app": "perpustakaan-sma1-abung-tengah", "version": 1, "generated_at": now_iso(), "collections": dump}
 
+BACKUP_REPORTS = [("transaksi", "01-Laporan-Transaksi"), ("masuk", "02-Laporan-Buku-Masuk"), ("hilang", "03-Laporan-Buku-Hilang"), ("kunjungan", "04-Laporan-Pengunjung")]
+
+@api.get("/admin/backup.zip")
+async def backup_zip(user=Depends(current_user)):
+    """Cadangan lengkap: data (JSON, bisa dipulihkan) + semua laporan siap baca (Excel & PDF)."""
+    if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mengunduh cadangan data")
+    import zipfile, asyncio
+    payload = await backup_data(user)
+    now = datetime.now(WIB); stamp = now.strftime("%Y-%m-%d")
+    jobs, notes = [], []
+    for kind, name in BACKUP_REPORTS:
+        rows, settings, _ = await export_rows(kind, "semua")
+        jobs.append((f"laporan/{name}", kind, "semua", rows, settings, len(rows)))
+    lb_months = (await visit_leaderboard(None, limit=1))["months"]
+    for month in lb_months:
+        lb, settings, _ = await export_rows("peringkat", month)
+        if lb["total_visits"] == 0 and month != now.strftime("%Y-%m"):
+            continue
+        jobs.append((f"laporan/05-Peringkat-Rajin-Berkunjung/Peringkat-{month}", "peringkat", lb["label"], lb, settings, len(lb["students"])))
+
+    def build():
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("data-cadangan.json", json.dumps(payload, ensure_ascii=False, indent=2, default=str))
+            for path, kind, period, rows, settings, count in jobs:
+                for ext, render in (("xlsx", render_report_xlsx), ("pdf", render_report_pdf)):
+                    try:
+                        z.writestr(f"{path}.{ext}", render(kind, period, rows, settings, user["name"]))
+                    except Exception as e:
+                        logging.getLogger(__name__).warning("Laporan %s.%s gagal dibuat: %s", path, ext, e)
+                        notes.append(f"- {path}.{ext} gagal dibuat")
+                notes_line = f"- {path}.xlsx / .pdf ({count} baris)"
+                notes.append(notes_line)
+            readme = [
+                "CADANGAN PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH",
+                f"Dibuat: {fmt_long(now, True)} WIB oleh {user['name']}",
+                "",
+                "data-cadangan.json  -> berkas untuk menu 'Pulihkan data' (boleh juga unggah ZIP ini langsung).",
+                "laporan/            -> laporan siap baca (Excel & PDF), semua periode:",
+                *notes,
+            ]
+            z.writestr("BACA-SAYA.txt", "\n".join(readme))
+        return buf.getvalue()
+
+    data = await asyncio.to_thread(build)
+    return Response(content=data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="backup-perpustakaan-{stamp}.zip"'})
+
 @api.post("/admin/restore")
 async def restore_data(file: UploadFile = File(...), user=Depends(current_user)):
     if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat memulihkan data")
     content = await file.read()
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(400, "Ukuran berkas cadangan maksimal 50MB")
+    if content[:2] == b"PK":  # berkas ZIP dari "Unduh cadangan"
+        import zipfile
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as z:
+                content = z.read("data-cadangan.json")
+        except KeyError:
+            raise HTTPException(400, "ZIP cadangan tidak berisi data-cadangan.json")
+        except zipfile.BadZipFile:
+            raise HTTPException(400, "Berkas ZIP cadangan rusak")
     if len(content) > 20 * 1024 * 1024:
-        raise HTTPException(400, "Ukuran berkas cadangan maksimal 20MB")
+        raise HTTPException(400, "Ukuran data cadangan maksimal 20MB")
     try:
         payload = json.loads(content.decode("utf-8-sig", errors="replace"))
     except Exception:
@@ -1072,14 +1097,14 @@ async def export_rows(type: str, period: str):
         await visits_auto_close()
         if type == "statistik":
             return await visit_stats(period), settings, now
-        rows = await db.visits.find({}, {"_id":0}).sort("check_in",-1).to_list(20000)
+        rows = await db.visits.find({}, {"_id":0}).sort("check_in",-1).to_list(100000)
         return [r for r in rows if in_visit_period(r.get("check_in"), period, now)], settings, now
     if type == "transaksi":
-        rows = build_loans(await db.transactions.find({}, {"_id":0}).to_list(2000))
+        rows = build_loans(await db.transactions.find({}, {"_id":0}).to_list(100000))
     elif type == "masuk":
-        rows = await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(2000)
+        rows = await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(100000)
     else:
-        rows = await db.missing.find({}, {"_id":0}).sort("date",-1).to_list(2000)
+        rows = await db.missing.find({}, {"_id":0}).sort("date",-1).to_list(100000)
     rows = [r for r in rows if in_period(r.get("date"), period, now)]
     return rows, settings, now
 

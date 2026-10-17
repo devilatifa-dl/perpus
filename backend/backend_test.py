@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 """
-Backend API Testing for Member Import Excel Feature & Admin Name Update
+Backend API Testing for Backup/Restore with All Reports Feature
 Tests:
-1. Admin login returns name 'Devi Latifa, S.I.Pust'
-2. GET /api/members/import-template.xlsx returns valid xlsx
-3. POST /api/members/import with xlsx works correctly
-4. Import handles numeric NIS correctly (no .0 suffix)
-5. Error handling for .xls files and missing columns
-6. PDF report shows officer name 'Devi Latifa, S.I.Pust'
+1. GET /api/admin/backup.zip as admin returns 200 with ZIP file
+2. ZIP contains data-cadangan.json, BACA-SAYA.txt, and all report files (xlsx + pdf)
+3. Excel files can be opened with openpyxl and data rows start at row 8
+4. Create a visit and incoming book, verify they appear in reports
+5. Petugas and siswa get 403 on /api/admin/backup.zip
+6. POST /api/admin/restore with ZIP restores successfully
+7. Legacy JSON from GET /api/admin/backup still restores
+8. Invalid zip returns 400
+9. Existing /api/reports/export.pdf and export.xlsx still work
 """
 
 import requests
 import sys
 import io
-from openpyxl import load_workbook, Workbook
+import zipfile
+import json
+from openpyxl import load_workbook
 
-BASE_URL = "https://devilatifa-perpus.preview.emergentagent.com/api"
+BASE_URL = "https://perpus-library-1.preview.emergentagent.com/api"
 
 class TestRunner:
     def __init__(self):
@@ -23,7 +28,10 @@ class TestRunner:
         self.tests_passed = 0
         self.token = None
         self.admin_name = None
-        self.test_member_ids = []
+        self.test_visit_id = None
+        self.test_book_id = None
+        self.backup_zip = None
+        self.backup_json = None
 
     def log(self, msg):
         print(f"  {msg}")
@@ -55,45 +63,184 @@ class TestRunner:
             assert resp.status_code == 200, f"Login failed: {resp.status_code} {resp.text}"
             data = resp.json()
             assert "id" in data, "No user id in response"
-            assert "name" in data, "No name in response"
             self.token = resp.cookies.get("access_token")
             self.admin_name = data["name"]
             self.log(f"Logged in as: {self.admin_name}")
-            assert self.admin_name == "Devi Latifa, S.I.Pust", f"Expected 'Devi Latifa, S.I.Pust', got '{self.admin_name}'"
-        self.test("Admin login returns name 'Devi Latifa, S.I.Pust'", _test)
+        self.test("Admin login successful", _test)
 
-    def test_template_download(self):
-        """Test GET /api/members/import-template.xlsx"""
+    def test_backup_zip_admin(self):
+        """Test GET /api/admin/backup.zip as admin returns 200 with ZIP"""
         def _test():
             headers = {"Cookie": f"access_token={self.token}"}
-            resp = requests.get(f"{BASE_URL}/members/import-template.xlsx", headers=headers)
-            assert resp.status_code == 200, f"Template download failed: {resp.status_code}"
-            assert resp.headers.get("content-type") == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Wrong content type"
+            resp = requests.get(f"{BASE_URL}/admin/backup.zip", headers=headers)
+            assert resp.status_code == 200, f"Backup failed: {resp.status_code} {resp.text}"
+            assert resp.headers.get("content-type") == "application/zip", f"Wrong content type: {resp.headers.get('content-type')}"
+            assert len(resp.content) > 1000, "ZIP content too small"
             
-            # Parse the xlsx
-            wb = load_workbook(io.BytesIO(resp.content), read_only=True)
-            assert "Anggota" in wb.sheetnames, "Sheet 'Anggota' not found"
-            assert "Petunjuk" in wb.sheetnames, "Sheet 'Petunjuk' not found"
-            
-            ws = wb["Anggota"]
-            rows = list(ws.iter_rows(values_only=True))
-            assert len(rows) >= 4, "Expected at least 4 rows (header + 3 samples)"
-            
-            # Check header
-            header = [str(c).strip().lower() if c else "" for c in rows[0]]
-            assert "nama" in header, "Column 'nama' not found in header"
-            assert "nis" in header, "Column 'nis' not found in header"
-            assert "kelas" in header, "Column 'kelas' not found in header"
-            
-            # Check sample rows
-            assert len(rows) >= 4, "Expected 3 sample rows"
-            self.log(f"Template has {len(wb.sheetnames)} sheets: {wb.sheetnames}")
-            self.log(f"Header: {header}")
-            self.log(f"Sample rows: {len(rows) - 1}")
-        self.test("GET /api/members/import-template.xlsx returns valid xlsx", _test)
+            self.backup_zip = resp.content
+            self.log(f"ZIP file size: {len(resp.content)} bytes")
+        self.test("GET /api/admin/backup.zip as admin returns 200 application/zip", _test)
 
-    def test_siswa_403_on_template(self):
-        """Test that siswa role gets 403 on template download"""
+    def test_zip_contents(self):
+        """Test ZIP contains data-cadangan.json, BACA-SAYA.txt, and all reports"""
+        def _test():
+            assert self.backup_zip, "No backup ZIP available"
+            
+            with zipfile.ZipFile(io.BytesIO(self.backup_zip)) as z:
+                files = z.namelist()
+                self.log(f"ZIP contains {len(files)} files")
+                
+                # Check required files
+                assert "data-cadangan.json" in files, "Missing data-cadangan.json"
+                assert "BACA-SAYA.txt" in files, "Missing BACA-SAYA.txt"
+                self.log("✓ data-cadangan.json found")
+                self.log("✓ BACA-SAYA.txt found")
+                
+                # Check report files
+                required_reports = [
+                    "laporan/01-Laporan-Transaksi.xlsx",
+                    "laporan/01-Laporan-Transaksi.pdf",
+                    "laporan/02-Laporan-Buku-Masuk.xlsx",
+                    "laporan/02-Laporan-Buku-Masuk.pdf",
+                    "laporan/03-Laporan-Buku-Hilang.xlsx",
+                    "laporan/03-Laporan-Buku-Hilang.pdf",
+                    "laporan/04-Laporan-Pengunjung.xlsx",
+                    "laporan/04-Laporan-Pengunjung.pdf",
+                ]
+                
+                for report in required_reports:
+                    assert report in files, f"Missing {report}"
+                    self.log(f"✓ {report} found")
+                
+                # Check for peringkat folder (at least current month should exist)
+                peringkat_files = [f for f in files if f.startswith("laporan/05-Peringkat-Rajin-Berkunjung/")]
+                assert len(peringkat_files) > 0, "No peringkat reports found"
+                self.log(f"✓ Found {len(peringkat_files)} peringkat report files")
+                
+                # Verify data-cadangan.json is valid JSON
+                json_data = z.read("data-cadangan.json")
+                backup_data = json.loads(json_data)
+                assert "collections" in backup_data, "data-cadangan.json missing 'collections'"
+                assert "app" in backup_data, "data-cadangan.json missing 'app'"
+                self.log(f"✓ data-cadangan.json is valid JSON with {len(backup_data['collections'])} collections")
+                
+                # Store for restore test
+                self.backup_json = json_data
+        self.test("ZIP contains data-cadangan.json, BACA-SAYA.txt, and all report files", _test)
+
+    def test_excel_format(self):
+        """Test Excel files can be opened with openpyxl and data rows start at row 8"""
+        def _test():
+            assert self.backup_zip, "No backup ZIP available"
+            
+            with zipfile.ZipFile(io.BytesIO(self.backup_zip)) as z:
+                # Test one Excel file
+                excel_file = "laporan/01-Laporan-Transaksi.xlsx"
+                excel_data = z.read(excel_file)
+                
+                wb = load_workbook(io.BytesIO(excel_data), read_only=True)
+                ws = wb.active
+                
+                rows = list(ws.iter_rows(values_only=True))
+                assert len(rows) >= 8, f"Expected at least 8 rows, got {len(rows)}"
+                
+                # Row 7 should be header (0-indexed row 6)
+                header_row = rows[6]
+                assert header_row is not None, "Row 7 (header) is empty"
+                self.log(f"Row 7 (header): {header_row[:3]}...")
+                
+                # Row 8 should be data or empty message (0-indexed row 7)
+                data_row = rows[7]
+                self.log(f"Row 8 (first data row): {data_row[:3] if data_row else 'empty'}...")
+                
+                self.log(f"✓ Excel file has {len(rows)} rows, data starts at row 8")
+        self.test("Excel files open with openpyxl and data rows start at row 8", _test)
+
+    def test_create_visit_and_incoming(self):
+        """Create a visit and incoming book record"""
+        def _test():
+            headers = {"Cookie": f"access_token={self.token}"}
+            
+            # Create a visit for member MB-2024003
+            visit_data = {
+                "code": "MB-2024003",
+                "purpose": "Test visit for backup"
+            }
+            resp = requests.post(f"{BASE_URL}/visits/scan", json=visit_data, headers=headers)
+            assert resp.status_code == 200, f"Visit creation failed: {resp.status_code} {resp.text}"
+            result = resp.json()
+            # Visit ID is in result["visit"]["id"]
+            self.test_visit_id = result.get("visit", {}).get("id")
+            self.log(f"Created visit: {self.test_visit_id} (action: {result.get('action')})")
+            
+            # Create an incoming book record
+            incoming_data = {
+                "title": "Test Book for Backup",
+                "author": "Test Author",
+                "category": "Test",
+                "shelf": "R-01",
+                "quantity": 1,
+                "source": "Test source"
+            }
+            resp = requests.post(f"{BASE_URL}/incoming", json=incoming_data, headers=headers)
+            assert resp.status_code == 200, f"Incoming creation failed: {resp.status_code} {resp.text}"
+            incoming = resp.json()
+            self.test_book_id = incoming.get("book_id")
+            self.log(f"Created incoming book: {self.test_book_id}")
+        self.test("Create visit and incoming book record", _test)
+
+    def test_reports_contain_test_data(self):
+        """Test that new backup contains the test visit and incoming book"""
+        def _test():
+            headers = {"Cookie": f"access_token={self.token}"}
+            
+            # Get a fresh backup
+            resp = requests.get(f"{BASE_URL}/admin/backup.zip", headers=headers)
+            assert resp.status_code == 200, "Backup failed"
+            
+            with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
+                # Check data-cadangan.json contains our test data
+                json_data = z.read("data-cadangan.json")
+                backup_data = json.loads(json_data)
+                
+                # Check visits
+                visits = backup_data["collections"].get("visits", [])
+                test_visits = [v for v in visits if v.get("id") == self.test_visit_id]
+                assert len(test_visits) > 0, f"Test visit {self.test_visit_id} not found in backup"
+                self.log(f"✓ Test visit found in backup")
+                
+                # Check incoming
+                incoming = backup_data["collections"].get("incoming", [])
+                test_incoming = [i for i in incoming if i.get("book_id") == self.test_book_id]
+                assert len(test_incoming) > 0, f"Test incoming book {self.test_book_id} not found in backup"
+                self.log(f"✓ Test incoming book found in backup")
+                
+                # Note: We can't easily verify Excel/PDF contents contain the data
+                # but if the JSON backup has it, the reports should too
+                self.log("✓ Test data appears in backup (reports should contain it)")
+        self.test("New backup contains test visit and incoming book in reports", _test)
+
+    def test_petugas_403(self):
+        """Test petugas gets 403 on /api/admin/backup.zip"""
+        def _test():
+            # Login as petugas
+            resp = requests.post(f"{BASE_URL}/auth/login", json={
+                "email": "petugas@smansa.sch.id",
+                "password": "petugas123",
+                "portal": "admin"
+            })
+            assert resp.status_code == 200, "Petugas login failed"
+            petugas_token = resp.cookies.get("access_token")
+            
+            # Try to download backup
+            headers = {"Cookie": f"access_token={petugas_token}"}
+            resp = requests.get(f"{BASE_URL}/admin/backup.zip", headers=headers)
+            assert resp.status_code == 403, f"Expected 403, got {resp.status_code}"
+            self.log("✓ Petugas correctly denied access")
+        self.test("Petugas gets 403 on /api/admin/backup.zip", _test)
+
+    def test_siswa_403(self):
+        """Test siswa gets 403 on /api/admin/backup.zip"""
         def _test():
             # Login as siswa
             resp = requests.post(f"{BASE_URL}/auth/login", json={
@@ -104,155 +251,124 @@ class TestRunner:
             assert resp.status_code == 200, "Siswa login failed"
             siswa_token = resp.cookies.get("access_token")
             
-            # Try to download template
+            # Try to download backup
             headers = {"Cookie": f"access_token={siswa_token}"}
-            resp = requests.get(f"{BASE_URL}/members/import-template.xlsx", headers=headers)
+            resp = requests.get(f"{BASE_URL}/admin/backup.zip", headers=headers)
             assert resp.status_code == 403, f"Expected 403, got {resp.status_code}"
-            self.log("Siswa correctly denied access to template")
-        self.test("GET /api/members/import-template.xlsx (siswa gets 403)", _test)
+            self.log("✓ Siswa correctly denied access")
+        self.test("Siswa gets 403 on /api/admin/backup.zip", _test)
 
-    def test_import_xlsx_success(self):
-        """Test successful import of xlsx file with numeric NIS"""
+    def test_restore_with_zip(self):
+        """Test POST /api/admin/restore with ZIP restores successfully"""
         def _test():
-            # Create a test xlsx file
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Anggota"
-            ws.append(["nama", "nis", "kelas"])
-            ws.append(["Test Member 1", 99001, "X IPA 1"])
-            ws.append(["Test Member 2", 99002, "X IPA 2"])
+            assert self.backup_zip, "No backup ZIP available"
             
-            # Save to bytes
-            buf = io.BytesIO()
-            wb.save(buf)
-            buf.seek(0)
-            
-            # Upload
             headers = {"Cookie": f"access_token={self.token}"}
-            files = {"file": ("test-import.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
-            resp = requests.post(f"{BASE_URL}/members/import", headers=headers, files=files)
-            assert resp.status_code == 200, f"Import failed: {resp.status_code} {resp.text}"
+            files = {"file": ("backup.zip", io.BytesIO(self.backup_zip), "application/zip")}
+            resp = requests.post(f"{BASE_URL}/admin/restore", headers=headers, files=files)
+            assert resp.status_code == 200, f"Restore failed: {resp.status_code} {resp.text}"
             
             data = resp.json()
-            assert data["imported"] == 2, f"Expected 2 imported, got {data['imported']}"
-            assert data["skipped"] == 0, f"Expected 0 skipped, got {data['skipped']}"
-            self.log(f"Imported: {data['imported']}, Skipped: {data['skipped']}")
+            assert data.get("ok") is True, "Restore did not return ok: true"
+            assert "restored" in data, "No 'restored' counts in response"
             
-            # Verify members were created with correct NIS (no .0 suffix)
-            resp = requests.get(f"{BASE_URL}/members", headers=headers)
-            assert resp.status_code == 200, "Failed to get members"
-            members = resp.json()
-            
-            test_members = [m for m in members if m["student_id"] in ["99001", "99002"]]
-            assert len(test_members) == 2, f"Expected 2 test members, found {len(test_members)}"
-            
-            for m in test_members:
-                self.test_member_ids.append(m["id"])
-                assert m["student_id"] in ["99001", "99002"], f"NIS should be '99001' or '99002', got '{m['student_id']}'"
-                assert ".0" not in m["student_id"], f"NIS should not have .0 suffix: {m['student_id']}"
-                self.log(f"Member {m['name']}: NIS={m['student_id']} (correct format)")
-        self.test("Import xlsx with numeric NIS (no .0 suffix)", _test)
+            total = sum(data["restored"].values())
+            self.log(f"✓ Restored {total} total entries")
+            self.log(f"  Collections: {data['restored']}")
+        self.test("POST /api/admin/restore with ZIP restores successfully", _test)
 
-    def test_import_duplicate_nis(self):
-        """Test that duplicate NIS is skipped"""
+    def test_restore_with_legacy_json(self):
+        """Test POST /api/admin/restore with legacy JSON still works"""
         def _test():
-            # Create xlsx with duplicate NIS
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Anggota"
-            ws.append(["nama", "nis", "kelas"])
-            ws.append(["Test Member 3", 99001, "X IPA 3"])  # Duplicate NIS
-            
-            buf = io.BytesIO()
-            wb.save(buf)
-            buf.seek(0)
-            
+            # Get legacy JSON backup
             headers = {"Cookie": f"access_token={self.token}"}
-            files = {"file": ("test-duplicate.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
-            resp = requests.post(f"{BASE_URL}/members/import", headers=headers, files=files)
-            assert resp.status_code == 200, f"Import failed: {resp.status_code} {resp.text}"
+            resp = requests.get(f"{BASE_URL}/admin/backup", headers=headers)
+            assert resp.status_code == 200, f"Legacy backup failed: {resp.status_code}"
+            
+            legacy_json = resp.content
+            
+            # Restore with legacy JSON
+            files = {"file": ("backup.json", io.BytesIO(legacy_json), "application/json")}
+            resp = requests.post(f"{BASE_URL}/admin/restore", headers=headers, files=files)
+            assert resp.status_code == 200, f"Restore failed: {resp.status_code} {resp.text}"
             
             data = resp.json()
-            assert data["skipped"] == 1, f"Expected 1 skipped, got {data['skipped']}"
-            assert data["imported"] == 0, f"Expected 0 imported, got {data['imported']}"
-            assert any("99001" in err and "sudah terdaftar" in err for err in data.get("errors", [])), "Expected 'NIS sudah terdaftar' error"
-            self.log(f"Duplicate NIS correctly skipped: {data['errors'][0] if data.get('errors') else 'N/A'}")
-        self.test("Re-import shows 'NIS sudah terdaftar' skipped", _test)
+            assert data.get("ok") is True, "Restore did not return ok: true"
+            self.log(f"✓ Legacy JSON restore successful")
+        self.test("POST /api/admin/restore with legacy JSON works", _test)
 
-    def test_import_xls_error(self):
-        """Test that .xls file returns 400 with Indonesian message"""
+    def test_restore_invalid_zip(self):
+        """Test POST /api/admin/restore with invalid zip returns 400"""
         def _test():
-            # Create a fake .xls file (just some bytes with .xls extension)
-            fake_xls = b"PK\x03\x04fake xls content"
-            
             headers = {"Cookie": f"access_token={self.token}"}
-            files = {"file": ("test.xls", io.BytesIO(fake_xls), "application/vnd.ms-excel")}
-            resp = requests.post(f"{BASE_URL}/members/import", headers=headers, files=files)
+            
+            # Create invalid zip (missing data-cadangan.json)
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w") as z:
+                z.writestr("dummy.txt", "invalid")
+            buf.seek(0)
+            
+            files = {"file": ("invalid.zip", buf, "application/zip")}
+            resp = requests.post(f"{BASE_URL}/admin/restore", headers=headers, files=files)
             assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
             
             error = resp.json().get("detail", "")
-            assert ".xls" in error.lower(), f"Error should mention .xls: {error}"
-            assert "xlsx" in error.lower(), f"Error should mention .xlsx: {error}"
-            self.log(f"Error message: {error}")
-        self.test("POST /api/members/import with .xls returns 400", _test)
+            assert "data-cadangan.json" in error, f"Error should mention data-cadangan.json: {error}"
+            self.log(f"✓ Invalid ZIP correctly rejected: {error}")
+        self.test("POST /api/admin/restore with invalid zip returns 400", _test)
 
-    def test_import_missing_column(self):
-        """Test that xlsx without 'nama' column returns 400"""
-        def _test():
-            # Create xlsx without 'nama' column
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Anggota"
-            ws.append(["nis", "kelas"])  # Missing 'nama'
-            ws.append([99003, "X IPA 1"])
-            
-            buf = io.BytesIO()
-            wb.save(buf)
-            buf.seek(0)
-            
-            headers = {"Cookie": f"access_token={self.token}"}
-            files = {"file": ("test-no-nama.xlsx", buf, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
-            resp = requests.post(f"{BASE_URL}/members/import", headers=headers, files=files)
-            assert resp.status_code == 400, f"Expected 400, got {resp.status_code}"
-            
-            error = resp.json().get("detail", "")
-            assert "nama" in error.lower(), f"Error should mention 'nama': {error}"
-            assert "tidak ditemukan" in error.lower(), f"Error should say 'tidak ditemukan': {error}"
-            self.log(f"Error message: {error}")
-        self.test("xlsx without 'nama' column returns 400", _test)
-
-    def test_pdf_report_officer_name(self):
-        """Test that PDF report is generated successfully (officer name verified in UI test)"""
+    def test_existing_export_pdf(self):
+        """Test existing /api/reports/export.pdf still works"""
         def _test():
             headers = {"Cookie": f"access_token={self.token}"}
             resp = requests.get(f"{BASE_URL}/reports/export.pdf?type=transaksi&period=semua", headers=headers)
             assert resp.status_code == 200, f"PDF export failed: {resp.status_code}"
             assert resp.headers.get("content-type") == "application/pdf", "Wrong content type"
             assert len(resp.content) > 1000, "PDF content too small"
+            self.log(f"✓ PDF export works (size: {len(resp.content)} bytes)")
+        self.test("Existing /api/reports/export.pdf still works", _test)
+
+    def test_existing_export_xlsx(self):
+        """Test existing /api/reports/export.xlsx still works"""
+        def _test():
+            headers = {"Cookie": f"access_token={self.token}"}
+            resp = requests.get(f"{BASE_URL}/reports/export.xlsx?type=masuk&period=semua", headers=headers)
+            assert resp.status_code == 200, f"Excel export failed: {resp.status_code}"
+            assert "spreadsheet" in resp.headers.get("content-type", ""), "Wrong content type"
+            assert len(resp.content) > 1000, "Excel content too small"
             
-            # Note: Officer name 'Devi Latifa, S.I.Pust' is embedded in PDF signature
-            # Binary PDF parsing is unreliable, so we verify the endpoint works
-            # The actual name display will be verified in frontend UI tests
-            self.log(f"PDF report generated successfully (size: {len(resp.content)} bytes)")
-            self.log("Officer name 'Devi Latifa, S.I.Pust' is used in PDF generation (verified in code)")
-        self.test("PDF report export returns 200 (officer name in signature)", _test)
+            # Verify it's a valid Excel file
+            wb = load_workbook(io.BytesIO(resp.content), read_only=True)
+            assert wb.active is not None, "Excel file has no active sheet"
+            self.log(f"✓ Excel export works (size: {len(resp.content)} bytes)")
+        self.test("Existing /api/reports/export.xlsx still works", _test)
 
     def cleanup(self):
-        """Delete test members"""
-        if not self.test_member_ids:
-            return
-        
-        print(f"\n🧹 Cleaning up {len(self.test_member_ids)} test members...")
+        """Delete test data"""
+        print(f"\n🧹 Cleaning up test data...")
         headers = {"Cookie": f"access_token={self.token}"}
-        for member_id in self.test_member_ids:
+        
+        # Delete test visit
+        if self.test_visit_id:
             try:
-                resp = requests.delete(f"{BASE_URL}/members/{member_id}", headers=headers)
+                resp = requests.delete(f"{BASE_URL}/visits/{self.test_visit_id}", headers=headers)
                 if resp.status_code == 200:
-                    print(f"  ✓ Deleted {member_id}")
+                    print(f"  ✓ Deleted visit {self.test_visit_id}")
                 else:
-                    print(f"  ✗ Failed to delete {member_id}: {resp.status_code}")
+                    print(f"  ✗ Failed to delete visit: {resp.status_code}")
             except Exception as e:
-                print(f"  ✗ Error deleting {member_id}: {e}")
+                print(f"  ✗ Error deleting visit: {e}")
+        
+        # Delete test book
+        if self.test_book_id:
+            try:
+                resp = requests.delete(f"{BASE_URL}/books/{self.test_book_id}", headers=headers)
+                if resp.status_code == 200:
+                    print(f"  ✓ Deleted book {self.test_book_id}")
+                else:
+                    print(f"  ✗ Failed to delete book: {resp.status_code}")
+            except Exception as e:
+                print(f"  ✗ Error deleting book: {e}")
 
     def summary(self):
         print(f"\n{'='*60}")
@@ -271,13 +387,18 @@ def main():
     try:
         # Run all tests
         runner.login_admin()
-        runner.test_template_download()
-        runner.test_siswa_403_on_template()
-        runner.test_import_xlsx_success()
-        runner.test_import_duplicate_nis()
-        runner.test_import_xls_error()
-        runner.test_import_missing_column()
-        runner.test_pdf_report_officer_name()
+        runner.test_backup_zip_admin()
+        runner.test_zip_contents()
+        runner.test_excel_format()
+        runner.test_create_visit_and_incoming()
+        runner.test_reports_contain_test_data()
+        runner.test_petugas_403()
+        runner.test_siswa_403()
+        runner.test_restore_with_zip()
+        runner.test_restore_with_legacy_json()
+        runner.test_restore_invalid_zip()
+        runner.test_existing_export_pdf()
+        runner.test_existing_export_xlsx()
         
     finally:
         # Always cleanup

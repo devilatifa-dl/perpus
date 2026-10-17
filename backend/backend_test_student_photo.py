@@ -15,7 +15,7 @@ import requests
 import sys
 from datetime import datetime, timedelta, timezone
 
-BASE_URL = "https://devilatifa-perpus.preview.emergentagent.com/api"
+BASE_URL = "https://perpus-library-1.preview.emergentagent.com/api"
 
 class TestRunner:
     def __init__(self):

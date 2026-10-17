@@ -71,8 +71,21 @@ def compress_photo(raw: bytes):
 
 
 async def photo_upload_allowed(db):
-    doc = await db.settings.find_one({"id": "main"}, {"_id": 0, "member_photo_upload": 1}) or {}
-    return doc.get("member_photo_upload", True)
+    """Izin unggah foto siswa mengikuti tombol "Foto siswa" (settings id=student_photo: enabled + until)."""
+    doc = await db.settings.find_one({"id": "student_photo"}, {"_id": 0}) or {}
+    if not doc.get("enabled", True):
+        return False
+    until = doc.get("until") or ""
+    if until:
+        try:
+            u = datetime.fromisoformat(until.replace("Z", "+00:00"))
+            if u.tzinfo is None:
+                u = u.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) >= u:
+                return False
+        except ValueError:
+            pass
+    return True
 
 
 def build_router(db, current_user):
@@ -81,7 +94,7 @@ def build_router(db, current_user):
     @r.post("/uploads/photo")
     async def upload_photo(file: UploadFile = File(...), user=Depends(current_user)):
         if user["role"] == "siswa" and not await photo_upload_allowed(db):
-            raise HTTPException(403, "Upload foto sedang ditutup admin")
+            raise HTTPException(403, "Unggah foto sedang ditutup oleh petugas perpustakaan")
         raw = await file.read()
         if not raw:
             raise HTTPException(400, "Berkas kosong")

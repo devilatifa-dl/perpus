@@ -112,3 +112,16 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - CORS: FRONTEND_URL + CORS_ORIGINS (opsional) + regex emergentagent.com / emergent.host / *.my.id. load_dotenv(override=False). Indeks Mongo dibuat saat start.
 - Statistik pengunjung disaring di database per periode (lebih cepat). .gitignore tidak lagi mengabaikan .env & test_credentials.md.
 - Catatan: preview DB sempat di-reset oleh sesi tes (tombol reset data admin); data contoh sudah dipulihkan.
+
+### 17 Okt 2026 — Impor dari GitHub (commit 9d06b02) & perbaikan merge
+- Kode diambil dari github.com/devilatifa-dl/perpus (main, commit 9d06b02). Commit tersebut rusak: merge PR #3 (fitur/laporan-kartu-belakang-cetak-duplex ↔ main) meninggalkan sisa penanda konflik, dan edit manual setelahnya mengubah Modal di Shared.js (isOpen/onClose) sehingga semua modal tidak tampil.
+- Merge diulang dengan benar: lib.js & QRScanner.js (fitur), Visitors.js, PhotoCropper.js, MemberImport.js (main), Shared.js (PhotoBox gabungan: foto anggota → potong lalu unggah ke object storage; sampul/logo → diperkecil otomatis di browser), StudentPortal.js (gabungan akun anggota + pengaturan foto siswa), App.js (versi fitur + tombol StudentPhotoSwitch), server.py (seed ADMIN_NAME, migrasi sekali jalan, init_storage + ensure_indexes, rute template ganda dihapus, _cell_text).
+- Env baru di backend/.env: JWT_SECRET, EMERGENT_LLM_KEY, FRONTEND_URL. frontend/.yarnrc `ignore-engines true` (package.json meminta Node 22, lingkungan Node 20).
+- Perbaikan ini BELUM di-push ke GitHub.
+
+### 17 Okt 2026 — Cadangan + semua laporan
+- GET /api/admin/backup.zip (admin): ZIP berisi data-cadangan.json (untuk pulihkan) + laporan/ (Excel & PDF semua periode): 01 Transaksi, 02 Buku Masuk, 03 Buku Hilang, 04 Pengunjung, 05 Peringkat Rajin Berkunjung per bulan, + BACA-SAYA.txt. Laporan hanya dibuat saat klik "Unduh cadangan".
+- POST /api/admin/restore menerima ZIP tersebut atau .json lama. Batas baris ekspor laporan dinaikkan ke 100.000.
+
+### 17 Okt 2026 — Chip "Foto siswa" dihapus
+- PhotoUploadChip (chip kecil di bawah "x anggota terdaftar") dihapus. Tombol "Foto siswa" di toolbar (StudentPhotoSwitch, settings id=student_photo) jadi satu-satunya pengatur izin unggah foto siswa: media.photo_upload_allowed, StudentPortal & StudentProfile kini hanya mengikuti pengaturan ini (flag lama member_photo_upload tidak dipakai lagi).
