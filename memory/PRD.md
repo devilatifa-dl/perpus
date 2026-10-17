@@ -131,3 +131,9 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Warna biru/hijau-portal di CSS lama & warna grafik diganti ungu. Desain kartu anggota (Card.css) TIDAK diubah.
 - HP: latar gelap di belakang menu samping (ketuk untuk menutup).
 - Belum di-push ke GitHub.
+- Sudah dikirim sebagai PR #4 (branch fitur/tampilan-ungu-modern).
+
+### 17 Okt 2026 — Mode gelap ungu
+- Tombol mode gelap/terang (ThemeToggle, ikon bulan/matahari) di semua halaman: pemilih portal & login (mengambang kanan atas), topbar admin/petugas, header portal siswa.
+- Awal buka mengikuti pengaturan HP/komputer; pilihan manual disimpan di localStorage `perpus-theme` (src/theme.js). Skrip kecil di public/index.html mencegah kedipan putih.
+- Dark.css = token & penyesuaian manual; DarkAuto.css = override warna otomatis hasil `python3 scripts/gen_dark_css.py` (jalankan ulang jika CSS lain diubah). Hanya berlaku di layar; cetak/PDF dan desain kartu anggota tetap.

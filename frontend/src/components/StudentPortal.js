@@ -11,6 +11,7 @@ import { Shelves } from "./Shelves";
 import { StudentProfile } from "./StudentProfile";
 import { uploadPhoto } from "../lib";
 import { UserCircle } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 
 const profileTab = ["profil", "Profil saya", UserCircle];
 const tabs = [["katalog", "Katalog buku", BookOpen], ["rak", "Rak buku", Boxes], ["pesanan", "Pesanan saya", ListChecks], ["peringkat", "Peringkat", Trophy]];
@@ -58,7 +59,7 @@ export default function StudentPortal() {
     <header className="student-top">
       <div className="student-brand"><img src={data.settings?.library_logo || LIBRARY_LOGO} alt="Logo perpustakaan"/><div><strong>RUANG BACA · PORTAL SISWA</strong><small>SMA NEGERI 1 ABUNG TENGAH</small></div></div>
       <nav className="student-nav">{allTabs.map(([id, label, Icon]) => <button key={id} data-testid={`student-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon size={16}/><span>{label}</span></button>)}</nav>
-      <div className="student-user"><img src={data.settings?.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/><div><b>{linked ? user.name : "MURID SMANSA"}</b><small>{linked ? "Akun anggota" : "Hanya lihat data buku"}</small></div><button className="icon-button" data-testid="student-logout-button" title="Keluar" onClick={logout}><LogOut size={18}/></button></div>
+      <div className="student-user"><img src={data.settings?.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/><div><b>{linked ? user.name : "MURID SMANSA"}</b><small>{linked ? "Akun anggota" : "Hanya lihat data buku"}</small></div><ThemeToggle testId="student-theme-toggle"/><button className="icon-button" data-testid="student-logout-button" title="Keluar" onClick={logout}><LogOut size={18}/></button></div>
     </header>
     <main className="student-main">
       <section className="student-hero">
