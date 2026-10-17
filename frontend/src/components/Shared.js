@@ -92,7 +92,8 @@ export function PhotoBox({ value, onChange, label = "Foto", upload, aspect = 1 }
         />
       )}
     </div>
-  );export function Modal({ isOpen, onClose, title, children }) {
+  );
+  export function Modal({ isOpen, onClose, title, children }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -105,5 +106,4 @@ export function PhotoBox({ value, onChange, label = "Foto", upload, aspect = 1 }
       </div>
     </div>
   );
-}
 }
