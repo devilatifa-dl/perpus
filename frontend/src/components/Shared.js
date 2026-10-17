@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Crop, Loader2, Sparkles, Upload, X } from "lucide-react";
-import { Photocropper } from "./Photocropper";
+import { PhotoCropper } from "./PhotoCropper";
 import { fmtSize, optimizeImage, prepareForCrop, readFile } from "../utils/image";
 
 export function PhotoBox({ value, onChange, label = "Foto", upload, aspect = 1 }) {
