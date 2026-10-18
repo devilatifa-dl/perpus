@@ -11,10 +11,10 @@ function Sheet({ cards, back, portrait, settings, page }) {
   </div>;
 }
 
-export function BulkCardPrint({ members, settings, close }) {
+export function BulkCardPrint({ members, settings, close, initialClass = "semua" }) {
   const classes = useMemo(() => [...new Set(members.map((m) => m.class_name))].sort(), [members]);
-  const [klass, setKlass] = useState("semua"); const [side, setSide] = useState("depan");
-  const list = members.filter((m) => klass === "semua" || m.class_name === klass);
+  const [klass, setKlass] = useState(initialClass); const [side, setSide] = useState("depan");
+  const list = members.filter((m) => klass === "semua" || (m.class_name || "") === klass);
   const portrait = settings?.card_layout === "portrait";
   const perPage = portrait ? 9 : 10;
   const pages = Math.ceil(list.length / perPage) || 0;
