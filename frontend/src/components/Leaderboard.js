@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PrintButton } from "./ReportPrint";
 import { Award, Crown, Download, FileSpreadsheet, Medal, Trophy, Users } from "lucide-react";
 import { api } from "../lib";
 
@@ -25,7 +26,7 @@ export function Leaderboard({ mode = "admin", meId = "", download, downloading, 
       <div className="lb-hero-text"><p className="eyebrow light">PERINGKAT RAJIN BERKUNJUNG</p><h2>Siapa paling rajin ke perpustakaan bulan {lb.label}?</h2><p>{lb.total_visits} pengunjung anggota dari {lb.active_students} siswa. Scan kartumu setiap datang agar tercatat!</p></div>
       <div className="lb-hero-actions">
         <select data-testid="leaderboard-month-select" value={month} onChange={(e) => setMonth(e.target.value)}>{lb.months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select>
-        {mode === "admin" && download && <div className="download-row"><button className="primary" data-testid="leaderboard-download-pdf" disabled={!!downloading} onClick={() => download("pdf", "peringkat", lb.month)}><Download size={16}/> {downloading === "pdf" ? "Menyiapkan..." : "PDF"}</button><button className="secondary" data-testid="leaderboard-download-xlsx" disabled={!!downloading} onClick={() => download("xlsx", "peringkat", lb.month)}><FileSpreadsheet size={16}/> {downloading === "xlsx" ? "Menyiapkan..." : "Excel"}</button></div>}
+        {mode === "admin" && download && <div className="download-row"><PrintButton/><button className="secondary" data-testid="leaderboard-download-pdf" disabled={!!downloading} onClick={() => download("pdf", "peringkat", lb.month)}><Download size={16}/> {downloading === "pdf" ? "Menyiapkan..." : "PDF"}</button><button className="secondary" data-testid="leaderboard-download-xlsx" disabled={!!downloading} onClick={() => download("xlsx", "peringkat", lb.month)}><FileSpreadsheet size={16}/> {downloading === "xlsx" ? "Menyiapkan..." : "Excel"}</button></div>}
       </div>
     </div>
     {mode === "siswa" && meId && <div className={`lb-me ${me ? "in" : ""}`} data-testid="leaderboard-me">{me ? <><Award size={18}/> Hebat! Kamu peringkat <b>#{me.rank}</b> bulan ini dengan {me.visits} pengunjung.</> : <><Trophy size={18}/> Kamu belum masuk 10 besar bulan ini — ayo lebih sering berkunjung!</>}</div>}

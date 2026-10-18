@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PrintButton } from "./ReportPrint";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CalendarDays, Clock, Download, FileSpreadsheet, TrendingUp, UserCheck, Users } from "lucide-react";
 import { api, fmtDate } from "../lib";
@@ -16,7 +17,7 @@ export function VisitStats({ download, downloading }) {
   return <div className="visit-stats-page" data-testid="visit-stats">
     <div className="stats-head">
       <div className="period-select" data-testid="stats-period">{STAT_PERIODS.map(([k, l]) => <button key={k} data-testid={`stats-period-${k}`} className={period === k ? "active" : ""} onClick={() => setPeriod(k)}>{l}</button>)}</div>
-      <div className="download-row"><button className="primary" data-testid="stats-download-pdf" disabled={!!downloading} onClick={() => download("pdf", "statistik", period)}><Download size={16}/> {downloading === "pdf" ? "Menyiapkan..." : "Unduh PDF"}</button><button className="secondary" data-testid="stats-download-xlsx" disabled={!!downloading} onClick={() => download("xlsx", "statistik", period)}><FileSpreadsheet size={16}/> {downloading === "xlsx" ? "Menyiapkan..." : "Excel"}</button></div>
+      <div className="download-row"><PrintButton/><button className="secondary" data-testid="stats-download-pdf" disabled={!!downloading} onClick={() => download("pdf", "statistik", period)}><Download size={16}/> {downloading === "pdf" ? "Menyiapkan..." : "PDF"}</button><button className="secondary" data-testid="stats-download-xlsx" disabled={!!downloading} onClick={() => download("xlsx", "statistik", period)}><FileSpreadsheet size={16}/> {downloading === "xlsx" ? "Menyiapkan..." : "Excel"}</button></div>
     </div>
     {err && <div className="error">{err}</div>}
     {!st && !err && <div className="panel muted">Menghitung statistik...</div>}
