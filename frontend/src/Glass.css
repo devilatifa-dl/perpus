@@ -156,3 +156,21 @@ html[data-theme="dark"] .app-frame .modal-backdrop{background:rgba(5,3,12,.6)}
 }
 @keyframes glassUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.app-frame *{animation:none!important;transition:none!important}}
+.field-label{display:grid;gap:8px;font-size:12px;font-weight:700;color:var(--ink-2);margin-top:13px}
+.member-search{position:relative}
+.member-search .searchbox{width:100%}
+.member-results{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:3;max-height:320px;overflow:auto;padding:6px;background:rgba(255,255,255,.96);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(124,58,237,.16);border-radius:18px;box-shadow:0 24px 48px -20px rgba(46,16,101,.45);animation:glassUp .18s ease-out}
+.member-results button,.member-picked{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:12px;color:var(--ink)}
+.member-results button.active{background:rgba(124,58,237,.09)}
+.member-results b,.member-picked b{display:block;font-size:13px}
+.member-results small,.member-picked small{display:block;font-size:11px;color:var(--muted);margin-top:2px;font-weight:500}
+.member-results .avatar,.member-picked .avatar{width:32px;height:32px;flex-shrink:0;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;font-size:13px}
+.member-empty{padding:12px;font-size:12px;color:var(--muted);font-weight:500}
+.member-picked{padding:8px 8px 8px 10px;background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.22);border-radius:16px}
+.member-picked>div:nth-child(2){flex:1;min-width:0}
+@media screen{
+html[data-theme="dark"] .member-results{background:rgba(23,19,43,.96);border-color:rgba(167,139,250,.2)}
+html[data-theme="dark"] .member-results button.active{background:rgba(167,139,250,.14)}
+html[data-theme="dark"] .member-picked{background:rgba(167,139,250,.08);border-color:rgba(167,139,250,.25)}
+html[data-theme="dark"] .field-label{color:var(--ink-2)}
+}

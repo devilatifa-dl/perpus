@@ -21,6 +21,7 @@ import "@/Ops.css";
 import { Login } from "@/components/Login";
 import { AccountManager } from "@/components/AccountManager";
 import { MemberImport } from "@/components/MemberImport";
+import { MemberSearch } from "@/components/MemberSearch";
 import { Shelves } from "@/components/Shelves";
 import StudentPortal from "@/components/StudentPortal";
 import PortalChooser from "@/components/PortalChooser";
@@ -106,8 +107,8 @@ function Circulation({data,reload,notify}) {
   return <><div className="circulation-grid"><div className="panel circulation-panel"><div className="mode-switch"><button data-testid="borrow-mode-button" className={mode==="pinjam"?"selected":""} onClick={()=>setMode("pinjam")}>Pinjam buku</button><button data-testid="return-mode-button" className={mode==="kembali"?"selected":""} onClick={()=>setMode("kembali")}>Kembalikan</button></div>
     <div className="scanner-box"><ScanLine size={40}/><h3>Pindai QR anggota &amp; buku</h3><p>Bisa menggunakan kamera HP, atau input kode manual di bawah.</p><div className="scan-buttons"><button className="secondary" data-testid="scan-member-button" onClick={()=>openScanner("member")}><QrCode size={16}/> Scan Anggota</button><button className="secondary" data-testid="scan-book-button" onClick={()=>openScanner("book")}><QrCode size={16}/> Scan Buku</button></div></div>
     <div className="manual-row"><input placeholder="Ketik/tempel kode (MB-xxx atau BK-xxx)" value={manual} onChange={e=>setManual(e.target.value)} data-testid="manual-code-input" onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();applyManual()}}}/><button className="secondary" data-testid="apply-manual-code-button" onClick={applyManual}>Terapkan</button></div>
-    <div className="or-line"><span>atau pilih dari daftar</span></div>
-    <label>Anggota<select data-testid="circulation-member-select" value={member} onChange={e=>setMember(e.target.value)}><option value="">Pilih anggota</option>{data.members.map(m=><option key={m.id} value={m.id}>{m.name} · {m.student_id}</option>)}</select></label>
+    <div className="or-line"><span>atau cari dari daftar</span></div>
+    <div className="field-label">Anggota<MemberSearch members={data.members} value={member} onChange={setMember}/></div>
     <label>Buku<select data-testid="circulation-book-select" value={book} onChange={e=>setBook(e.target.value)}><option value="">{mode==="kembali"&&member&&choices.length===0?"Anggota ini tidak sedang meminjam buku":"Pilih buku"}</option>{choices.map(b=><option key={b.id} value={b.id}>{b.title} · {b.id} · stok {b.available}/{b.stock}</option>)}</select></label>{book&&(()=>{const b=data.books.find(x=>x.id===book);return b?<div className="soft-badge" style={{marginTop:10,width:"fit-content"}} data-testid="circulation-stock-info"><BookOpen size={14}/> Stok "{b.title}": {b.available} dari {b.stock} tersedia → setelah {mode==="pinjam"?"dipinjam":"dikembalikan"}: {mode==="pinjam"?b.available-1:b.available+1}</div>:null})()}
     <button className="primary full" data-testid="submit-circulation-button" onClick={submit}>{mode==="pinjam"?"Catat peminjaman":"Catat pengembalian"} <ChevronRight size={17}/></button></div>
     <div className="panel today-panel"><div className="panel-title"><div><p className="eyebrow">HARI INI</p><h3>Aktivitas sirkulasi</h3></div><span className="live-dot">LIVE</span></div>{data.transactions.slice(0,7).map(t=><div className="mini-transaction" key={t.id}><div className={`activity-icon ${t.action==="pinjam"?"borrow":"return"}`}>{t.action==="pinjam"?<BookOpen size={15}/>:<ClipboardList size={15}/>}</div><div><b>{t.member_name}</b><span>{t.book_title}</span></div><small>{t.action}</small></div>)}</div>
