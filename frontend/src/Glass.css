@@ -174,3 +174,12 @@ html[data-theme="dark"] .member-results button.active{background:rgba(167,139,25
 html[data-theme="dark"] .member-picked{background:rgba(167,139,250,.08);border-color:rgba(167,139,250,.25)}
 html[data-theme="dark"] .field-label{color:var(--ink-2)}
 }
+/* Ruang ketik lebih lega di semua kolom */
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]),select{padding-left:16px;padding-right:16px}
+select{padding-right:36px}
+textarea{padding:12px 16px}
+.app-frame input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]),.app-frame select{height:46px}
+.searchbox{padding-left:16px!important;padding-right:16px!important;gap:10px}
+.searchbox input{padding:0!important;height:100%}
+.visit-search-input input{padding-left:40px!important;padding-right:36px!important}
+.visit-list-search input{padding-left:36px!important;padding-right:32px!important}
