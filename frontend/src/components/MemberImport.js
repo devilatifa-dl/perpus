@@ -3,6 +3,27 @@ import { UploadCloud, Download, FileSpreadsheet } from "lucide-react";
 import { api } from "../lib";
 import { Modal } from "./Shared";
 
+function FailedRows({ rows, notify }) {
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const { data } = await api.post("/members/import-failed.xlsx", rows, { responseType: "blob" });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a"); a.href = url; a.download = "anggota-gagal-impor.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    } catch (e) { notify("Daftar baris gagal belum dapat diunduh"); } finally { setBusy(false); }
+  };
+  return <div className="failed-rows" data-testid="import-failed-rows">
+    <div className="failed-head"><span data-testid="import-failed-count">{rows.length} baris gagal diimpor</span>
+      <button type="button" className="secondary" data-testid="download-failed-rows-button" onClick={download} disabled={busy}><Download size={14}/> {busy ? "Menyiapkan..." : "Unduh Excel untuk diperbaiki"}</button></div>
+    <div className="failed-table-wrap"><table className="failed-table"><thead><tr><th>Baris</th><th>Nama</th><th>NIS</th><th>Kelas</th><th>Alasan</th></tr></thead>
+      <tbody>{rows.map((r) => <tr key={r.row} data-testid={`import-failed-row-${r.row}`}><td>{r.row}</td><td>{r.nama || "-"}</td><td>{r.nis || "-"}</td><td>{r.kelas || "-"}</td><td className="reason">{r.alasan}</td></tr>)}</tbody></table></div>
+    <small className="failed-hint">Perbaiki baris di berkas unduhan, lalu impor ulang berkas tersebut.</small>
+  </div>;
+}
+
 export function MemberImport({ close, onDone, notify }) {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -55,7 +76,7 @@ export function MemberImport({ close, onDone, notify }) {
       {result && <div className="import-result" data-testid="import-result">
         <b>Hasil impor</b>
         <span>Berhasil: {result.imported} · Dilewati: {result.skipped} · Total baris: {result.total}</span>
-        {result.errors?.length > 0 && <ul>{result.errors.map((er, i) => <li key={i}>{er}</li>)}</ul>}
+        {result.errors?.length > 0 && <FailedRows rows={result.errors} notify={notify}/>}
       </div>}
       <button className="primary full" data-testid="do-import-button" disabled={busy || !file} onClick={upload}><UploadCloud size={16}/> {busy ? "Mengimpor..." : "Impor sekarang"}</button>
     </div>

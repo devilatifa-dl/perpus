@@ -92,3 +92,17 @@
 .import-result li{font-size:11px;color:#b45309;margin-bottom:3px}
 .preset-pill{background:#faf8ff;border-color:#ddd6fe;color:#6d28d9}
 
+.failed-rows{margin-top:10px}
+.failed-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.failed-head span{font-size:12px;font-weight:600;color:#b45309}
+.failed-head button{font-size:12px;padding:6px 10px}
+.failed-table-wrap{max-height:260px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px}
+.failed-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.failed-table th{position:sticky;top:0;background:#f1f5f9;text-align:left;padding:6px 8px;font-weight:600}
+.failed-table td{padding:5px 8px;border-top:1px solid #eef2f7}
+.failed-table td.reason{color:#b45309}
+.failed-hint{display:block;margin-top:6px;font-size:11px;color:#64748b}
+:where(html[data-theme="dark"]) .failed-table-wrap{border-color:var(--line)}
+:where(html[data-theme="dark"]) .failed-table th{background:var(--surface-2);color:var(--ink-2)}
+:where(html[data-theme="dark"]) .failed-table td{border-color:var(--line)}
+:where(html[data-theme="dark"]) .failed-table td.reason,:where(html[data-theme="dark"]) .failed-head span{color:#fbbf24}

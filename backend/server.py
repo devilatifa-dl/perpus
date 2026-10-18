@@ -764,20 +764,37 @@ async def import_members(file: UploadFile = File(...), user=Depends(current_user
         name = _pick(d, "nama", "name", "nama lengkap", "nama_lengkap")
         sid = _pick(d, "nis", "student_id", "nomor induk", "no induk", "nomor_induk", "no_induk")
         cls = _pick(d, "kelas", "class_name", "class", "rombel")
-        if not name or not cls:
+        reason = "Nama atau kelas kosong" if not name or not cls else (f"NIS {sid} sudah terdaftar" if sid and (sid in existing or sid in seen) else None)
+        if reason:
             skipped += 1
-            errors.append(f"Baris {idx}: nama atau kelas kosong")
-            continue
-        if sid and (sid in existing or sid in seen):
-            skipped += 1
-            errors.append(f"Baris {idx}: NIS {sid} sudah terdaftar")
+            errors.append({"row": idx, "nama": name, "nis": sid, "kelas": cls, "alasan": reason})
             continue
         if sid:
             seen.add(sid)
         to_insert.append({"id": "MB-" + str(uuid.uuid4())[:8].upper(), "name": name, "student_id": sid, "class_name": cls, "photo": ""})
     if to_insert:
         await db.members.insert_many(to_insert)
-    return {"imported": len(to_insert), "skipped": skipped, "total": len(rows), "errors": errors[:25]}
+    return {"imported": len(to_insert), "skipped": skipped, "total": len(rows), "errors": errors}
+
+class FailedRow(BaseModel):
+    row: int
+    nama: str = ""
+    nis: str = ""
+    kelas: str = ""
+    alasan: str = ""
+
+@api.post("/members/import-failed.xlsx")
+async def import_failed_xlsx(rows: List[FailedRow], user=Depends(current_user)):
+    staff_only(user)
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    wb = Workbook(); ws = wb.active; ws.title = "Gagal diimpor"
+    ws.append(["nama", "nis", "kelas", "alasan", "baris asal"])
+    for c in ws[1]: c.font = Font(bold=True)
+    for r in rows: ws.append([r.nama, r.nis, r.kelas, r.alasan, r.row])
+    for col, w in zip("ABCDE", (32, 16, 12, 36, 11)): ws.column_dimensions[col].width = w
+    buf = io.BytesIO(); wb.save(buf)
+    return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": 'attachment; filename="anggota-gagal-impor.xlsx"'})
 
 @api.put("/members/{member_id}")
 async def update_member(member_id: str, data: MemberInput, user=Depends(current_user)):
