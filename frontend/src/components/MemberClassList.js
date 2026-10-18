@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, Search, Users } from "lucide-react";
+import { ChevronDown, Printer, Search, Users } from "lucide-react";
 
 const NO_CLASS = "(Tanpa kelas)";
 
-export function MemberClassList({ members, renderRow }) {
+export function MemberClassList({ members, renderRow, onPrintClass }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(() => new Set());
   const groups = useMemo(() => {
@@ -26,12 +26,13 @@ export function MemberClassList({ members, renderRow }) {
     {groups.map(([cls, list]) => {
       const isOpen = searching || open.has(cls);
       return <div className={`class-group${isOpen ? " open" : ""}`} key={cls} data-testid={`class-group-${cls}`}>
-        <button type="button" className="class-head" data-testid={`class-toggle-${cls}`} onClick={() => toggle(cls)} aria-expanded={isOpen}>
+        <div className="class-head-row"><button type="button" className="class-head" data-testid={`class-toggle-${cls}`} onClick={() => toggle(cls)} aria-expanded={isOpen}>
           <span className="class-icon"><Users size={15}/></span>
           <span className="class-name"><small>Kelas</small><b>{cls}</b></span>
           <span className="class-count" data-testid={`class-count-${cls}`}>{list.length} anggota</span>
           <ChevronDown size={17} className="class-chevron"/>
         </button>
+        {onPrintClass && <button type="button" className="class-print" title={`Cetak kartu kelas ${cls}`} data-testid={`class-print-${cls}`} onClick={() => onPrintClass(cls === NO_CLASS ? "" : cls)}><Printer size={15}/><span>Cetak kartu</span></button>}</div>
         {isOpen && <div className="class-body">{list.map(renderRow)}</div>}
       </div>;
     })}

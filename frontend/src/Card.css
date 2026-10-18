@@ -117,3 +117,4 @@
 .card-identity .card-field{display:flex;gap:4px;align-items:baseline;margin-top:3px}
 .card-identity .card-field i{font-style:normal;min-width:3.2em;opacity:.8}
 .card-identity .card-field em{font-style:normal;opacity:.8;margin-right:3px}
+.card-identity h3.long-name{zoom:.8;line-height:1.15}
