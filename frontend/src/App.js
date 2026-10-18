@@ -38,6 +38,7 @@ import "@/Lanjutan.css";
 import "@/Theme.css";
 import "@/DarkAuto.css";
 import "@/Dark.css";
+import "@/Glass.css";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const nav = [{id:"overview", label:"Ringkasan", icon:LayoutDashboard},{id:"books",label:"Koleksi buku",icon:BookOpen},{id:"members",label:"Anggota",icon:Users},{id:"shelves",label:"Rak buku",icon:Boxes},{id:"circulation",label:"Sirkulasi",icon:QrCode},{id:"visitors",label:"Pengunjung",icon:DoorOpen},{id:"reports",label:"Laporan",icon:BarChart3}];
