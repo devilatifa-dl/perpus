@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, BookOpen, ClipboardList, DoorOpen, FileSpreadsheet, Printer, Users } from "lucide-react";
+import { AlertTriangle, BookOpen, ClipboardList, DoorOpen, FileSpreadsheet, Users } from "lucide-react";
 import { api, fmt } from "../lib";
 
 const todayWib = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
@@ -50,7 +50,6 @@ export function ReportOverview({ notify }) {
       <div className="period-select" data-testid="ro-group">{[["day", "Per hari"], ["month", "Per bulan"]].map(([g, l]) => <button key={g} data-testid={`ro-group-${g}`} className={group === g ? "active" : ""} onClick={() => setRange([start, end, g])}>{l}</button>)}</div>
       <div className="download-row ro-actions">
         <button className="secondary" data-testid="ro-export-csv" disabled={!d} onClick={() => { downloadCsv(d); notify?.("Laporan CSV diunduh — bisa dibuka di Excel"); }}><FileSpreadsheet size={16}/> Excel / CSV</button>
-        <button className="primary" data-testid="ro-print-pdf" disabled={!d} onClick={() => window.print()}><Printer size={16}/> Cetak / PDF</button>
       </div>
     </div>
     {err && <div className="error" data-testid="ro-error">{err}</div>}

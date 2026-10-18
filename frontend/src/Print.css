@@ -1,0 +1,41 @@
+.report-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:23px}
+.report-bar .report-tabs{margin-bottom:0;flex:1 1 auto;min-width:0}
+.report-print-btn{flex-shrink:0}
+.print-sign{display:none}
+@media print{
+  body.report-print{background:#fff!important;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.report-print .app-frame{display:block!important;background:#fff!important;min-height:0}
+  body.report-print .sidebar,body.report-print .topbar,body.report-print .page-heading,body.report-print .report-bar,body.report-print .period-select,body.report-print .download-row,body.report-print .ro-filters,body.report-print .toast,body.report-print .modal-backdrop,body.report-print .leaderboard-actions,body.report-print button{display:none!important}
+  body.report-print .content,body.report-print .main-area{padding:0!important;margin:0!important;max-width:none!important;width:100%!important}
+  body.report-print *{box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;animation:none!important;transition:none!important;text-shadow:none!important}
+  body.report-print .main-area>*{opacity:1!important;transform:none!important}
+  body.report-print .print-header{display:flex!important;align-items:center;gap:12px;padding-bottom:10px;margin-bottom:14px;border-bottom:2.5px double #1e293b}
+  body.report-print .print-header>div{flex:1;text-align:center}
+  body.report-print .print-header img{width:54px;height:54px;object-fit:contain}
+  body.report-print .print-header b{display:block;font-size:13pt;letter-spacing:.02em;color:#0f172a}
+  body.report-print .print-header small{display:block;font-size:9pt;color:#334155;margin-top:3px}
+  body.report-print .print-header .print-title{display:block;font-size:11pt;font-weight:700;margin-top:6px;color:#0f172a;text-transform:uppercase}
+  body.report-print .panel,body.report-print .stat-card,body.report-print .report-summary>div{background:#fff!important;border:1px solid #cbd5e1!important;border-radius:6px!important;padding:10px 12px!important;color:#0f172a!important}
+  body.report-print .report-summary{display:grid!important;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  body.report-print .report-summary b{font-size:16pt!important;margin:3px 0!important}
+  body.report-print .stat-grid{display:grid!important;grid-template-columns:repeat(5,1fr)!important;gap:8px!important;margin-bottom:10px}
+  body.report-print .stat-grid:not(.five){grid-template-columns:repeat(4,1fr)!important}
+  body.report-print .stat-card strong{font-size:15pt!important}
+  body.report-print .stat-icon{display:none!important}
+  body.report-print .ro-charts{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-bottom:8px}
+  body.report-print .panel,body.report-print .ro-charts>*{break-inside:avoid;page-break-inside:avoid}
+  body.report-print .table-panel{break-inside:auto;page-break-inside:auto;border:0!important;padding:0!important}
+  body.report-print .panel-title{margin-bottom:8px}
+  body.report-print .panel-title h3{font-size:11pt}
+  body.report-print .eyebrow{font-size:7.5pt}
+  body.report-print .table-wrap{overflow:visible!important;max-height:none!important}
+  body.report-print table{width:100%!important;min-width:0!important;border-collapse:collapse!important;font-size:8.5pt!important;table-layout:auto}
+  body.report-print thead{display:table-header-group}
+  body.report-print tr{break-inside:avoid;page-break-inside:avoid}
+  body.report-print th{background:#eef2f7!important;color:#0f172a!important;border:1px solid #94a3b8!important;padding:5px 6px!important;font-size:7.5pt!important;border-radius:0!important;position:static!important}
+  body.report-print td{border:1px solid #cbd5e1!important;padding:4px 6px!important;color:#0f172a!important;background:#fff!important;vertical-align:top}
+  body.report-print .status{background:none!important;border:0!important;padding:0!important;color:#0f172a!important;font-weight:600}
+  body.report-print .print-sign{display:flex!important;justify-content:flex-end;margin-top:22px;break-inside:avoid;page-break-inside:avoid}
+  body.report-print .print-sign>div{display:grid;gap:3px;text-align:center;font-size:10pt;min-width:220px}
+  body.report-print .print-sign b{margin-top:56px;font-weight:600}
+}
