@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PrintButton } from "./ReportPrint";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, BookOpen, ClipboardList, DoorOpen, FileSpreadsheet, Users } from "lucide-react";
 import { api, fmt } from "../lib";
@@ -49,7 +50,8 @@ export function ReportOverview({ notify }) {
       <label className="ro-date">Sampai<input type="date" data-testid="ro-end-input" value={end} min={start} max={todayWib()} onChange={(e) => setField(1, e.target.value)}/></label>
       <div className="period-select" data-testid="ro-group">{[["day", "Per hari"], ["month", "Per bulan"]].map(([g, l]) => <button key={g} data-testid={`ro-group-${g}`} className={group === g ? "active" : ""} onClick={() => setRange([start, end, g])}>{l}</button>)}</div>
       <div className="download-row ro-actions">
-        <button className="secondary" data-testid="ro-export-csv" disabled={!d} onClick={() => { downloadCsv(d); notify?.("Laporan CSV diunduh — bisa dibuka di Excel"); }}><FileSpreadsheet size={16}/> Excel / CSV</button>
+        <PrintButton/>
+        <button className="secondary" data-testid="ro-export-csv" disabled={!d} onClick={() => { downloadCsv(d); notify?.("Laporan CSV diunduh — bisa dibuka di Excel"); }}><FileSpreadsheet size={16}/> Excel</button>
       </div>
     </div>
     {err && <div className="error" data-testid="ro-error">{err}</div>}
