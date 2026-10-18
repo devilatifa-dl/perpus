@@ -15,7 +15,7 @@ export function MemberCard({ member, settings }) {
     </div>
     <div className="id-card-body">
       <div className="photo">{member.photo ? <img src={member.photo} alt={member.name}/> : member.name[0]}</div>
-      <div className="card-identity"><span>PEMILIK KARTU</span><h3>{member.name}</h3><p>{member.class_name} · NIS {member.student_id}</p><p>Anggota aktif</p></div>
+      <div className="card-identity"><span>PEMILIK KARTU</span><h3>{member.name}</h3><p className="card-field" data-testid="card-class"><i>Kelas</i><em>:</em>{member.class_name}</p><p className="card-field" data-testid="card-nis"><i>NIS</i><em>:</em>{member.student_id}</p></div>
       {s.card_qr_pos === "bawah" && qr}
     </div>
     <div className="id-card-foot">{s.card_show_address && <span>Jln Raya Subik, Desa Pekurun Selatan</span>}<b>{member.id}</b></div>
