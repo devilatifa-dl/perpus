@@ -31,7 +31,7 @@ export function Login({ onLogin, portal }) {
         {error && <div className="error" data-testid="login-error">{error}</div>}
         <button className="primary full" data-testid="login-submit-button">{student ? "Masuk portal siswa" : "Masuk ke dashboard"} <ChevronRight size={17}/></button>
       </form>
-      <div className="demo-login" style={student ? undefined : { display: "none" }}><span>AKSES DEMO CEPAT</span><div>{roles.map((role) => <button key={role} data-testid={`demo-login-${role}-button`} onClick={() => demo(role)}>{role}</button>)}</div></div>
+      <div className="demo-login" style={student ? undefined : { display: "none" }}><span>AKSES CEPAT</span><div>{roles.map((role) => <button key={role} data-testid={`demo-login-${role}-button`} onClick={() => demo(role)}>{role}</button>)}</div></div>
       <p className="portal-switch">{student ? <>Petugas atau admin? <Link to="/admin" data-testid="switch-to-admin-link">Masuk lewat /admin</Link></> : <>Kamu siswa? <Link to="/siswa" data-testid="switch-to-student-link">Masuk lewat /siswa</Link></>}</p>
     </div></div>
   </main>;

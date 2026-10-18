@@ -652,11 +652,11 @@ async def add_incoming(data: IncomingInput, user=Depends(current_user)):
 @api.get("/members")
 async def members(user=Depends(current_user)):
     staff_only(user)
-    return await db.members.find({}, {"_id":0}).to_list(200)
+    return await db.members.find({}, {"_id":0}).to_list(None)
 
 @api.get("/members/options")
 async def member_options(user=Depends(current_user)):
-    rows = await db.members.find({}, {"_id":0,"id":1,"name":1,"class_name":1,"student_id":1,"photo":1}).to_list(5000)
+    rows = await db.members.find({}, {"_id":0,"id":1,"name":1,"class_name":1,"student_id":1,"photo":1}).to_list(None)
     rows.sort(key=lambda m: (m.get("class_name",""), m.get("name","")))
     return rows
 
@@ -757,27 +757,44 @@ async def import_members(file: UploadFile = File(...), user=Depends(current_user
         raise HTTPException(400, "Berkas kosong atau tidak memiliki data")
     if len(rows) > 2000:
         raise HTTPException(400, "Maksimal 2000 baris per impor")
-    existing = {m.get("student_id") for m in await db.members.find({}, {"_id": 0, "student_id": 1}).to_list(5000) if m.get("student_id")}
+    existing = {m.get("student_id") for m in await db.members.find({}, {"_id": 0, "student_id": 1}).to_list(None) if m.get("student_id")}
     seen = set()
     to_insert, errors, skipped = [], [], 0
     for idx, d in enumerate(rows, start=2):
         name = _pick(d, "nama", "name", "nama lengkap", "nama_lengkap")
         sid = _pick(d, "nis", "student_id", "nomor induk", "no induk", "nomor_induk", "no_induk")
         cls = _pick(d, "kelas", "class_name", "class", "rombel")
-        if not name or not cls:
+        reason = "Nama atau kelas kosong" if not name or not cls else (f"NIS {sid} sudah terdaftar" if sid and (sid in existing or sid in seen) else None)
+        if reason:
             skipped += 1
-            errors.append(f"Baris {idx}: nama atau kelas kosong")
-            continue
-        if sid and (sid in existing or sid in seen):
-            skipped += 1
-            errors.append(f"Baris {idx}: NIS {sid} sudah terdaftar")
+            errors.append({"row": idx, "nama": name, "nis": sid, "kelas": cls, "alasan": reason})
             continue
         if sid:
             seen.add(sid)
         to_insert.append({"id": "MB-" + str(uuid.uuid4())[:8].upper(), "name": name, "student_id": sid, "class_name": cls, "photo": ""})
     if to_insert:
         await db.members.insert_many(to_insert)
-    return {"imported": len(to_insert), "skipped": skipped, "total": len(rows), "errors": errors[:25]}
+    return {"imported": len(to_insert), "skipped": skipped, "total": len(rows), "errors": errors}
+
+class FailedRow(BaseModel):
+    row: int
+    nama: str = ""
+    nis: str = ""
+    kelas: str = ""
+    alasan: str = ""
+
+@api.post("/members/import-failed.xlsx")
+async def import_failed_xlsx(rows: List[FailedRow], user=Depends(current_user)):
+    staff_only(user)
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+    wb = Workbook(); ws = wb.active; ws.title = "Gagal diimpor"
+    ws.append(["nama", "nis", "kelas", "alasan", "baris asal"])
+    for c in ws[1]: c.font = Font(bold=True)
+    for r in rows: ws.append([r.nama, r.nis, r.kelas, r.alasan, r.row])
+    for col, w in zip("ABCDE", (32, 16, 12, 36, 11)): ws.column_dimensions[col].width = w
+    buf = io.BytesIO(); wb.save(buf)
+    return Response(buf.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": 'attachment; filename="anggota-gagal-impor.xlsx"'})
 
 @api.put("/members/{member_id}")
 async def update_member(member_id: str, data: MemberInput, user=Depends(current_user)):
@@ -816,7 +833,7 @@ async def promote_members(data: PromoteInput, user=Depends(current_user)):
 @api.post("/members/bulk-delete")
 async def bulk_delete_members(data: BulkDeleteInput, user=Depends(current_user)):
     staff_only(user)
-    members = await db.members.find({"class_name": data.class_name}, {"_id":0,"id":1}).to_list(1000)
+    members = await db.members.find({"class_name": data.class_name}, {"_id":0,"id":1}).to_list(None)
     ids = [m["id"] for m in members]
     if not ids: raise HTTPException(404, "Tidak ada anggota pada kelas tersebut")
     await db.reservations.update_many({"member_id": {"$in": ids}, "status": "Menunggu"}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
