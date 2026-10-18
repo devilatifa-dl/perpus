@@ -114,3 +114,6 @@
 .status.ditemukan{background:#dcfce7;color:#15803d}
 @media print{.print-header{display:flex;align-items:center;gap:14px;padding-bottom:14px;margin-bottom:14px;border-bottom:2px solid #0f2745}.print-header img{width:56px;height:56px;object-fit:contain}.print-header b{display:block;font-size:16px}.print-header small{color:#475569}.history-panel,.card-actions,.member-list,.report-summary{display:none!important}.id-card{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 @media(max-width:760px){.designer{grid-template-columns:1fr}.designer-preview{position:static}.layout-options{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.toolbar-buttons .primary,.toolbar-buttons .secondary{font-size:0;padding:12px}.toolbar-buttons svg{margin:0}}
+.card-identity .card-field{display:flex;gap:4px;align-items:baseline;margin-top:3px}
+.card-identity .card-field i{font-style:normal;min-width:3.2em;opacity:.8}
+.card-identity .card-field em{font-style:normal;opacity:.8;margin-right:3px}

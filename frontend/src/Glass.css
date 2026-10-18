@@ -183,3 +183,27 @@ textarea{padding:12px 16px}
 .searchbox input{padding:0!important;height:100%}
 .visit-search-input input{padding-left:40px!important;padding-right:36px!important}
 .visit-list-search input{padding-left:36px!important;padding-right:32px!important}
+.class-list{display:grid;gap:8px}
+.class-search{width:100%;margin-bottom:2px}
+.class-summary{font-size:11.5px;color:var(--muted);font-weight:600;margin:2px 4px 4px}
+.class-empty{padding:10px 4px}
+.class-group{border:1px solid rgba(124,58,237,.12);border-radius:16px;background:rgba(255,255,255,.55);overflow:hidden;transition:border-color .25s,box-shadow .25s}
+.class-group.open{border-color:rgba(124,58,237,.28);box-shadow:0 12px 26px -20px rgba(76,29,149,.5)}
+.class-head{display:flex;align-items:center;gap:12px;width:100%;padding:11px 14px;background:transparent;border:0;text-align:left;color:var(--ink);transition:background-color .2s}
+.class-head:hover{background:rgba(124,58,237,.06)}
+.class-icon{width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;border-radius:11px;background:rgba(124,58,237,.1);color:#7c3aed}
+.class-group.open .class-icon{background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff}
+.class-name{flex:1;min-width:0}
+.class-name small{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.class-name b{display:block;font-size:14px;margin-top:1px}
+.class-count{font-size:11px;font-weight:700;color:#6d28d9;background:rgba(124,58,237,.1);padding:4px 10px;border-radius:999px;white-space:nowrap}
+.class-chevron{color:var(--muted);transition:transform .25s}
+.class-group.open .class-chevron{transform:rotate(180deg)}
+.class-body{padding:4px 8px 8px;border-top:1px solid rgba(124,58,237,.1);animation:glassUp .2s ease-out}
+@media screen{
+html[data-theme="dark"] .class-group{background:rgba(23,19,43,.5);border-color:rgba(167,139,250,.16)}
+html[data-theme="dark"] .class-group.open{border-color:rgba(167,139,250,.32)}
+html[data-theme="dark"] .class-head:hover{background:rgba(167,139,250,.08)}
+html[data-theme="dark"] .class-icon,html[data-theme="dark"] .class-count{background:rgba(167,139,250,.14);color:#c4b5fd}
+html[data-theme="dark"] .class-body{border-top-color:rgba(167,139,250,.14)}
+}
