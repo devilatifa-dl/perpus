@@ -21,7 +21,7 @@ export function printReport() {
 }
 
 export function PrintButton() {
-  return <button type="button" className="primary report-print-btn" data-testid="print-report-button" onClick={printReport}><Printer size={16}/> Cetak A4</button>;
+  return <button type="button" className="primary report-print-btn" data-testid="print-report-button" onClick={printReport}><Printer size={16}/> Cetak</button>;
 }
 
 export function PrintSignature({ date }) {

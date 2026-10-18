@@ -1,6 +1,11 @@
 .report-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:23px}
 .report-bar .report-tabs{margin-bottom:0;flex:1 1 auto;min-width:0}
-.report-print-btn{flex-shrink:0}
+.report-print-btn{flex-shrink:0;margin-left:auto}
+@media screen{
+.app-frame .report-bar .report-tabs{display:flex;flex-wrap:wrap;gap:4px;width:auto;overflow:visible;border-radius:22px;padding:6px;border:1px solid rgba(124,58,237,.18);box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 10px 24px -18px rgba(76,29,149,.4)}
+.app-frame .report-bar .report-tabs button{border-radius:16px;padding:10px 18px}
+html[data-theme="dark"] .app-frame .report-bar .report-tabs{border-color:rgba(167,139,250,.28);box-shadow:0 10px 24px -18px rgba(0,0,0,.8)}
+}
 .print-sign{display:none}
 @media print{
   body.report-print{background:#fff!important;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
