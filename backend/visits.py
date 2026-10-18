@@ -197,7 +197,7 @@ async def visit_leaderboard(month: Optional[str] = None, limit: int = 10):
         cls = (r.get("class_name") or "").strip() or "Tanpa kelas"
         c = classes.setdefault(cls, {"class_name": cls, "visits": 0, "members": set()})
         c["visits"] += 1; c["members"].add(mid)
-    members = {m_["id"]: m_ for m_ in await _db.members.find({"id": {"$in": [k for k in students if k]}}, {"_id": 0, "id": 1, "name": 1, "class_name": 1, "photo": 1}).to_list(5000)}
+    members = {m_["id"]: m_ for m_ in await _db.members.find({"id": {"$in": [k for k in students if k]}}, {"_id": 0, "id": 1, "name": 1, "class_name": 1, "photo": 1}).to_list(None)}
     total = len(rows)
     ranked = sorted(students.values(), key=lambda x: (-x["visits"], -len(x["days"]), -x["minutes"], x["name"]))
     out_students = []
