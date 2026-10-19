@@ -48,14 +48,28 @@ export function AccountManager({ user, close, notify }) {
     } finally { setBusyData(""); }
   };
 
-  const reset = async () => {
+  const [codeTo, setCodeTo] = useState(""); const [code, setCode] = useState("");
+
+  const requestCode = async () => {
     const msg = resetBooks
       ? "Reset SEMUA data termasuk koleksi buku? Tindakan ini tidak dapat dibatalkan."
       : "Reset data (anggota, transaksi, pesanan, dll) kecuali koleksi buku? Tindakan ini tidak dapat dibatalkan.";
     if (!window.confirm(msg)) return;
+    setBusyData("code");
+    try {
+      const { data } = await api.post("/admin/reset-code");
+      setCodeTo(data.sent_to); setCode("");
+      notify(`Kode verifikasi dikirim ke ${data.sent_to}`);
+    } catch (err) {
+      notify(err.response?.data?.detail || "Gagal mengirim kode verifikasi");
+    } finally { setBusyData(""); }
+  };
+
+  const reset = async () => {
+    if (code.trim().length !== 6) return notify("Masukkan 6 digit kode verifikasi");
     setBusyData("reset");
     try {
-      await api.post("/admin/reset-data", { include_books: resetBooks });
+      await api.post("/admin/reset-data", { include_books: resetBooks, code: code.trim() });
       notify("Data berhasil direset. Memuat ulang...");
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
@@ -123,7 +137,13 @@ export function AccountManager({ user, close, notify }) {
         </div>
         <div className="data-reset-zone">
           <label className="reset-books-check"><input type="checkbox" data-testid="reset-include-books" checked={resetBooks} onChange={e => setResetBooks(e.target.checked)}/> Ikut hapus koleksi buku</label>
-          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={reset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Reset data"}</button>
+          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={requestCode}><Trash2 size={15}/> {busyData === "code" ? "Mengirim kode..." : codeTo ? "Kirim ulang kode" : "Reset data"}</button>
+          {codeTo && <div className="reset-code-box" data-testid="reset-code-box" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 10 }}>
+            <p className="account-hint" data-testid="reset-code-sent-to" style={{ width: "100%" }}>Kode verifikasi 6 digit sudah dikirim ke <b>{codeTo}</b>. Berlaku 10 menit.</p>
+            <input data-testid="reset-code-input" inputMode="numeric" maxLength={6} placeholder="Kode verifikasi" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))} style={{ maxWidth: 180, letterSpacing: 4 }}/>
+            <button type="button" className="danger-btn" data-testid="reset-confirm-button" disabled={busyData !== "" || code.length !== 6} onClick={reset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Konfirmasi reset"}</button>
+            <button type="button" className="secondary" data-testid="reset-cancel-button" disabled={busyData !== ""} onClick={() => { setCodeTo(""); setCode(""); }}>Batal</button>
+          </div>}
           <p className="account-hint reset-warn"><AlertTriangle size={13}/> Reset &amp; pulihkan akan mengganti data saat ini dan tidak dapat dibatalkan.</p>
         </div>
       </div>}
