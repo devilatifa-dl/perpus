@@ -307,14 +307,15 @@ async def login(data: LoginInput, response: Response):
         raise HTTPException(403, "Akun petugas/admin harus masuk melalui portal /admin")
     if data.portal == "admin" and user["role"] == "siswa":
         raise HTTPException(403, "Akun siswa hanya dapat masuk melalui portal /siswa")
-    response.set_cookie("access_token", token_for(user), httponly=True, samesite="lax", max_age=28800)
-    return public(user)
+    token = token_for(user)
+    response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=28800, path="/")
+    return {**public(user), "token": token}
 
 @api.get("/auth/me")
 async def me(user=Depends(current_user)): return public(user)
 
 @api.post("/auth/logout")
-async def logout(response: Response): response.delete_cookie("access_token"); return {"ok":True}
+async def logout(response: Response): response.delete_cookie("access_token", path="/", secure=True, samesite="none"); return {"ok":True}
 
 @api.post("/account/password")
 async def change_own_password(data: PasswordChangeInput, user=Depends(current_user)):
@@ -1149,7 +1150,7 @@ api.include_router(summary_router(db, current_user, staff_only, overdue_loans, v
 app.include_router(api)
 _cors = [o.strip() for o in (os.environ.get("FRONTEND_URL", "") + "," + os.environ.get("CORS_ORIGINS", "")).split(",") if o.strip() and o.strip() != "*"]
 # Frontend & API berada di domain yang sama (preview / domain sendiri .my.id), CORS hanya untuk asal tambahan
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_origin_regex=r"https://([a-z0-9-]+\.)*(emergentagent\.com|emergent\.host|my\.id)", allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_origin_regex=r"https://([a-z0-9-]+\.)*(emergentagent\.com|emergent\.host|my\.id|vercel\.app)", allow_methods=["*"], allow_headers=["*"])
 
 @app.on_event("shutdown")
 async def shutdown(): client.close()

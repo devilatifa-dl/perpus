@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera, Trophy, Lock } from "lucide-react";
 import { Leaderboard } from "./Leaderboard";
 import { fmtDate } from "../lib";
-import { api, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
+import { api, saveToken, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { Login } from "./Login";
 import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
@@ -50,7 +50,7 @@ export default function StudentPortal() {
   if (!user) return <Login onLogin={setUser} portal="siswa"/>;
   if (user.role !== "siswa") return <Navigate to="/admin" replace/>;
   const linked = !!user.member_id; const allTabs = linked ? [profileTab, ...tabs] : tabs;
-  const logout = async () => { await api.post("/auth/logout"); setUser(null); };
+  const logout = async () => { await api.post("/auth/logout").catch(() => {}); saveToken(null); setUser(null); };
   const filtered = data.books.filter((b) => (shelfFilter === "semua" || b.shelf === shelfFilter) && `${b.title} ${b.author} ${b.category} ${b.id}`.toLowerCase().includes(search.toLowerCase()));
   const shelfName = (id) => data.shelves.find((s) => s.id === id)?.name || "";
   const goToShelf = (id) => { setHighlight(id); setTab("rak"); };

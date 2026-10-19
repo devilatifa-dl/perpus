@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { api, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
+import { api, saveToken, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { ThemeToggle } from "./ThemeToggle";
 
 const ACCOUNTS = { admin: ["admin@smansa.sch.id", "admin123"], petugas: ["petugas@smansa.sch.id", "petugas123"], siswa: ["siswa@smansa.sch.id", "siswa123"] };
@@ -10,7 +10,7 @@ export function Login({ onLogin, portal }) {
   const student = portal === "siswa";
   const roles = student ? ["siswa"] : ["admin", "petugas"];
   const [email, setEmail] = useState(student ? ACCOUNTS.siswa[0] : ""); const [password, setPassword] = useState(student ? ACCOUNTS.siswa[1] : ""); const [error, setError] = useState("");
-  const submit = async (e) => { e.preventDefault(); try { const { data } = await api.post("/auth/login", { email, password, portal }); onLogin(data); } catch (err) { setError(err.response?.data?.detail || "Email atau kata sandi salah"); } };
+  const submit = async (e) => { e.preventDefault(); try { const { data } = await api.post("/auth/login", { email, password, portal }); const { token, ...user } = data; saveToken(token); onLogin(user); } catch (err) { const d = err.response?.data?.detail; setError(typeof d === "string" ? d : err.response ? "Email atau kata sandi salah" : "Server tidak dapat dihubungi. Coba lagi."); } };
   const demo = (role) => { setEmail(ACCOUNTS[role][0]); setPassword(ACCOUNTS[role][1]); setError(""); };
   return <main className={student ? "login-shell student" : "login-shell"} data-testid={`login-page-${portal}`}>
     <ThemeToggle variant="floating" testId="login-theme-toggle"/>

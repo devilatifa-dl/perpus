@@ -1,7 +1,10 @@
 import axios from "axios";
 
-export const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+export const API = `${process.env.REACT_APP_BACKEND_URL || ""}/api`;
 export const api = axios.create({ baseURL: API, withCredentials: true });
+const TOKEN_KEY = "perpus_token";
+export const saveToken = (t) => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* abaikan */ } };
+api.interceptors.request.use((cfg) => { const t = localStorage.getItem(TOKEN_KEY); if (t) cfg.headers.Authorization = `Bearer ${t}`; return cfg; });
 export const fmt = (value) => new Intl.NumberFormat("id-ID").format(value || 0);
 export const fmtDate = (d, opts = { day: "numeric", month: "short", year: "numeric" }) => d ? new Date(d).toLocaleDateString("id-ID", opts) : "-";
 
