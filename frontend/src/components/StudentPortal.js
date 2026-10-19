@@ -1,3 +1,4 @@
+import { MemberSearch } from "./MemberSearch";
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera, Trophy, Lock } from "lucide-react";
@@ -100,13 +101,10 @@ export default function StudentPortal() {
       </div>}
     </main>
     {photoOpen && <Modal title="Unggah / ganti foto anggota" close={() => { setPhotoOpen(false); setSelId(""); setDraftPhoto(""); }}>
-      <p className="account-hint" style={{ marginTop: 0 }}>Pilih nama anggota, lalu unggah {photoCfg.allow_replace ? "atau ganti " : ""}fotonya. Kartu anggota akan otomatis memakai foto terbaru.{photoCfg.until ? ` Unggah foto dibuka sampai ${new Date(photoCfg.until).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB.` : ""}</p>
-      <label className="photo-member-select">Nama anggota
-        <select data-testid="photo-member-select" value={selId} onChange={(e) => chooseMember(e.target.value)}>
-          <option value="">— Pilih nama anggota —</option>
-          {options.map((o) => <option key={o.id} value={o.id}>{o.name}{o.class_name ? ` · ${o.class_name}` : ""}</option>)}
-        </select>
-      </label>
+      <p className="account-hint" style={{ marginTop: 0 }}>Ketik dan pilih namamu, lalu unggah {photoCfg.allow_replace ? "atau ganti " : ""}fotonya. Kartu anggota akan otomatis memakai foto terbaru.{photoCfg.until ? ` Unggah foto dibuka sampai ${new Date(photoCfg.until).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" })} WIB.` : ""}</p>
+      <div className="photo-member-select">Ketik nama anggota
+        <MemberSearch members={options} value={selId} onChange={chooseMember} testId="photo-member" placeholder="Ketik namamu atau kelas..."/>
+      </div>
       {options.length === 0 && <p className="muted">Belum ada data anggota. Hubungi petugas perpustakaan.</p>}
       {selId && replaceBlocked ? <div className="photo-locked" data-testid="student-photo-replace-blocked"><Lock size={18}/><div><b>Foto anggota ini sudah ada</b>Penggantian foto sedang tidak diizinkan. Hubungi petugas perpustakaan bila foto perlu diganti.</div></div>
       : selId ? <>
