@@ -31,14 +31,29 @@ export function AccountManager({ user, close, notify }) {
     } finally { setBusyData(""); }
   };
 
-  const restore = async (e) => {
+  const [restoreFile, setRestoreFile] = useState(null); const [restoreTo, setRestoreTo] = useState(""); const [restoreCode, setRestoreCode] = useState("");
+
+  const sendCode = async (purpose) => {
+    const { data } = await api.post(`/admin/reset-code?purpose=${purpose}`);
+    notify(`Kode verifikasi dikirim ke ${data.sent_to}`);
+    return data.sent_to;
+  };
+
+  const pickRestore = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     if (!window.confirm(`Pulihkan data dari "${file.name}"? Seluruh data saat ini akan digantikan oleh isi berkas cadangan.`)) return;
+    setBusyData("restore-code");
+    try { setRestoreTo(await sendCode("restore")); setRestoreFile(file); setRestoreCode(""); }
+    catch (err) { notify(err.response?.data?.detail || "Gagal mengirim kode verifikasi"); }
+    finally { setBusyData(""); }
+  };
+
+  const restore = async () => {
     setBusyData("restore");
     try {
-      const fd = new FormData(); fd.append("file", file);
+      const fd = new FormData(); fd.append("file", restoreFile); fd.append("code", restoreCode);
       const res = await api.post("/admin/restore", fd);
       const total = Object.values(res.data.restored || {}).reduce((a, b) => a + b, 0);
       notify(`Data berhasil dipulihkan (${total} entri). Memuat ulang...`);
@@ -57,9 +72,7 @@ export function AccountManager({ user, close, notify }) {
     if (!window.confirm(msg)) return;
     setBusyData("code");
     try {
-      const { data } = await api.post("/admin/reset-code");
-      setCodeTo(data.sent_to); setCode("");
-      notify(`Kode verifikasi dikirim ke ${data.sent_to}`);
+      setCodeTo(await sendCode("reset")); setCode("");
     } catch (err) {
       notify(err.response?.data?.detail || "Gagal mengirim kode verifikasi");
     } finally { setBusyData(""); }
@@ -132,21 +145,26 @@ export function AccountManager({ user, close, notify }) {
         <p className="account-hint" data-testid="backup-contents-hint"><b>Unduh cadangan</b> menghasilkan satu berkas ZIP: data untuk pemulihan + semua laporan (Excel &amp; PDF) — transaksi, buku masuk, buku hilang, pengunjung, dan peringkat rajin berkunjung per bulan.</p>
         <div className="data-actions">
           <button type="button" className="secondary" data-testid="backup-data-button" disabled={busyData !== ""} onClick={backup}><Download size={15}/> {busyData === "backup" ? "Menyiapkan cadangan & laporan..." : "Unduh cadangan"}</button>
-          <button type="button" className="secondary" data-testid="restore-data-button" disabled={busyData !== ""} onClick={() => restoreRef.current?.click()}><Upload size={15}/> {busyData === "restore" ? "Memulihkan..." : "Pulihkan data"}</button>
-          <input ref={restoreRef} type="file" accept="application/json,.json,application/zip,.zip" hidden data-testid="restore-file-input" onChange={restore}/>
+          <button type="button" className="secondary" data-testid="restore-data-button" disabled={busyData !== ""} onClick={() => restoreRef.current?.click()}><Upload size={15}/> {busyData === "restore-code" ? "Mengirim kode..." : busyData === "restore" ? "Memulihkan..." : "Pulihkan data"}</button>
+          <input ref={restoreRef} type="file" accept="application/json,.json,application/zip,.zip" hidden data-testid="restore-file-input" onChange={pickRestore}/>
         </div>
+        {restoreFile && <CodeBox prefix="restore" to={restoreTo} code={restoreCode} setCode={setRestoreCode} busy={busyData !== ""} label={busyData === "restore" ? "Memulihkan..." : "Konfirmasi pulihkan"} note={`Berkas: ${restoreFile.name}`} onConfirm={restore} onCancel={() => { setRestoreFile(null); setRestoreTo(""); setRestoreCode(""); }}/>}
         <div className="data-reset-zone">
           <label className="reset-books-check"><input type="checkbox" data-testid="reset-include-books" checked={resetBooks} onChange={e => setResetBooks(e.target.checked)}/> Ikut hapus koleksi buku</label>
           <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={requestCode}><Trash2 size={15}/> {busyData === "code" ? "Mengirim kode..." : codeTo ? "Kirim ulang kode" : "Reset data"}</button>
-          {codeTo && <div className="reset-code-box" data-testid="reset-code-box" style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 10 }}>
-            <p className="account-hint" data-testid="reset-code-sent-to" style={{ width: "100%" }}>Kode verifikasi 6 digit sudah dikirim ke <b>{codeTo}</b>. Berlaku 10 menit.</p>
-            <input data-testid="reset-code-input" inputMode="numeric" maxLength={6} placeholder="Kode verifikasi" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))} style={{ maxWidth: 180, letterSpacing: 4 }}/>
-            <button type="button" className="danger-btn" data-testid="reset-confirm-button" disabled={busyData !== "" || code.length !== 6} onClick={reset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Konfirmasi reset"}</button>
-            <button type="button" className="secondary" data-testid="reset-cancel-button" disabled={busyData !== ""} onClick={() => { setCodeTo(""); setCode(""); }}>Batal</button>
-          </div>}
+          {codeTo && <CodeBox prefix="reset" to={codeTo} code={code} setCode={setCode} busy={busyData !== ""} label={busyData === "reset" ? "Mereset..." : "Konfirmasi reset"} onConfirm={reset} onCancel={() => { setCodeTo(""); setCode(""); }}/>}
           <p className="account-hint reset-warn"><AlertTriangle size={13}/> Reset &amp; pulihkan akan mengganti data saat ini dan tidak dapat dibatalkan.</p>
         </div>
       </div>}
     </div>
   </Modal>;
+}
+
+function CodeBox({ prefix, to, code, setCode, busy, label, note, onConfirm, onCancel }) {
+  return <div className={`${prefix}-code-box`} data-testid={`${prefix}-code-box`} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 10 }}>
+    <p className="account-hint" data-testid={`${prefix}-code-sent-to`} style={{ width: "100%" }}>{note ? `${note}. ` : ""}Kode verifikasi 6 digit sudah dikirim ke <b>{to}</b>. Berlaku 10 menit.</p>
+    <input data-testid={`${prefix}-code-input`} inputMode="numeric" maxLength={6} placeholder="Kode verifikasi" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))} style={{ maxWidth: 180, letterSpacing: 4 }}/>
+    <button type="button" className="danger-btn" data-testid={`${prefix}-confirm-button`} disabled={busy || code.length !== 6} onClick={onConfirm}>{label}</button>
+    <button type="button" className="secondary" data-testid={`${prefix}-cancel-button`} disabled={busy} onClick={onCancel}>Batal</button>
+  </div>;
 }

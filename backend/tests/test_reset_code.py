@@ -197,10 +197,24 @@ class TestResetSuccess:
 
     def test_zz_restore_backup(self, admin_token, backup_payload, mongo):
         """Named 'zz' to run LAST within class - restores preview data."""
+        # Restore now requires a verification code (purpose='restore')
+        code_hash = bcrypt.hashpw(b"654321", bcrypt.gensalt()).decode()
+        mongo.reset_codes.update_one(
+            {"id": "restore"},
+            {"$set": {
+                "id": "restore",
+                "code_hash": code_hash,
+                "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                "sent_at": (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat(),
+                "attempts": 0,
+            }},
+            upsert=True,
+        )
         payload_bytes = json.dumps(backup_payload).encode("utf-8")
         files = {"file": ("backup.json", io.BytesIO(payload_bytes), "application/json")}
+        data = {"code": "654321"}
         headers = {"Authorization": f"Bearer {admin_token}"}
-        r = requests.post(f"{BASE_URL}/api/admin/restore", headers=headers, files=files, timeout=120)
+        r = requests.post(f"{BASE_URL}/api/admin/restore", headers=headers, files=files, data=data, timeout=120)
         assert r.status_code == 200, r.text
         body = r.json()
         assert body.get("ok") is True
@@ -235,3 +249,155 @@ class TestRateLimit:
 
         # Cleanup: delete reset code so the user is not blocked afterwards
         mongo.reset_codes.delete_many({})
+
+
+# ---------- Restore flow (new feature: email code required) ----------
+class TestRestorePermissions:
+    def test_petugas_cannot_request_restore_code(self, petugas_token):
+        r = requests.post(f"{BASE_URL}/api/admin/reset-code?purpose=restore",
+                          headers=_hdr(petugas_token), timeout=20)
+        assert r.status_code == 403, r.text
+
+    def test_petugas_cannot_restore(self, petugas_token, backup_payload):
+        payload_bytes = json.dumps(backup_payload).encode("utf-8")
+        files = {"file": ("backup.json", io.BytesIO(payload_bytes), "application/json")}
+        headers = {"Authorization": f"Bearer {petugas_token}"}
+        r = requests.post(f"{BASE_URL}/api/admin/restore", headers=headers,
+                          files=files, data={"code": "123456"}, timeout=30)
+        assert r.status_code == 403, r.text
+
+    def test_unknown_purpose_rejected(self, admin_token, mongo):
+        mongo.reset_codes.delete_many({})
+        r = requests.post(f"{BASE_URL}/api/admin/reset-code?purpose=garbage",
+                          headers=_hdr(admin_token), timeout=20)
+        assert r.status_code == 400, r.text
+        assert "dikenal" in r.json().get("detail", "").lower()
+
+
+class TestRestoreValidation:
+    def test_restore_without_code_rejected_no_deletion(self, admin_token, backup_payload, mongo):
+        mongo.reset_codes.delete_many({"id": "restore"})
+        before_members = mongo.members.count_documents({})
+        before_books = mongo.books.count_documents({})
+        payload_bytes = json.dumps(backup_payload).encode("utf-8")
+        files = {"file": ("b.json", io.BytesIO(payload_bytes), "application/json")}
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        r = requests.post(f"{BASE_URL}/api/admin/restore", headers=headers,
+                          files=files, data={"code": ""}, timeout=30)
+        assert r.status_code == 400, r.text
+        assert mongo.members.count_documents({}) == before_members
+        assert mongo.books.count_documents({}) == before_books
+
+    def test_restore_wrong_code_rejected(self, admin_token, backup_payload, mongo):
+        code_hash = bcrypt.hashpw(b"111222", bcrypt.gensalt()).decode()
+        mongo.reset_codes.update_one(
+            {"id": "restore"},
+            {"$set": {"id": "restore", "code_hash": code_hash,
+                      "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                      "sent_at": (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat(),
+                      "attempts": 0}},
+            upsert=True)
+        before_members = mongo.members.count_documents({})
+        payload_bytes = json.dumps(backup_payload).encode("utf-8")
+        files = {"file": ("b.json", io.BytesIO(payload_bytes), "application/json")}
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        r = requests.post(f"{BASE_URL}/api/admin/restore", headers=headers,
+                          files=files, data={"code": "000000"}, timeout=30)
+        assert r.status_code == 400, r.text
+        assert "salah" in r.json().get("detail", "").lower()
+        assert mongo.members.count_documents({}) == before_members
+        rec = mongo.reset_codes.find_one({"id": "restore"})
+        assert rec["attempts"] == 1
+
+    def test_reset_code_not_accepted_for_restore(self, admin_token, backup_payload, mongo):
+        """Seeding code with id='reset' must not satisfy restore endpoint."""
+        mongo.reset_codes.delete_many({})
+        code_hash = bcrypt.hashpw(b"777888", bcrypt.gensalt()).decode()
+        mongo.reset_codes.update_one(
+            {"id": "reset"},
+            {"$set": {"id": "reset", "code_hash": code_hash,
+                      "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                      "sent_at": (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat(),
+                      "attempts": 0}},
+            upsert=True)
+        payload_bytes = json.dumps(backup_payload).encode("utf-8")
+        files = {"file": ("b.json", io.BytesIO(payload_bytes), "application/json")}
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        r = requests.post(f"{BASE_URL}/api/admin/restore", headers=headers,
+                          files=files, data={"code": "777888"}, timeout=30)
+        # No 'restore' row exists -> endpoint rejects
+        assert r.status_code == 400, r.text
+        # 'reset' row untouched (restore shouldn't consume it)
+        rec = mongo.reset_codes.find_one({"id": "reset"})
+        assert rec is not None, "reset code must not be consumed by restore endpoint"
+
+    def test_restore_code_not_accepted_for_reset(self, admin_token, mongo):
+        """Code with id='restore' must not satisfy reset-data endpoint."""
+        mongo.reset_codes.delete_many({})
+        code_hash = bcrypt.hashpw(b"333444", bcrypt.gensalt()).decode()
+        mongo.reset_codes.update_one(
+            {"id": "restore"},
+            {"$set": {"id": "restore", "code_hash": code_hash,
+                      "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                      "sent_at": (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat(),
+                      "attempts": 0}},
+            upsert=True)
+        before_members = mongo.members.count_documents({})
+        r = requests.post(f"{BASE_URL}/api/admin/reset-data",
+                          headers=_hdr(admin_token),
+                          json={"include_books": False, "code": "333444"}, timeout=20)
+        assert r.status_code == 400, r.text
+        assert mongo.members.count_documents({}) == before_members
+        rec = mongo.reset_codes.find_one({"id": "restore"})
+        assert rec is not None, "restore code must not be consumed by reset endpoint"
+
+
+class TestRestoreSuccess:
+    def test_restore_with_valid_code_succeeds_and_replay_fails(self, admin_token, backup_payload, mongo):
+        # Seed a known restore code
+        code_hash = bcrypt.hashpw(b"123456", bcrypt.gensalt()).decode()
+        mongo.reset_codes.update_one(
+            {"id": "restore"},
+            {"$set": {"id": "restore", "code_hash": code_hash,
+                      "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                      "sent_at": (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat(),
+                      "attempts": 0}},
+            upsert=True)
+        payload_bytes = json.dumps(backup_payload).encode("utf-8")
+        files = {"file": ("b.json", io.BytesIO(payload_bytes), "application/json")}
+        headers = {"Authorization": f"Bearer {admin_token}"}
+        r = requests.post(f"{BASE_URL}/api/admin/restore", headers=headers,
+                          files=files, data={"code": "123456"}, timeout=60)
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body.get("ok") is True
+        assert "restored" in body
+        expected_members = len(backup_payload["collections"].get("members", []))
+        assert mongo.members.count_documents({}) == expected_members
+        # replay: code was consumed, same code should fail
+        files2 = {"file": ("b.json", io.BytesIO(payload_bytes), "application/json")}
+        r2 = requests.post(f"{BASE_URL}/api/admin/restore", headers=headers,
+                           files=files2, data={"code": "123456"}, timeout=30)
+        assert r2.status_code == 400, r2.text
+
+
+class TestRestoreRateLimit:
+    """Seed a recent sent_at for id='restore' and verify 429 without triggering email."""
+    def test_restore_rate_limit_60s(self, admin_token, mongo):
+        # Seed existing restore code with sent_at = now (within 60s)
+        mongo.reset_codes.update_one(
+            {"id": "restore"},
+            {"$set": {"id": "restore", "code_hash": bcrypt.hashpw(b"999999", bcrypt.gensalt()).decode(),
+                      "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                      "sent_at": datetime.now(timezone.utc).isoformat(),
+                      "attempts": 0}},
+            upsert=True)
+        r = requests.post(f"{BASE_URL}/api/admin/reset-code?purpose=restore",
+                          headers=_hdr(admin_token), timeout=20)
+        assert r.status_code == 429, r.text
+        assert "menit" in r.json().get("detail", "").lower()
+        # Verify reset purpose is independent: no 'reset' row, so this should attempt send
+        # (we skip actually calling it to avoid firing a real email)
+        # Just verify rate-limit is keyed per purpose by inspecting the DB
+        mongo.reset_codes.delete_many({"id": "restore"})
+
