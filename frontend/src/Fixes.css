@@ -43,3 +43,4 @@
 .identity-empty{padding:10px;color:#94a3b8;font-size:13px}
 .photo-member-select .member-results{position:static;max-height:none;margin-top:4px}
 .photo-member-select .member-search{font-weight:500}
+.searchbox input,.searchbox input:focus,.searchbox input:focus-visible,html[data-theme="dark"] .searchbox input,html[data-theme="dark"] .searchbox input:focus{background:transparent!important;border:0!important;box-shadow:none!important;outline:none!important}
