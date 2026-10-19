@@ -205,7 +205,6 @@
 :where(html[data-theme="dark"]) .catalog-card{background:var(--surface);border:1px solid var(--line)}
 :where(html[data-theme="dark"]) .catalog-cover{background:rgba(139,92,246,.2);color:#a78bfa}
 :where(html[data-theme="dark"]) .catalog-info small{color:#d4d0e8}
-:where(html[data-theme="dark"]) .catalog-info>b{color:#fff}
 :where(html[data-theme="dark"]) .catalog-meta{color:#b8b2d6}
 :where(html[data-theme="dark"]) .student-foot{border-top:1px solid var(--line)}
 /* Visitors.css */
