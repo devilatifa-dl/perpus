@@ -107,9 +107,9 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Penjagaan backend: POST /members/{id}/photo & /account/photo oleh siswa ditolak 403 bila ditutup, atau bila foto sudah ada dan penggantian tidak diizinkan. Admin/petugas selalu boleh.
 - UI admin: tombol "Foto siswa: Aktif/Nonaktif" di toolbar Anggota → modal switch, tutup otomatis (1 jam/2 jam/14:00/tanpa batas), centang "boleh mengganti foto". Portal siswa: tombol berubah "Unggah foto ditutup" (kunci), pemberitahuan bila foto sudah ada & tidak boleh diganti. Status dicek ulang tiap 60 detik.
 
-### 15 Okt 2026 — Siap deploy (domain .my.id)
+### 15 Okt 2026 — Siap deploy (domain perpusmansa.vercel.app)
 - Deployment check PASS. Migrasi lama di startup kini sekali jalan (meta `legacy-migrations-v1`); normalize_books tidak lagi otomatis saat start (hanya saat restore cadangan format lama). Buku contoh langsung format stok.
-- CORS: FRONTEND_URL + CORS_ORIGINS (opsional) + regex emergentagent.com / emergent.host / *.my.id. load_dotenv(override=False). Indeks Mongo dibuat saat start.
+- CORS: FRONTEND_URL + CORS_ORIGINS (opsional) + regex emergentagent.com / emergent.host / *.vercel.app. load_dotenv(override=False). Indeks Mongo dibuat saat start.
 - Statistik pengunjung disaring di database per periode (lebih cepat). .gitignore tidak lagi mengabaikan .env & test_credentials.md.
 - Catatan: preview DB sempat di-reset oleh sesi tes (tombol reset data admin); data contoh sudah dipulihkan.
 

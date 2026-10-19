@@ -1193,8 +1193,8 @@ api.include_router(media_router(db, current_user))
 api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
 app.include_router(api)
 _cors = [o.strip() for o in (os.environ.get("FRONTEND_URL", "") + "," + os.environ.get("CORS_ORIGINS", "")).split(",") if o.strip() and o.strip() != "*"]
-# Frontend & API berada di domain yang sama (preview / domain sendiri .my.id), CORS hanya untuk asal tambahan
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_origin_regex=r"https://([a-z0-9-]+\.)*(emergentagent\.com|emergent\.host|my\.id|vercel\.app)", allow_methods=["*"], allow_headers=["*"])
+# Frontend di perpusmansa.vercel.app (proxy /api) atau preview Emergent; CORS hanya untuk asal tambahan
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_origin_regex=r"https://([a-z0-9-]+\.)*(emergentagent\.com|emergent\.host|vercel\.app)", allow_methods=["*"], allow_headers=["*"])
 
 @app.on_event("shutdown")
 async def shutdown(): client.close()
