@@ -44,3 +44,7 @@
 .photo-member-select .member-results{position:static;max-height:none;margin-top:4px}
 .photo-member-select .member-search{font-weight:500}
 .searchbox input,.searchbox input:focus,.searchbox input:focus-visible,html[data-theme="dark"] .searchbox input,html[data-theme="dark"] .searchbox input:focus{background:transparent!important;border:0!important;box-shadow:none!important;outline:none!important}
+.book-thumb{overflow:hidden;background:#ede9fe;color:#7c3aed}
+.book-thumb img{width:100%;height:100%;object-fit:cover}
+.circulation-grid{position:relative;z-index:3}
+.circulation-panel{position:relative;z-index:2}
