@@ -49,8 +49,11 @@
 .catalog-info>b{font-size:15px;line-height:1.3}
 .catalog-info small{color:#475569;font-size:12.5px}
 .catalog-card.has-cover{position:relative;color:#fff}
-.catalog-card.has-cover .catalog-cover img{position:absolute;inset:0}
-.catalog-card.has-cover .catalog-info{background:none;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.catalog-card.has-cover .catalog-cover{display:block;width:100%;height:300px;padding:0;border:0;background:none!important;cursor:zoom-in}
+.catalog-card.has-cover .cover-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(18px) brightness(.7);transform:scale(1.15)}
+.catalog-card.has-cover .cover-main{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:contain;padding:12px 12px 0}
+.cover-zoom-hint{position:absolute;top:10px;right:10px;z-index:2;display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:rgba(15,10,35,.55);color:#fff;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.catalog-card.has-cover .catalog-info{z-index:1;background:none;text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .catalog-card.has-cover .catalog-info>b,.catalog-card.has-cover .catalog-info small,.catalog-card.has-cover .catalog-stock,.catalog-card.has-cover .catalog-meta{justify-self:start;padding:3px 9px;border-radius:8px;background:rgba(15,10,35,.45);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#fff!important}
 .catalog-card.has-cover .catalog-stock b{color:#4ade80!important}
 .catalog-card.has-cover .catalog-shelf{background:rgba(6,78,59,.75)!important;border-color:rgba(74,222,128,.5)!important;color:#bbf7d0!important}
@@ -62,3 +65,11 @@
 .student-foot span{display:inline-flex;align-items:center;gap:4px}
 @media print{.student-top,.student-hero,.student-foot,.toolbar{display:none!important}}
 @media(max-width:860px){.chooser-grid{grid-template-columns:1fr}.student-top{flex-wrap:wrap;height:auto;padding:12px 4%}.student-nav{order:3;width:100%;justify-content:space-between}.student-nav button span{display:none}.student-nav button{flex:1;justify-content:center}.student-user div{display:none}.student-hero{flex-direction:column;align-items:flex-start;padding:24px}.student-foot{flex-direction:column;gap:6px}}
+
+.cover-zoom{position:fixed;inset:0;z-index:1000;background:rgba(8,6,20,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:56px 16px 24px;animation:coverZoomIn .2s ease-out}
+.cover-zoom img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.cover-zoom-close{position:absolute;top:14px;right:14px;width:42px;height:42px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center;cursor:pointer}
+.cover-zoom-caption{display:grid;gap:2px;text-align:center;color:#fff}
+.cover-zoom-caption b{font-size:16px}
+.cover-zoom-caption small{color:#d4d0e8;font-size:13px}
+@keyframes coverZoomIn{from{opacity:0}to{opacity:1}}
