@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { PrintButton } from "./ReportPrint";
+import { PrintButton, getPrintOrientation } from "./ReportPrint";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, BookOpen, ClipboardList, DoorOpen, FileSpreadsheet, Users } from "lucide-react";
+import { AlertTriangle, BookOpen, ClipboardList, Download, DoorOpen, FileSpreadsheet, Users } from "lucide-react";
 import { api, fmt } from "../lib";
 
 const todayWib = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
@@ -15,16 +15,13 @@ function presetRange(k) {
   return [shift(t, -(Number(k) - 1)), t, "day"];
 }
 
-const csvCell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-function downloadCsv(d) {
-  const lines = [["Laporan ringkasan perpustakaan", `${d.start} s.d. ${d.end}`], [],
-    ["RINGKASAN"], ["Total eksemplar", d.kpis.books], ["Judul buku", d.kpis.titles], ["Anggota", d.kpis.members], ["Peminjaman aktif", d.kpis.active_loans], ["Buku terlambat", d.kpis.overdue], ["Pengunjung hari ini", d.kpis.visits_today],
-    ["Peminjaman pada rentang", d.totals.loans], ["Pengembalian pada rentang", d.totals.returns], ["Pengunjung pada rentang", d.totals.visits], [],
-    [d.group === "month" ? "PER BULAN" : "PER HARI"], ["Periode", "Peminjaman", "Pengembalian", "Pengunjung"], ...d.series.map((s) => [s.key, s.loans, s.returns, s.visits]), [],
-    ["BUKU TERPOPULER"], ["Peringkat", "Kode", "Judul", "Dipinjam"], ...d.top_books.map((b, i) => [i + 1, b.book_id, b.title, b.count]), [],
-    ["ANGGOTA PALING AKTIF"], ["Peringkat", "Nama", "Kelas", "Peminjaman", "Pengunjung"], ...d.top_members.map((m, i) => [i + 1, m.name, m.class_name, m.loans, m.visits])];
-  const blob = new Blob(["\ufeff" + lines.map((r) => r.map(csvCell).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `laporan-ringkasan-${d.start}-${d.end}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+async function downloadSummary(ext, start, end, group) {
+  const orientation = getPrintOrientation();
+  const res = await api.get(`/reports/summary.${ext}`, { params: { start, end, group, orientation }, responseType: "blob" });
+  const url = URL.createObjectURL(res.data); const a = document.createElement("a");
+  a.href = url; a.download = `laporan-ringkasan-${start}-${end}${ext === "pdf" ? `-${orientation === "landscape" ? "lanskap" : "potret"}` : ""}.${ext}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 function TopList({ title, eyebrow, rows, render, empty, testId }) {
@@ -36,7 +33,8 @@ function TopList({ title, eyebrow, rows, render, empty, testId }) {
 
 export function ReportOverview({ notify }) {
   const [range, setRange] = useState(() => presetRange("30")); const [preset, setPreset] = useState("30");
-  const [d, setD] = useState(null); const [err, setErr] = useState("");
+  const [d, setD] = useState(null); const [err, setErr] = useState(""); const [busy, setBusy] = useState("");
+  const download = async (ext) => { setBusy(ext); try { await downloadSummary(ext, start, end, group); notify?.(ext === "pdf" ? "Laporan PDF berhasil diunduh" : "Laporan Excel (.xlsx) berhasil diunduh"); } catch (e) { notify?.(ext === "pdf" ? "Gagal mengunduh laporan PDF" : "Gagal mengunduh laporan Excel"); } finally { setBusy(""); } };
   const [start, end, group] = range;
   useEffect(() => { setErr(""); api.get("/reports/summary", { params: { start, end, group } }).then((r) => setD(r.data)).catch((e) => setErr(e.response?.data?.detail || "Laporan belum dapat dimuat")); }, [start, end, group]);
   const pick = (k) => { setPreset(k); setRange(presetRange(k)); };
@@ -51,7 +49,8 @@ export function ReportOverview({ notify }) {
       <div className="period-select" data-testid="ro-group">{[["day", "Per hari"], ["month", "Per bulan"]].map(([g, l]) => <button key={g} data-testid={`ro-group-${g}`} className={group === g ? "active" : ""} onClick={() => setRange([start, end, g])}>{l}</button>)}</div>
       <div className="download-row ro-actions">
         <PrintButton/>
-        <button className="secondary" data-testid="ro-export-csv" disabled={!d} onClick={() => { downloadCsv(d); notify?.("Laporan CSV diunduh — bisa dibuka di Excel"); }}><FileSpreadsheet size={16}/> Excel</button>
+        <button className="secondary" data-testid="ro-export-pdf" disabled={!d || !!busy} onClick={() => download("pdf")}><Download size={16}/> {busy === "pdf" ? "Menyiapkan..." : "PDF"}</button>
+        <button className="secondary" data-testid="ro-export-xlsx" disabled={!d || !!busy} onClick={() => download("xlsx")}><FileSpreadsheet size={16}/> {busy === "xlsx" ? "Menyiapkan..." : "Excel"}</button>
       </div>
     </div>
     {err && <div className="error" data-testid="ro-error">{err}</div>}
@@ -66,10 +65,10 @@ export function ReportOverview({ notify }) {
       </div>
       <div className="ro-charts">
         <div className="panel" data-testid="ro-chart-loans"><div className="panel-title"><div><p className="eyebrow">SIRKULASI {group === "month" ? "PER BULAN" : "PER HARI"}</p><h3>Peminjaman &amp; pengembalian</h3></div></div>
-          <div style={{ width: "100%", height: 260 }}><ResponsiveContainer><BarChart data={d.series} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0"/><XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} interval="preserveStartEnd"/><YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#64748b" }}/><Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }}/><Legend wrapperStyle={{ fontSize: 12 }}/><Bar dataKey="loans" name="Peminjaman" fill="#7c3aed" radius={[4, 4, 0, 0]}/><Bar dataKey="returns" name="Pengembalian" fill="#16a34a" radius={[4, 4, 0, 0]}/></BarChart></ResponsiveContainer></div>
+          <div style={{ width: "100%", height: 260 }}><ResponsiveContainer initialDimension={{ width: 520, height: 260 }}><BarChart data={d.series} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0"/><XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} interval="preserveStartEnd"/><YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#64748b" }}/><Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }}/><Legend wrapperStyle={{ fontSize: 12 }}/><Bar dataKey="loans" name="Peminjaman" fill="#7c3aed" radius={[4, 4, 0, 0]}/><Bar dataKey="returns" name="Pengembalian" fill="#16a34a" radius={[4, 4, 0, 0]}/></BarChart></ResponsiveContainer></div>
         </div>
         <div className="panel" data-testid="ro-chart-visits"><div className="panel-title"><div><p className="eyebrow">PENGUNJUNG {group === "month" ? "PER BULAN" : "PER HARI"}</p><h3>Tren pengunjung</h3></div></div>
-          <div style={{ width: "100%", height: 260 }}><ResponsiveContainer><AreaChart data={d.series} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}><defs><linearGradient id="visGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#d97706" stopOpacity={0.35}/><stop offset="100%" stopColor="#d97706" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0"/><XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} interval="preserveStartEnd"/><YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#64748b" }}/><Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }}/><Area type="monotone" dataKey="visits" name="Pengunjung" stroke="#d97706" strokeWidth={2} fill="url(#visGrad)"/></AreaChart></ResponsiveContainer></div>
+          <div style={{ width: "100%", height: 260 }}><ResponsiveContainer initialDimension={{ width: 520, height: 260 }}><AreaChart data={d.series} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}><defs><linearGradient id="visGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#d97706" stopOpacity={0.35}/><stop offset="100%" stopColor="#d97706" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0"/><XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} interval="preserveStartEnd"/><YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#64748b" }}/><Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }}/><Area type="monotone" dataKey="visits" name="Pengunjung" stroke="#d97706" strokeWidth={2} fill="url(#visGrad)"/></AreaChart></ResponsiveContainer></div>
         </div>
       </div>
       <div className="ro-charts">

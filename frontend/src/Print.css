@@ -46,3 +46,57 @@ html[data-theme="dark"] .app-frame .report-bar .report-tabs{border-color:rgba(16
   body.report-print .print-sign>div{display:grid;gap:3px;text-align:center;font-size:10pt;min-width:220px}
   body.report-print .print-sign b{margin-top:56px;font-weight:600}
 }
+
+/* ===== Pilihan orientasi kertas (Potret / Lanskap) ===== */
+.print-orient{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:12px;background:#f5f3ff;border:1px solid rgba(124,58,237,.22);flex-shrink:0}
+.print-orient>button.po-btn{height:34px;min-width:0;padding:0 11px;border:0;border-radius:9px;background:transparent;color:#6d28d9;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px;cursor:pointer;box-shadow:none;transition:background .15s,color .15s}
+.print-orient>button.po-btn:hover{background:rgba(124,58,237,.1)}
+.print-orient>button.po-btn.active,.print-orient>button.po-btn.active:hover{background:#7c3aed;color:#fff;box-shadow:0 4px 10px -4px rgba(124,58,237,.6)}
+.print-orient>button.po-btn:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
+html[data-theme="dark"] .print-orient{background:rgba(139,92,246,.12);border-color:rgba(167,139,250,.3)}
+html[data-theme="dark"] .print-orient>button.po-btn{color:#c4b5fd}
+html[data-theme="dark"] .print-orient>button.po-btn.active{background:#7c3aed;color:#fff}
+
+/* ===== Tata letak cetak per orientasi =====
+   Berlaku selama proses cetak (class body.report-print), juga di layar sesaat sebelum dialog cetak terbuka,
+   supaya grafik & teks dihitung ulang tepat selebar kertas A4 (potret 186 mm / lanskap 273 mm). */
+body.report-print .main-area{box-sizing:border-box!important;padding:0!important;margin:0!important}
+body.report-print.print-portrait .main-area{width:186mm!important;max-width:186mm!important}
+body.report-print.print-landscape .main-area{width:273mm!important;max-width:273mm!important}
+body.report-print .main-area *{min-width:0}
+body.report-print .recharts-tooltip-wrapper{display:none!important}
+body.report-print.print-portrait .stat-grid,body.report-print.print-portrait .stat-grid:not(.five){grid-template-columns:repeat(3,1fr)!important}
+body.report-print.print-portrait .stats-kpis{display:grid!important;grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+body.report-print.print-portrait .ro-charts,body.report-print.print-portrait .stats-grid,body.report-print.print-portrait .lb-grid{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:8px!important}
+body.report-print.print-landscape .stat-grid{grid-template-columns:repeat(5,1fr)!important}
+body.report-print.print-landscape .stat-grid:not(.five){grid-template-columns:repeat(4,1fr)!important}
+body.report-print.print-landscape .stats-kpis{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:8px!important}
+body.report-print.print-landscape .ro-charts,body.report-print.print-landscape .lb-grid{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px!important}
+body.report-print.print-landscape .stats-grid{display:grid!important;grid-template-columns:minmax(0,1.4fr) minmax(0,.9fr)!important;gap:8px!important}
+body.report-print.print-landscape .panel div:has(> .recharts-responsive-container){height:190px!important}
+
+@media print{
+  body.report-print .print-orient{display:none!important}
+  body.report-print .main-area,body.report-print .content{overflow:visible!important}
+  body.report-print .main-area{width:100%!important;max-width:100%!important}
+  /* Teks dibungkus mengikuti lebar kertas */
+  body.report-print td,body.report-print th{overflow-wrap:anywhere;word-break:break-word;white-space:normal!important}
+  body.report-print td *{white-space:normal!important}
+  body.report-print td .inline-pct span{white-space:nowrap!important}
+  body.report-print .lb-hero{background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;padding:10px 12px!important}
+  body.report-print .lb-hero:after{display:none!important}
+  body.report-print .lb-hero h2{color:#0f172a!important;max-width:none!important}
+  body.report-print .lb-hero p,body.report-print .lb-hero .eyebrow{color:#334155!important}
+  body.report-print .lb-hero-actions{display:none!important}
+  /* Potret: kertas sempit, huruf sedikit lebih kecil */
+  body.report-print.print-portrait{font-size:9.5pt}
+  body.report-print.print-portrait table{font-size:8pt!important}
+  body.report-print.print-portrait th{font-size:7pt!important;padding:4px 5px!important}
+  body.report-print.print-portrait td{padding:3px 5px!important}
+  body.report-print.print-portrait .report-summary b{font-size:14pt!important}
+  body.report-print.print-portrait .print-header b{font-size:12pt}
+  body.report-print.print-portrait .print-header img{width:46px;height:46px}
+  /* Lanskap: kertas lebar */
+  body.report-print.print-landscape{font-size:10pt}
+  body.report-print.print-landscape table{font-size:9pt!important}
+}

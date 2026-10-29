@@ -204,3 +204,25 @@ button.danger.full{width:100%}
   .visit-filters{width:100%}
   .visit-cam-hit b{font-size:20px}
 }
+
+/* Keperluan kunjungan (dipilih sebelum scan masuk) */
+.visit-purpose{display:grid;gap:8px}
+.visit-purpose-label{font-size:12px;font-weight:700;color:#334155;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.visit-purpose-label small{font-weight:500;color:#94a3b8;font-size:11px}
+.visit-purpose-chips{display:flex;flex-wrap:wrap;gap:6px}
+.visit-purpose-chips button{border:1px solid #ddd6fe;background:#fff;color:#5b21b6;border-radius:999px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s,color .15s,border-color .15s,box-shadow .15s}
+.visit-purpose-chips button:hover:not(:disabled){background:#f5f3ff;border-color:#c4b5fd}
+.visit-purpose-chips button.active{background:#7c3aed;border-color:#7c3aed;color:#fff;box-shadow:0 6px 14px -8px rgba(124,58,237,.8)}
+.visit-purpose-chips button:disabled{opacity:.55;cursor:not-allowed}
+.visit-purpose-chips button:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
+.visit-result em{font-style:normal;font-weight:700;color:inherit}
+.visit-purpose-select{height:34px;min-width:150px;max-width:210px;font-size:12px;padding:0 8px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;color:#0f172a}
+html[data-theme="dark"] .visit-purpose-label{color:var(--ink-2,#e2e8f0)}
+html[data-theme="dark"] .visit-purpose-chips button{background:var(--surface,#1e1b2e);border-color:rgba(167,139,250,.3);color:#c4b5fd}
+html[data-theme="dark"] .visit-purpose-chips button.active{background:#7c3aed;border-color:#7c3aed;color:#fff}
+html[data-theme="dark"] .visit-purpose-select{background:var(--surface-2,#26223a);border-color:var(--line,#3b3552);color:var(--ink,#f1f5f9)}
+@media print{.visit-purpose-select{border:0;background:none;appearance:none;padding:0}}
+.visit-purpose-other{height:42px;font-size:13px;border-radius:10px;border:1px solid #c4b5fd;padding:0 12px;background:#fff;color:#0f172a;animation:poIn .18s ease}
+.visit-purpose-other:focus{outline:2px solid #7c3aed;outline-offset:1px;border-color:#7c3aed}
+@keyframes poIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+html[data-theme="dark"] .visit-purpose-other{background:var(--surface-2,#26223a);border-color:rgba(167,139,250,.4);color:var(--ink,#f1f5f9)}

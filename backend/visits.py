@@ -16,6 +16,11 @@ _db = None
 
 class ScanInput(BaseModel):
     code: str = Field(..., min_length=1, max_length=80)
+    purpose: str = Field("", max_length=120)
+
+
+class PurposeInput(BaseModel):
+    purpose: str = Field(..., max_length=120)
 
 
 class GuestInput(BaseModel):
@@ -290,7 +295,7 @@ def build_router(db, current_user, staff_only, now_iso):
             lo = _parse(last["check_out"])
             if lo and (now - lo).total_seconds() < 30:
                 return {"action": "sudah_keluar", "visit": last, "member": member}
-        doc = {"id": new_id(), "kind": "anggota", "member_id": member["id"], "student_id": member.get("student_id", ""), "name": member["name"], "class_name": member.get("class_name", ""), "purpose": "", "origin": "", "photo": member.get("photo", ""), "check_in": now.isoformat(), "check_out": None, "checkout_type": None, "duration_min": None, "date": today_wib(), "recorded_by": user["name"]}
+        doc = {"id": new_id(), "kind": "anggota", "member_id": member["id"], "student_id": member.get("student_id", ""), "name": member["name"], "class_name": member.get("class_name", ""), "purpose": (data.purpose or "").strip(), "origin": "", "photo": member.get("photo", ""), "check_in": now.isoformat(), "check_out": None, "checkout_type": None, "duration_min": None, "date": today_wib(), "recorded_by": user["name"]}
         await db.visits.insert_one(doc)
         return {"action": "masuk", "visit": _clean(doc), "member": member}
 
@@ -311,6 +316,14 @@ def build_router(db, current_user, staff_only, now_iso):
             raise HTTPException(400, "Pengunjung sudah tercatat keluar")
         out = now_iso()
         await db.visits.update_one({"id": visit_id}, {"$set": {"check_out": out, "checkout_type": "manual", "duration_min": _duration(v["check_in"], out), "checkout_by": user["name"]}})
+        return await db.visits.find_one({"id": visit_id}, {"_id": 0})
+
+    @r.patch("/visits/{visit_id}/purpose")
+    async def update_purpose(visit_id: str, data: PurposeInput, user=Depends(current_user)):
+        staff_only(user)
+        res = await db.visits.update_one({"id": visit_id}, {"$set": {"purpose": data.purpose.strip()}})
+        if res.matched_count == 0:
+            raise HTTPException(404, "Data pengunjung tidak ditemukan")
         return await db.visits.find_one({"id": visit_id}, {"_id": 0})
 
     @r.delete("/visits/{visit_id}")

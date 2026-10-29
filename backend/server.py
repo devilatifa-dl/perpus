@@ -469,7 +469,8 @@ async def process_reservation(res_id: str, data: ProcessInput, user=Depends(curr
         if not book: raise HTTPException(404, "Buku tidak ditemukan")
         if await open_loan_count(res["member_id"], book["id"]) > 0: raise HTTPException(400, "Anggota ini masih meminjam buku yang sama")
         await take_copy(book["id"])
-        await db.transactions.insert_one({"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":res["member_id"],"member_name":res["member_name"],"book_id":book["id"],"book_title":book["title"],"action":"pinjam","date":now_iso(),"reservation_id":res_id})
+        rm = await db.members.find_one({"id": res["member_id"]}, {"_id":0, "class_name":1}) or {}
+        await db.transactions.insert_one({"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":res["member_id"],"member_name":res["member_name"],"class_name":rm.get("class_name",""),"book_id":book["id"],"book_title":book["title"],"action":"pinjam","date":now_iso(),"reservation_id":res_id})
         status = "Dipinjamkan"
     elif data.action == "tolak": status = "Ditolak"
     else: raise HTTPException(400, "Aksi tidak valid")
@@ -1138,7 +1139,7 @@ async def transaction(data: TransactionInput, user=Depends(current_user)):
     else:
         if open_count <= 0: raise HTTPException(400,"Anggota ini tidak sedang meminjam buku ini")
         await return_copy(book["id"])
-    doc={"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":member["id"],"member_name":member["name"],"book_id":book["id"],"book_title":book["title"],"action":action,"date":now_iso()}; await db.transactions.insert_one(doc); return public(doc)
+    doc={"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":member["id"],"member_name":member["name"],"class_name":member.get("class_name",""),"book_id":book["id"],"book_title":book["title"],"action":action,"date":now_iso()}; await db.transactions.insert_one(doc); return public(doc)
 
 @api.get("/reports")
 async def reports(user=Depends(current_user)):
@@ -1146,7 +1147,15 @@ async def reports(user=Depends(current_user)):
     tx=await db.transactions.find({}, {"_id":0}).sort("date",-1).to_list(500)
     incoming=await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(200)
     missing=await db.missing.find({}, {"_id":0}).sort("date",-1).to_list(200)
-    return {"transactions":tx,"loans":build_loans(tx),"incoming":incoming,"missing":missing}
+    return {"transactions":tx,"loans":await attach_class(build_loans(tx)),"incoming":incoming,"missing":missing}
+
+async def attach_class(loans):
+    """Lengkapi kelas peminjam: pakai kelas saat transaksi, atau kelas anggota sekarang untuk transaksi lama."""
+    ids = list({l["member_id"] for l in loans if not l.get("class_name") and l.get("member_id")})
+    info = {m["id"]: m.get("class_name", "") for m in await db.members.find({"id": {"$in": ids}}, {"_id":0, "id":1, "class_name":1}).to_list(100000)} if ids else {}
+    for l in loans:
+        if not l.get("class_name"): l["class_name"] = info.get(l.get("member_id"), "")
+    return loans
 
 async def export_rows(type: str, period: str):
     if type not in ("transaksi","masuk","hilang","kunjungan","statistik","peringkat"): raise HTTPException(400, "Jenis laporan tidak valid")
@@ -1162,7 +1171,7 @@ async def export_rows(type: str, period: str):
         rows = await db.visits.find({}, {"_id":0}).sort("check_in",-1).to_list(100000)
         return [r for r in rows if in_visit_period(r.get("check_in"), period, now)], settings, now
     if type == "transaksi":
-        rows = build_loans(await db.transactions.find({}, {"_id":0}).to_list(100000))
+        rows = await attach_class(build_loans(await db.transactions.find({}, {"_id":0}).to_list(100000)))
     elif type == "masuk":
         rows = await db.incoming.find({}, {"_id":0}).sort("date",-1).to_list(100000)
     else:
@@ -1171,19 +1180,21 @@ async def export_rows(type: str, period: str):
     return rows, settings, now
 
 @api.get("/reports/export.pdf")
-async def export_report(type: str = "transaksi", period: str = "semua", user=Depends(current_user)):
+async def export_report(type: str = "transaksi", period: str = "semua", orientation: str = "landscape", user=Depends(current_user)):
     staff_only(user)
+    orientation = "portrait" if orientation == "portrait" else "landscape"
     rows, settings, now = await export_rows(type, period)
-    pdf = render_report_pdf(type, rows["label"] if type == "peringkat" else period, rows, settings, user["name"])
-    filename = f"laporan-{type}-{period}-{now.strftime('%Y%m%d')}.pdf"
+    pdf = render_report_pdf(type, rows["label"] if type == "peringkat" else period, rows, settings, user["name"], orientation=orientation)
+    filename = f"laporan-{type}-{period}-{'potret' if orientation == 'portrait' else 'lanskap'}-{now.strftime('%Y%m%d')}.pdf"
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 @api.get("/reports/export.xlsx")
-async def export_report_xlsx(type: str = "transaksi", period: str = "semua", user=Depends(current_user)):
+async def export_report_xlsx(type: str = "transaksi", period: str = "semua", orientation: str = "landscape", user=Depends(current_user)):
     staff_only(user)
+    orientation = "portrait" if orientation == "portrait" else "landscape"
     rows, settings, now = await export_rows(type, period)
-    data = render_report_xlsx(type, rows["label"] if type == "peringkat" else period, rows, settings, user["name"])
-    filename = f"laporan-{type}-{period}-{now.strftime('%Y%m%d')}.xlsx"
+    data = render_report_xlsx(type, rows["label"] if type == "peringkat" else period, rows, settings, user["name"], orientation=orientation)
+    filename = f"laporan-{type}-{period}-{'potret' if orientation == 'portrait' else 'lanskap'}-{now.strftime('%Y%m%d')}.xlsx"
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 from visits import build_router, visits_auto_close, visit_stats, in_visit_period, visit_leaderboard

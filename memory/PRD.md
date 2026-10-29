@@ -137,3 +137,30 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Tombol mode gelap/terang (ThemeToggle, ikon bulan/matahari) di semua halaman: pemilih portal & login (mengambang kanan atas), topbar admin/petugas, header portal siswa.
 - Awal buka mengikuti pengaturan HP/komputer; pilihan manual disimpan di localStorage `perpus-theme` (src/theme.js). Skrip kecil di public/index.html mencegah kedipan putih.
 - Dark.css = token & penyesuaian manual; DarkAuto.css = override warna otomatis hasil `python3 scripts/gen_dark_css.py` (jalankan ulang jika CSS lain diubah). Hanya berlaku di layar; cetak/PDF dan desain kartu anggota tetap.
+
+### 29 Okt 2026 — Pemulihan dari ZIP "perpus-main" ke workspace baru
+- Source asli disalin apa adanya (backend, frontend/src, public, plugins, package.json, yarn.lock, .yarnrc, memory, plan, scripts). Tidak ada fitur/desain yang diubah.
+- Dependensi: `pip install -r requirements.txt`, `yarn install`.
+- backend/.env ditambah: JWT_SECRET (baru, acak → sesi login lama tidak berlaku), EMERGENT_LLM_KEY (object storage foto), EMERGENT_EMAIL_KEY + EMAIL_FROM_NAME (email kode verifikasi), RESET_VERIFY_EMAIL=latifadevii@gmail.com, FRONTEND_URL=preview URL.
+- Tidak ada di ZIP: file .env, isi database, foto anggota lama di object storage. DB baru di-seed otomatis (akun + data contoh). Data asli menunggu file cadangan dari user (Akun → Unduh cadangan di aplikasi lama → Pulihkan data).
+- Regresi (testing agent iteration_1): backend 36/36 lulus, UI lengkap berfungsi.
+
+### 29 Okt 2026 — Orientasi cetak laporan (Potret / Lanskap)
+- Di setiap tab Laporan ada pilihan "Potret | Lanskap" di samping tombol Cetak (`OrientationToggle` di ReportPrint.js, disimpan di localStorage `perpus-print-orientation`, bawaan Potret).
+- Cetak: @page A4 sesuai pilihan; sebelum dialog cetak, area laporan diatur selebar kertas (186 mm / 273 mm) supaya grafik digambar ulang & teks tabel dibungkus. Potret = susunan menurun (grafik 1 kolom, kartu 3/2 kolom, huruf lebih kecil); Lanskap = menyamping (grafik 2 kolom, kartu 4/5 kolom).
+- PDF & Excel ikut pilihan: `orientation=portrait|landscape` di /api/reports/export.pdf|xlsx (lebar kolom PDF diskalakan ke lebar halaman; Excel page_setup A4 + pas 1 halaman lebar). Tanpa parameter = lanskap (cadangan ZIP tetap sama).
+
+### 29 Okt 2026 — Keperluan saat scan masuk pengunjung
+- Kios Pengunjung: pilihan "Keperluan masuk" (Membaca / Meminjam-mengembalikan buku / Mengerjakan tugas / Lainnya), diingat di localStorage `perpus-visit-purpose`, dikirim di POST /api/visits/scan {code, purpose} untuk setiap scan masuk (kamera, alat pemindai, ketik NIS, atau pilih nama).
+- Hasil scan (panel & layar hijau kamera) menampilkan keperluan. Daftar pengunjung punya kolom KEPERLUAN yang bisa diubah (PATCH /api/visits/{id}/purpose, staff only).
+- Laporan → Pengunjung kini punya kolom KEPERLUAN (layar); PDF/Excel sudah memuat Keperluan.
+
+### 29 Okt 2026 — Keperluan "Lainnya" diketik, kelas di laporan transaksi, Excel ringkasan
+- Pengunjung: chip "Lainnya" memunculkan kolom ketik keperluan (diingat di localStorage `perpus-visit-purpose-other`); teks itu yang disimpan (kosong = "Lainnya"). Form tamu juga punya kolom ketik saat pilih Lainnya. Di daftar pengunjung pilihan "Tulis sendiri..." membuka jendela untuk mengetik keperluan.
+- Laporan Transaksi: kolom KELAS (layar, PDF, Excel). Transaksi baru menyimpan `class_name` saat itu; transaksi lama memakai kelas anggota sekarang (`attach_class`).
+- Ringkasan & grafik: tombol Excel kini mengunduh .xlsx asli dari GET /api/reports/summary.xlsx?start&end&group&orientation (lembar Ringkasan, Grafik + 2 grafik Excel, Buku terpopuler, Anggota aktif; kop berlogo; orientasi cetak ikut pilihan Potret/Lanskap). CSV dihapus.
+
+### 29 Okt 2026 — PDF Ringkasan & grafik
+- Tombol "PDF" (ro-export-pdf) di tab Ringkasan & grafik → GET /api/reports/summary.pdf?start&end&group&orientation (reportlab, `render_summary_pdf` di summary.py; helper bersama di reportlab_helpers.py). Isi: kop berlogo, periode, kartu angka, grafik batang sirkulasi + grafik garis pengunjung, buku terpopuler, anggota aktif (dengan kelas), tanda tangan. Potret = grafik bertumpuk; lanskap = grafik & tabel berdampingan.
+- Grafik layar memakai initialDimension (tanpa peringatan width/height -1).
+- Belum di-push ke GitHub: user perlu memakai tombol "Save to GitHub" (repo devilatifa-dl/perpus, branch main).

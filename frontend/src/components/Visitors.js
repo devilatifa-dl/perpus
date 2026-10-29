@@ -10,6 +10,17 @@ const todayStr = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slic
 export const fmtClock = (d) => d ? new Date(d).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }) : "-";
 export const fmtDur = (m) => m == null ? "-" : m >= 60 ? `${Math.floor(m / 60)} j ${m % 60} m` : `${m} menit`;
 export const OUT_LABEL = { scan: "Scan keluar", manual: "Dicatat petugas", otomatis: "Otomatis" };
+// Keperluan kunjungan: dipilih sebelum scan masuk (anggota) atau di form tamu. Ikut tampil di laporan Pengunjung.
+export const VISIT_PURPOSES = ["Membaca", "Meminjam / mengembalikan buku", "Mengerjakan tugas", "Lainnya"];
+export const GUEST_PURPOSES = ["Membaca", "Meminjam / mengembalikan buku", "Mengerjakan tugas", "Kunjungan dinas", "Lainnya"];
+const PURPOSE_KEY = "perpus-visit-purpose";
+const OTHER_KEY = "perpus-visit-purpose-other";
+const OTHER = "Lainnya";
+const loadOther = () => { try { return localStorage.getItem(OTHER_KEY) || ""; } catch { return ""; } };
+// "Lainnya" + teks ketikan petugas -> teks itu yang disimpan (kosong = "Lainnya")
+export const resolvePurpose = (choice, other) => (choice === OTHER ? (other || "").trim().slice(0, 120) || OTHER : choice);
+const loadPurpose = () => { try { const v = localStorage.getItem(PURPOSE_KEY); return VISIT_PURPOSES.includes(v) ? v : "Membaca"; } catch { return "Membaca"; } };
+const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 const OVERLAY = {
   masuk: { tone: "ok", label: "BERHASIL · MASUK", Icon: CheckCircle2 },
@@ -53,7 +64,7 @@ function LiveScanner({ onCode }) {
         <o.Icon size={46}/>
         <small>{o.label}</small>
         <b>{hit.member?.name || hit.message}</b>
-        <span>{o.tone === "bad" ? "Periksa kartu lalu scan lagi" : hit.member?.class_name || "Tamu"}</span>
+        <span>{o.tone === "bad" ? "Periksa kartu lalu scan lagi" : `${hit.member?.class_name || "Tamu"}${hit.action === "masuk" && hit.visit?.purpose ? ` · ${hit.visit.purpose}` : ""}`}</span>
         <i className="visit-cam-bar" style={{ animationDuration: `${COOLDOWN_MS}ms` }}/>
       </div>}
     </div>
@@ -83,6 +94,12 @@ export function Visitors({ notify }) {
   const [camOn, setCamOn] = useState(false); const [guest, setGuest] = useState(false); const [guestForm, setGuestForm] = useState({ name: "", origin: "", purpose: "Membaca" });
   const [filter, setFilter] = useState("semua"); const [cfgOpen, setCfgOpen] = useState(false); const [cfgTime, setCfgTime] = useState("14:00");
   const [q, setQ] = useState(""); const [sugs, setSugs] = useState([]); const [sugActive, setSugActive] = useState(-1);
+  const [purpose, setPurposeState] = useState(loadPurpose); const purposeRef = useRef(purpose); purposeRef.current = purpose;
+  const setPurpose = (v) => { setPurposeState(v); try { localStorage.setItem(PURPOSE_KEY, v); } catch { /* abaikan */ } };
+  const [other, setOtherState] = useState(loadOther); const otherRef = useRef(other); otherRef.current = other;
+  const setOther = (v) => { setOtherState(v); try { localStorage.setItem(OTHER_KEY, v); } catch { /* abaikan */ } };
+  const [guestOther, setGuestOther] = useState("");
+  const [purposeEdit, setPurposeEdit] = useState(null);
   const inputRef = useRef(null); const kioskRef = useRef(null); const resultTimer = useRef(null); const camOnRef = useRef(false); const busyRef = useRef(false);
   camOnRef.current = camOn;
   const isToday = date === todayStr();
@@ -106,7 +123,7 @@ export function Visitors({ notify }) {
     busyRef.current = true; setBusy(true);
     let out = null;
     try {
-      const { data: r } = await api.post("/visits/scan", { code: c });
+      const { data: r } = await api.post("/visits/scan", { code: c, purpose: resolvePurpose(purposeRef.current, otherRef.current) });
       beep(r.action === "masuk" || r.action === "keluar"); flash(r); load(); out = r;
     } catch (e) { beep(false); out = { action: "error", message: e.response?.data?.detail || "Gagal memproses kode" }; flash(out); }
     finally {
@@ -133,9 +150,10 @@ export function Visitors({ notify }) {
   };
   const addGuest = async (e) => {
     e.preventDefault();
-    try { const { data: v } = await api.post("/visits/guest", guestForm); setGuest(false); setGuestForm({ name: "", origin: "", purpose: "Membaca" }); flash({ action: "masuk", visit: v, member: { name: v.name, class_name: v.origin || "Tamu" } }); load(); }
+    try { const { data: v } = await api.post("/visits/guest", { ...guestForm, purpose: resolvePurpose(guestForm.purpose, guestOther) }); setGuest(false); setGuestForm({ name: "", origin: "", purpose: "Membaca" }); setGuestOther(""); flash({ action: "masuk", visit: v, member: { name: v.name, class_name: v.origin || "Tamu" } }); load(); }
     catch (err) { notify(err.response?.data?.detail || "Gagal mencatat tamu"); }
   };
+  const changePurpose = async (v, value) => { try { await api.patch(`/visits/${v.id}/purpose`, { purpose: value }); notify(`Keperluan ${v.name}: ${value || "-"}`); load(); } catch (e) { notify(e.response?.data?.detail || "Gagal mengubah keperluan"); } };
   const checkout = async (v) => { try { await api.post(`/visits/${v.id}/checkout`); notify(`${v.name} tercatat keluar`); load(); } catch (e) { notify(e.response?.data?.detail || "Gagal"); } };
   const remove = async (v) => { if (!window.confirm(`Hapus catatan pengunjung ${v.name}?`)) return; try { await api.delete(`/visits/${v.id}`); notify("Catatan pengunjung dihapus"); load(); } catch (e) { notify("Gagal menghapus"); } };
   const saveCfg = async (e) => { e.preventDefault(); try { const { data: r } = await api.put("/visits/config", { checkout_time: cfgTime }); setCfgOpen(false); notify(`Otomatis keluar diatur pukul ${r.checkout_time} WIB`); load(); } catch (err) { notify("Format jam tidak valid"); } };
@@ -155,6 +173,11 @@ export function Visitors({ notify }) {
             <button className={camOn ? "secondary full" : "primary full"} data-testid="visit-camera-toggle" onClick={() => { unlockAudio(); setCamOn(!camOn); }} disabled={!isToday}>{camOn ? <><CameraOff size={16}/> Matikan kamera</> : <><Camera size={16}/> Nyalakan kamera</>}</button>
           </div>
           <div className="visit-scan-side">
+            <div className="visit-purpose" data-testid="visit-purpose-picker">
+              <span className="visit-purpose-label">Keperluan masuk <small>berlaku untuk setiap scan masuk</small></span>
+              <div className="visit-purpose-chips" role="radiogroup" aria-label="Keperluan kunjungan">{VISIT_PURPOSES.map((p) => <button key={p} type="button" role="radio" aria-checked={purpose === p} data-testid={`visit-purpose-${slug(p)}`} className={purpose === p ? "active" : ""} onClick={() => setPurpose(p)} disabled={!isToday}>{p}</button>)}</div>
+              {purpose === OTHER && <input className="visit-purpose-other" data-testid="visit-purpose-other-input" maxLength={120} placeholder="Tulis keperluan, mis. Rapat OSIS, Latihan lomba..." value={other} onChange={(e) => setOther(e.target.value)} disabled={!isToday} autoComplete="off"/>}
+            </div>
             <form className="visit-code-form" onSubmit={onSearchSubmit} autoComplete="off">
               <div className="visit-search-wrap">
                 <label>Nama siswa / kode kartu / NIS<div className="visit-search-input"><Search size={16}/><input ref={inputRef} data-testid="visit-code-input" placeholder="Ketik nama, atau scan kartu lalu Enter" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={onSearchKey} onBlur={() => setTimeout(() => setSugs([]), 150)} disabled={!isToday} autoComplete="off"/>{code && <button type="button" className="visit-search-clear" aria-label="Hapus" data-testid="visit-code-clear" onClick={() => { setCode(""); inputRef.current?.focus(); }}><X size={14}/></button>}</div></label>
@@ -164,7 +187,7 @@ export function Visitors({ notify }) {
             </form>
             <div className={`visit-result ${res ? res.action : "idle"}`} data-testid="visit-result" aria-live="polite">
               {!res && <><Users size={22}/><div><b>Scan pertama = masuk, scan berikutnya = keluar</b><span>Yang lupa scan keluar otomatis tercatat keluar pukul {data.checkout_time} WIB.</span></div></>}
-              {res?.action === "masuk" && <><DoorOpen size={26}/><div><small>MASUK · {fmtClock(res.visit?.check_in)}</small><b data-testid="visit-result-name">{res.member?.name}</b><span>Selamat datang{res.member?.class_name ? ` · ${res.member.class_name}` : ""}</span></div></>}
+              {res?.action === "masuk" && <><DoorOpen size={26}/><div><small>MASUK · {fmtClock(res.visit?.check_in)}</small><b data-testid="visit-result-name">{res.member?.name}</b><span>Selamat datang{res.member?.class_name ? ` · ${res.member.class_name}` : ""}{res.visit?.purpose ? <> · <em data-testid="visit-result-purpose">{res.visit.purpose}</em></> : ""}</span></div></>}
               {res?.action === "keluar" && <><DoorClosed size={26}/><div><small>KELUAR · {fmtClock(res.visit?.check_out)}</small><b data-testid="visit-result-name">{res.member?.name}</b><span>Sampai jumpa · lama berkunjung {fmtDur(res.visit?.duration_min)}</span></div></>}
               {(res?.action === "sudah_masuk" || res?.action === "sudah_keluar") && <><Clock size={24}/><div><small>BARU SAJA DIPINDAI</small><b data-testid="visit-result-name">{res.member?.name}</b><span>{res.action === "sudah_masuk" ? "Sudah tercatat masuk. Scan lagi saat keluar." : "Sudah tercatat keluar."}</span></div></>}
               {res?.action === "error" && <><ScanLine size={24}/><div><small>GAGAL</small><b data-testid="visit-result-name">{res.message}</b><span>Periksa kartu atau catat sebagai tamu.</span></div></>}
@@ -189,24 +212,31 @@ export function Visitors({ notify }) {
           <input type="date" data-testid="visit-date-input" value={date} max={todayStr()} onChange={(e) => setDate(e.target.value || todayStr())}/>
         </div>
       </div>
-      <div className="table-wrap"><table><thead><tr><th>PENGUNJUNG</th><th>KELAS / ASAL</th><th>MASUK</th><th>KELUAR</th><th>DURASI</th><th>STATUS</th><th></th></tr></thead><tbody>
+      <div className="table-wrap"><table><thead><tr><th>PENGUNJUNG</th><th>KELAS / ASAL</th><th>KEPERLUAN</th><th>MASUK</th><th>KELUAR</th><th>DURASI</th><th>STATUS</th><th></th></tr></thead><tbody>
         {rows.map((v) => <tr key={v.id} data-testid={`visit-row-${v.id}`}>
-          <td><div className="book-cell"><div className={`avatar ${v.kind === "tamu" ? "guest" : ""}`}>{v.photo ? <img src={v.photo} alt={v.name}/> : v.name[0]}</div><div><b>{v.name}</b><span>{v.kind === "tamu" ? `Tamu${v.purpose ? ` · ${v.purpose}` : ""}` : `Anggota · ${v.student_id || v.member_id}`}</span></div></div></td>
+          <td><div className="book-cell"><div className={`avatar ${v.kind === "tamu" ? "guest" : ""}`}>{v.photo ? <img src={v.photo} alt={v.name}/> : v.name[0]}</div><div><b>{v.name}</b><span>{v.kind === "tamu" ? "Tamu" : `Anggota · ${v.student_id || v.member_id}`}</span></div></div></td>
           <td>{v.kind === "tamu" ? (v.origin || "-") : v.class_name}</td>
+          <td><select className="visit-purpose-select" aria-label={`Keperluan ${v.name}`} data-testid={`visit-purpose-select-${v.id}`} value={v.purpose || ""} onChange={(e) => { const val = e.target.value; if (val === "__other") setPurposeEdit({ visit: v, text: GUEST_PURPOSES.includes(v.purpose) ? "" : (v.purpose || "") }); else changePurpose(v, val); }}><option value="">— Belum diisi —</option>{[...new Set([...GUEST_PURPOSES, ...(v.purpose ? [v.purpose] : [])])].map((p) => <option key={p} value={p}>{p}</option>)}<option value="__other">Tulis sendiri...</option></select></td>
           <td>{fmtClock(v.check_in)}</td>
           <td>{v.check_out ? fmtClock(v.check_out) : "-"}</td>
           <td>{fmtDur(v.duration_min)}</td>
           <td>{v.check_out ? <span className={`status ${v.checkout_type === "otomatis" ? "dipinjam" : "keluar"}`}>{OUT_LABEL[v.checkout_type] || "Keluar"}</span> : <span className="status tersedia" data-testid={`visit-inside-${v.id}`}>Di dalam</span>}</td>
           <td><div className="row-actions">{!v.check_out && <button className="ok-icon" title="Catat keluar" data-testid={`visit-checkout-${v.id}`} onClick={() => checkout(v)}><LogOut size={15}/></button>}<button className="danger-icon" title="Hapus" data-testid={`visit-delete-${v.id}`} onClick={() => remove(v)}><Trash2 size={15}/></button></div></td>
         </tr>)}
-        {rows.length === 0 && <tr><td colSpan={7} style={{ textAlign: "center", padding: 30, color: "#94a3b8" }} data-testid="visit-empty">{term ? `Tidak ada pengunjung bernama "${q.trim()}"` : "Belum ada pengunjung pada tanggal ini"}</td></tr>}
+        {rows.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center", padding: 30, color: "#94a3b8" }} data-testid="visit-empty">{term ? `Tidak ada pengunjung bernama "${q.trim()}"` : "Belum ada pengunjung pada tanggal ini"}</td></tr>}
       </tbody></table></div>
     </div>
     {guest && <Modal title="Catat tamu" close={() => setGuest(false)}><form className="modal-form" onSubmit={addGuest} data-testid="guest-form">
       <label>Nama tamu<input data-testid="guest-name-input" required value={guestForm.name} onChange={(e) => setGuestForm({ ...guestForm, name: e.target.value })}/></label>
       <label>Asal / instansi<input data-testid="guest-origin-input" placeholder="mis. Guru, Orang tua, Dinas Pendidikan" value={guestForm.origin} onChange={(e) => setGuestForm({ ...guestForm, origin: e.target.value })}/></label>
-      <label>Keperluan<select data-testid="guest-purpose-input" value={guestForm.purpose} onChange={(e) => setGuestForm({ ...guestForm, purpose: e.target.value })}><option>Membaca</option><option>Meminjam / mengembalikan buku</option><option>Mengerjakan tugas</option><option>Kunjungan dinas</option><option>Lainnya</option></select></label>
+      <label>Keperluan<select data-testid="guest-purpose-input" value={guestForm.purpose} onChange={(e) => setGuestForm({ ...guestForm, purpose: e.target.value })}>{GUEST_PURPOSES.map((p) => <option key={p}>{p}</option>)}</select></label>
+      {guestForm.purpose === OTHER && <label>Tulis keperluan<input data-testid="guest-purpose-other-input" maxLength={120} placeholder="mis. Rapat komite, Survei akreditasi" value={guestOther} onChange={(e) => setGuestOther(e.target.value)}/></label>}
       <button className="primary full" data-testid="save-guest-button"><UserPlus size={16}/> Catat masuk</button>
+    </form></Modal>}
+    {purposeEdit && <Modal title="Tulis keperluan" close={() => setPurposeEdit(null)}><form className="modal-form" data-testid="purpose-edit-form" onSubmit={async (e) => { e.preventDefault(); const t = purposeEdit.text.trim(); if (!t) return; await changePurpose(purposeEdit.visit, t); setPurposeEdit(null); }}>
+      <p className="account-hint" style={{ marginTop: 0 }}>Keperluan kunjungan <b>{purposeEdit.visit.name}</b>. Teks ini tampil di daftar pengunjung dan laporan.</p>
+      <label>Keperluan<input autoFocus data-testid="purpose-edit-input" required maxLength={120} placeholder="mis. Rapat OSIS" value={purposeEdit.text} onChange={(e) => setPurposeEdit({ ...purposeEdit, text: e.target.value })}/></label>
+      <button className="primary full" data-testid="purpose-edit-save">Simpan keperluan</button>
     </form></Modal>}
     {cfgOpen && <Modal title="Jam otomatis keluar" close={() => setCfgOpen(false)}><form className="modal-form" onSubmit={saveCfg}>
       <p className="account-hint" style={{ marginTop: 0 }}>Pengunjung yang belum scan keluar akan otomatis tercatat keluar pada jam ini (WIB). Yang masuk setelah jam ini ditutup pada akhir hari.</p>
