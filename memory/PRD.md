@@ -164,3 +164,11 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Tombol "PDF" (ro-export-pdf) di tab Ringkasan & grafik → GET /api/reports/summary.pdf?start&end&group&orientation (reportlab, `render_summary_pdf` di summary.py; helper bersama di reportlab_helpers.py). Isi: kop berlogo, periode, kartu angka, grafik batang sirkulasi + grafik garis pengunjung, buku terpopuler, anggota aktif (dengan kelas), tanda tangan. Potret = grafik bertumpuk; lanskap = grafik & tabel berdampingan.
 - Grafik layar memakai initialDimension (tanpa peringatan width/height -1).
 - Belum di-push ke GitHub: user perlu memakai tombol "Save to GitHub" (repo devilatifa-dl/perpus, branch main).
+
+### 29 Okt 2026 — Pull Request #14 ke GitHub
+- Semua perubahan sesi ini di-push ke branch `fitur/orientasi-cetak-keperluan-ringkasan-pdf` dan dibuat PR #14 (base main): https://github.com/devilatifa-dl/perpus/pull/14
+- Token GitHub disimpan sebagai secret `GITHUB_TOKEN` + /root/.github_token & /root/.git-credentials (chmod 600). File .env tidak di-commit.
+
+### 29 Okt 2026 — Penanda anggota belum upload foto
+- Anggota (MemberClassList): chip "Semua anggota" / "Belum foto (N)", ringkasan "N belum upload foto", lencana per kelas "X belum foto" / "Foto lengkap", tag "Belum upload foto" + avatar bergaris di baris anggota; yang belum berfoto diurutkan paling atas.
+- Disimpan langsung ke branch main GitHub.
