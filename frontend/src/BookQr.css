@@ -54,3 +54,15 @@ html[data-theme="dark"] .qrb-meta{color:#475569!important}
   .qrb-sheet:last-child{page-break-after:auto;break-after:auto}
   .qrb-label{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* Kemajuan pulihkan data */
+.restore-progress{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.restore-progress-track{height:10px;border-radius:999px;background:#ede9fe;overflow:hidden}
+.restore-progress-track>div{height:100%;background:linear-gradient(90deg,#7c3aed,#a855f7);border-radius:999px;transition:width .3s ease}
+.restore-progress-track>div.busy{background:repeating-linear-gradient(45deg,#7c3aed 0 12px,#a855f7 12px 24px);background-size:34px 34px;animation:restoreStripe 1s linear infinite}
+@keyframes restoreStripe{to{background-position:34px 0}}
+.restore-progress.done .restore-progress-track>div{background:#16a34a}
+.restore-progress.error .restore-progress-track{background:#fee2e2}
+.restore-progress.error .account-hint{color:#b91c1c;font-weight:600}
+html[data-theme="dark"] .restore-progress-track{background:rgba(139,92,246,.2)}
+html[data-theme="dark"] .restore-progress.error .account-hint{color:#fca5a5}

@@ -50,17 +50,64 @@ export function AccountManager({ user, close, notify }) {
     finally { setBusyData(""); }
   };
 
+  const [restoreProg, setRestoreProg] = useState(null);
+  // Berkas dikirim dalam potongan kecil sehingga cadangan berukuran berapa pun bisa dipulihkan.
   const restore = async () => {
     setBusyData("restore");
+    const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
     try {
-      const fd = new FormData(); fd.append("file", restoreFile); fd.append("code", restoreCode);
-      const res = await api.post("/admin/restore", fd);
-      const total = Object.values(res.data.restored || {}).reduce((a, b) => a + b, 0);
-      notify(`Data berhasil dipulihkan (${total} entri). Memuat ulang...`);
-      setTimeout(() => window.location.reload(), 1200);
+      const guessChunk = 8 * 1024 * 1024;
+      const chunks = Math.max(1, Math.ceil(restoreFile.size / guessChunk));
+      setRestoreProg({ pct: 0, text: "Memverifikasi kode..." });
+      const { data: st } = await api.post("/admin/restore/start", { code: restoreCode, filename: restoreFile.name, size: restoreFile.size, chunks });
+      const size = st.chunk_size || guessChunk;
+      if (size !== guessChunk) throw new Error("Ukuran potongan tidak cocok, muat ulang halaman lalu coba lagi");
+      for (let i = 0; i < chunks; i++) {
+        const part = restoreFile.slice(i * size, Math.min(restoreFile.size, (i + 1) * size));
+        let ok = false, lastErr = null;
+        for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+          try {
+            await api.put("/admin/restore/chunk", part, { params: { upload_id: st.upload_id, index: i }, headers: { "Content-Type": "application/octet-stream" } });
+            ok = true;
+          } catch (err) {
+            lastErr = err;
+            if (err.response && err.response.status < 500) break;
+            await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          }
+        }
+        if (!ok) throw lastErr;
+        const pct = Math.round(((i + 1) / chunks) * 100);
+        setRestoreProg({ pct, text: `Mengunggah ${fmtSize(Math.min(restoreFile.size, (i + 1) * size))} dari ${fmtSize(restoreFile.size)}` });
+      }
+      await api.post("/admin/restore/finish", { upload_id: st.upload_id });
+      const STAGE = { menyiapkan: "Menyiapkan berkas", memeriksa: "Memeriksa isi cadangan", memuat: "Memuat data", mengganti: "Mengganti data lama" };
+      let fails = 0;
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 2000));
+        let job;
+        try { job = (await api.get(`/admin/restore/status/${st.upload_id}`)).data; fails = 0; }
+        catch (err) { if (++fails > 30) throw err; continue; }
+        if (job.status === "done") {
+          const total = Object.values(job.restored || {}).reduce((a, b) => a + b, 0);
+          setRestoreProg({ pct: 100, text: `Selesai: ${total} entri dipulihkan`, done: true });
+          notify(`Data berhasil dipulihkan (${total} entri). Memuat ulang...`);
+          window.removeEventListener("beforeunload", warn);
+          setTimeout(() => window.location.reload(), 1500);
+          return;
+        }
+        if (job.status === "error") throw new Error(job.error || "Gagal memulihkan data");
+        const pr = job.progress || {};
+        setRestoreProg({ pct: 100, processing: true, text: `${STAGE[pr.stage] || "Memproses"}${pr.collection ? ` · ${pr.collection}` : ""}${pr.inserted ? ` · ${pr.inserted} entri` : ""}...` });
+      }
     } catch (err) {
-      notify(err.response?.data?.detail || "Gagal memulihkan data");
-    } finally { setBusyData(""); }
+      const msg = err.response?.data?.detail || err.message || "Gagal memulihkan data";
+      setRestoreProg({ pct: 0, text: msg, error: true });
+      notify(msg);
+    } finally {
+      window.removeEventListener("beforeunload", warn);
+      setBusyData("");
+    }
   };
 
   const [codeTo, setCodeTo] = useState(""); const [code, setCode] = useState("");
@@ -148,7 +195,12 @@ export function AccountManager({ user, close, notify }) {
           <button type="button" className="secondary" data-testid="restore-data-button" disabled={busyData !== ""} onClick={() => restoreRef.current?.click()}><Upload size={15}/> {busyData === "restore-code" ? "Mengirim kode..." : busyData === "restore" ? "Memulihkan..." : "Pulihkan data"}</button>
           <input ref={restoreRef} type="file" accept="application/json,.json,application/zip,.zip" hidden data-testid="restore-file-input" onChange={pickRestore}/>
         </div>
-        {restoreFile && <CodeBox prefix="restore" to={restoreTo} code={restoreCode} setCode={setRestoreCode} busy={busyData !== ""} label={busyData === "restore" ? "Memulihkan..." : "Konfirmasi pulihkan"} note={`Berkas: ${restoreFile.name}`} onConfirm={restore} onCancel={() => { setRestoreFile(null); setRestoreTo(""); setRestoreCode(""); }}/>}
+        {restoreFile && <CodeBox prefix="restore" to={restoreTo} code={restoreCode} setCode={setRestoreCode} busy={busyData !== ""} label={busyData === "restore" ? "Memulihkan..." : "Konfirmasi pulihkan"} note={`Berkas: ${restoreFile.name} (${fmtSize(restoreFile.size)})`} onConfirm={restore} onCancel={() => { setRestoreFile(null); setRestoreTo(""); setRestoreCode(""); setRestoreProg(null); }}/>}
+        {restoreProg && <div className={`restore-progress${restoreProg.error ? " error" : ""}${restoreProg.done ? " done" : ""}`} data-testid="restore-progress">
+          <div className="restore-progress-track"><div className={restoreProg.processing ? "busy" : ""} style={{ width: `${restoreProg.pct}%` }}/></div>
+          <p className="account-hint" data-testid="restore-progress-text">{restoreProg.text}</p>
+        </div>}
+        <p className="account-hint" data-testid="restore-size-hint">Cadangan berukuran berapa pun bisa dipulihkan. Berkas besar dikirim bertahap — jangan tutup halaman sampai selesai.</p>
         <div className="data-reset-zone">
           <label className="reset-books-check"><input type="checkbox" data-testid="reset-include-books" checked={resetBooks} onChange={e => setResetBooks(e.target.checked)}/> Ikut hapus koleksi buku</label>
           <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={requestCode}><Trash2 size={15}/> {busyData === "code" ? "Mengirim kode..." : codeTo ? "Kirim ulang kode" : "Reset data"}</button>
@@ -158,6 +210,13 @@ export function AccountManager({ user, close, notify }) {
       </div>}
     </div>
   </Modal>;
+}
+
+function fmtSize(n) {
+  if (!n && n !== 0) return "-";
+  if (n >= 1024 * 1024 * 1024) return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(n / 1024))} KB`;
 }
 
 function CodeBox({ prefix, to, code, setCode, busy, label, note, onConfirm, onCancel }) {

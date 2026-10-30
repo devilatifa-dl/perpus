@@ -971,48 +971,7 @@ async def backup_zip(user=Depends(current_user)):
     data = await asyncio.to_thread(build)
     return Response(content=data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="backup-perpustakaan-{stamp}.zip"'})
 
-@api.post("/admin/restore")
-async def restore_data(file: UploadFile = File(...), code: str = Form(""), user=Depends(current_user)):
-    if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat memulihkan data")
-    await verify_reset_code(code, "restore")
-    content = await file.read()
-    if len(content) > 50 * 1024 * 1024:
-        raise HTTPException(400, "Ukuran berkas cadangan maksimal 50MB")
-    if content[:2] == b"PK":  # berkas ZIP dari "Unduh cadangan"
-        import zipfile
-        try:
-            with zipfile.ZipFile(io.BytesIO(content)) as z:
-                content = z.read("data-cadangan.json")
-        except KeyError:
-            raise HTTPException(400, "ZIP cadangan tidak berisi data-cadangan.json")
-        except zipfile.BadZipFile:
-            raise HTTPException(400, "Berkas ZIP cadangan rusak")
-    if len(content) > 20 * 1024 * 1024:
-        raise HTTPException(400, "Ukuran data cadangan maksimal 20MB")
-    try:
-        payload = json.loads(content.decode("utf-8-sig", errors="replace"))
-    except Exception:
-        raise HTTPException(400, "Berkas cadangan tidak valid (bukan JSON)")
-    collections = payload.get("collections")
-    if not isinstance(collections, dict):
-        raise HTTPException(400, "Struktur berkas cadangan tidak dikenali")
-    restored = {}
-    for name in BACKUP_COLLECTIONS:
-        rows = collections.get(name)
-        if rows is None:
-            continue
-        if not isinstance(rows, list):
-            raise HTTPException(400, f"Data '{name}' pada cadangan tidak valid")
-        await db[name].delete_many({})
-        clean = [{k: v for k, v in r.items() if k != "_id"} for r in rows if isinstance(r, dict)]
-        if clean:
-            await db[name].insert_many(clean)
-        restored[name] = len(clean)
-    # Cadangan format lama (buku per eksemplar tanpa angka stok) digabung menjadi satu judul
-    if await db.books.count_documents({"stock": {"$exists": False}}) > 0:
-        await normalize_books()
-    await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
-    return {"ok": True, "restored": restored}
+# Pemulihan data dari cadangan: lihat restore_big.py (tanpa batas ukuran, unggah bertahap).
 
 
 @api.get("/members/{member_id}/history")
@@ -1203,6 +1162,8 @@ from visits import build_router, visits_auto_close, visit_stats, in_visit_period
 api.include_router(build_router(db, current_user, staff_only, now_iso))
 from summary import build_router as summary_router
 from loan_rank import build_router as loan_rank_router, loan_leaderboard
+from restore_big import build_router as restore_router
+api.include_router(restore_router(db, current_user, verify_reset_code, normalize_books, BACKUP_COLLECTIONS))
 api.include_router(loan_rank_router(db, current_user))
 api.include_router(media_router(db, current_user))
 api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
