@@ -172,3 +172,9 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 ### 29 Okt 2026 — Penanda anggota belum upload foto
 - Anggota (MemberClassList): chip "Semua anggota" / "Belum foto (N)", ringkasan "N belum upload foto", lencana per kelas "X belum foto" / "Foto lengkap", tag "Belum upload foto" + avatar bergaris di baris anggota; yang belum berfoto diurutkan paling atas.
 - Disimpan langsung ke branch main GitHub.
+
+## GitHub sync (workspace)
+- Token: `GITHUB_TOKEN` in backend/.env (secure card). Never print it.
+- Push: `bash /app/scripts/push_to_github.sh --dry-run <branch>` then `bash /app/scripts/push_to_github.sh <branch> "pesan"`.
+- Uses separate clone at /root/perpus-github (workspace /app git history is unrelated to GitHub). Excludes .env/node_modules/build; aborts if secrets detected.
+- Pushing to `main` triggers Vercel redeploy (perpusmansa.vercel.app) — confirm with user first.
