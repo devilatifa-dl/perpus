@@ -1158,9 +1158,11 @@ async def attach_class(loans):
     return loans
 
 async def export_rows(type: str, period: str):
-    if type not in ("transaksi","masuk","hilang","kunjungan","statistik","peringkat"): raise HTTPException(400, "Jenis laporan tidak valid")
+    if type not in ("transaksi","masuk","hilang","kunjungan","statistik","peringkat","peringkat-pinjam"): raise HTTPException(400, "Jenis laporan tidak valid")
     now = datetime.now(WIB)
     settings = await db.settings.find_one({"id":"main"}, {"_id":0}) or {}
+    if type == "peringkat-pinjam":
+        return await loan_leaderboard(period if re.match(r"^\d{4}-\d{2}$", period or "") else None, limit=50), settings, now
     if type == "peringkat":
         await visits_auto_close()
         return await visit_leaderboard(period if re.match(r"^\d{4}-\d{2}$", period or "") else None, limit=50), settings, now
@@ -1184,7 +1186,7 @@ async def export_report(type: str = "transaksi", period: str = "semua", orientat
     staff_only(user)
     orientation = "portrait" if orientation == "portrait" else "landscape"
     rows, settings, now = await export_rows(type, period)
-    pdf = render_report_pdf(type, rows["label"] if type == "peringkat" else period, rows, settings, user["name"], orientation=orientation)
+    pdf = render_report_pdf(type, rows["label"] if type in ("peringkat", "peringkat-pinjam") else period, rows, settings, user["name"], orientation=orientation)
     filename = f"laporan-{type}-{period}-{'potret' if orientation == 'portrait' else 'lanskap'}-{now.strftime('%Y%m%d')}.pdf"
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
@@ -1193,13 +1195,15 @@ async def export_report_xlsx(type: str = "transaksi", period: str = "semua", ori
     staff_only(user)
     orientation = "portrait" if orientation == "portrait" else "landscape"
     rows, settings, now = await export_rows(type, period)
-    data = render_report_xlsx(type, rows["label"] if type == "peringkat" else period, rows, settings, user["name"], orientation=orientation)
+    data = render_report_xlsx(type, rows["label"] if type in ("peringkat", "peringkat-pinjam") else period, rows, settings, user["name"], orientation=orientation)
     filename = f"laporan-{type}-{period}-{'potret' if orientation == 'portrait' else 'lanskap'}-{now.strftime('%Y%m%d')}.xlsx"
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 from visits import build_router, visits_auto_close, visit_stats, in_visit_period, visit_leaderboard
 api.include_router(build_router(db, current_user, staff_only, now_iso))
 from summary import build_router as summary_router
+from loan_rank import build_router as loan_rank_router, loan_leaderboard
+api.include_router(loan_rank_router(db, current_user))
 api.include_router(media_router(db, current_user))
 api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
 app.include_router(api)

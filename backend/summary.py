@@ -160,8 +160,9 @@ def render_summary_xlsx(d, settings, officer, orientation="landscape"):
                 img = XLImage(_logo_bytes(logo_val, fallback)); img.width = img.height = 56; ws.add_image(img, f"{col}1")
             except Exception:
                 pass
-        for row in (1, 2, 3):
-            ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=max(2, ncol - 1))
+        if ncol - 1 > 2:
+            for row in (1, 2, 3):
+                ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=ncol - 1)
         ws["B1"] = "PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH"; ws["B1"].font = Font(bold=True, size=14, color=navy)
         ws["B2"] = "Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara"; ws["B2"].font = Font(size=9, color="475569")
         ws["B3"] = f"{title} — {period} · dicetak {fmt_long(now, True)} WIB oleh {officer}"; ws["B3"].font = Font(size=9, italic=True, color="475569")
@@ -222,8 +223,8 @@ def render_summary_xlsx(d, settings, officer, orientation="landscape"):
 
     # 3. Buku terpopuler
     bs = wb.create_sheet("Buku terpopuler")
-    setup(bs, 4, "Buku terpopuler", [12, 16, 48, 14])
-    table(bs, 5, ["Peringkat", "Kode", "Judul", "Dipinjam"], [[i + 1, b["book_id"], b["title"], b["count"]] for i, b in enumerate(d["top_books"])], "Paling sering dipinjam")
+    setup(bs, 3, "Buku terpopuler", [12, 64, 14])
+    table(bs, 5, ["Peringkat", "Judul", "Dipinjam"], [[i + 1, b["title"], b["count"]] for i, b in enumerate(d["top_books"])], "Paling sering dipinjam")
 
     # 4. Anggota aktif
     ms = wb.create_sheet("Anggota aktif")
@@ -329,7 +330,7 @@ def render_summary_pdf(d, settings, officer, orientation="portrait"):
         tb = Table(body, colWidths=fit_widths(widths, avail if portrait else (avail - 6 * mm) / 2), repeatRows=1)
         tb.setStyle(base_table_style()); return tb
 
-    books = ranked(["#", "Judul", "Kode", "Dipinjam"], [[i + 1, b["title"], b["book_id"], f"{b['count']}×"] for i, b in enumerate(d["top_books"])], [8, 60, 22, 18])
+    books = ranked(["#", "Judul", "Dipinjam"], [[i + 1, b["title"], f"{b['count']}×"] for i, b in enumerate(d["top_books"])], [8, 82, 18])
     members = ranked(["#", "Nama", "Kelas", "Pinjam", "Kunjungan"], [[i + 1, m["name"], m.get("class_name") or "-", m["loans"], m["visits"]] for i, m in enumerate(d["top_members"])], [8, 44, 22, 16, 18])
     tops = [KeepTogether([Paragraph("Buku terpopuler", h2), books]), Spacer(1, 8), KeepTogether([Paragraph("Anggota paling aktif", h2), members])] if portrait else [
         Table([[[Paragraph("Buku terpopuler", h2), books], [Paragraph("Anggota paling aktif", h2), members]]], colWidths=[(avail) / 2] * 2, style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 3 * mm)]))]

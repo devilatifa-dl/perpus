@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { CameraOff, CheckCircle2, ChevronDown, Printer, Search, Users } from "lucide-react";
+import { CameraOff, CheckCircle2, ChevronDown, Search, Users } from "lucide-react";
 
 const NO_CLASS = "(Tanpa kelas)";
 const hasPhoto = (m) => !!(m.photo && String(m.photo).trim());
 
-export function MemberClassList({ members, renderRow, onPrintClass }) {
+export function MemberClassList({ members, renderRow }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(() => new Set());
   const [onlyNoPhoto, setOnlyNoPhoto] = useState(false);
@@ -50,7 +50,7 @@ export function MemberClassList({ members, renderRow, onPrintClass }) {
           <span className="class-count" data-testid={`class-count-${cls}`}>{list.length} anggota</span>
           <ChevronDown size={17} className="class-chevron"/>
         </button>
-        {onPrintClass && <button type="button" className="class-print" title={`Cetak kartu kelas ${cls}`} data-testid={`class-print-${cls}`} onClick={() => onPrintClass(cls === NO_CLASS ? "" : cls)}><Printer size={15}/><span>Cetak kartu</span></button>}</div>
+</div>
         {isOpen && <div className="class-body">{list.map(renderRow)}</div>}
       </div>;
     })}

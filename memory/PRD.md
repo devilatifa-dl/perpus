@@ -172,3 +172,15 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 ### 29 Okt 2026 — Penanda anggota belum upload foto
 - Anggota (MemberClassList): chip "Semua anggota" / "Belum foto (N)", ringkasan "N belum upload foto", lencana per kelas "X belum foto" / "Foto lengkap", tag "Belum upload foto" + avatar bergaris di baris anggota; yang belum berfoto diurutkan paling atas.
 - Disimpan langsung ke branch main GitHub.
+
+## GitHub sync (workspace)
+- Token: `GITHUB_TOKEN` in backend/.env (secure card). Never print it.
+- Push: `bash /app/scripts/push_to_github.sh --dry-run <branch>` then `bash /app/scripts/push_to_github.sh <branch> "pesan"`.
+- Uses separate clone at /root/perpus-github (workspace /app git history is unrelated to GitHub). Excludes .env/node_modules/build; aborts if secrets detected.
+- Pushing to `main` triggers Vercel redeploy (perpusmansa.vercel.app) — confirm with user first.
+
+## 2026-10-30 changes
+- Removed Potret/Lanskap orientation toggle from Laporan (print always A4 portrait; downloads use backend default orientation).
+- Removed per-class "Cetak kartu" button on Anggota class rows (MemberClassList). Kept "Cetak massal" (BulkCardPrint with class select) and single-card print.
+- New "Peringkat rajin meminjam": backend/loan_rank.py GET /api/loans/leaderboard?month=YYYY-MM (counts action=pinjam per WIB month; students loans/books/days, classes). Export type `peringkat-pinjam` (PDF/Excel). Admin Laporan tab `peringkat-pinjam`; siswa portal Peringkat tab has switch Rajin berkunjung / Rajin meminjam.
+- PDF/Excel downloads no longer show book codes (BK-xxxx): removed "Kode" column from Transaksi & Buku hilang (reports_pdf.table_rows) and from "Buku terpopuler" in summary PDF/Excel (summary.py). On-screen views unchanged.

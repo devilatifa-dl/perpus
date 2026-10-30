@@ -48,14 +48,6 @@ html[data-theme="dark"] .app-frame .report-bar .report-tabs{border-color:rgba(16
 }
 
 /* ===== Pilihan orientasi kertas (Potret / Lanskap) ===== */
-.print-orient{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:12px;background:#f5f3ff;border:1px solid rgba(124,58,237,.22);flex-shrink:0}
-.print-orient>button.po-btn{height:34px;min-width:0;padding:0 11px;border:0;border-radius:9px;background:transparent;color:#6d28d9;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px;cursor:pointer;box-shadow:none;transition:background .15s,color .15s}
-.print-orient>button.po-btn:hover{background:rgba(124,58,237,.1)}
-.print-orient>button.po-btn.active,.print-orient>button.po-btn.active:hover{background:#7c3aed;color:#fff;box-shadow:0 4px 10px -4px rgba(124,58,237,.6)}
-.print-orient>button.po-btn:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
-html[data-theme="dark"] .print-orient{background:rgba(139,92,246,.12);border-color:rgba(167,139,250,.3)}
-html[data-theme="dark"] .print-orient>button.po-btn{color:#c4b5fd}
-html[data-theme="dark"] .print-orient>button.po-btn.active{background:#7c3aed;color:#fff}
 
 /* ===== Tata letak cetak per orientasi =====
    Berlaku selama proses cetak (class body.report-print), juga di layar sesaat sebelum dialog cetak terbuka,
@@ -76,7 +68,6 @@ body.report-print.print-landscape .stats-grid{display:grid!important;grid-templa
 body.report-print.print-landscape .panel div:has(> .recharts-responsive-container){height:190px!important}
 
 @media print{
-  body.report-print .print-orient{display:none!important}
   body.report-print .main-area,body.report-print .content{overflow:visible!important}
   body.report-print .main-area{width:100%!important;max-width:100%!important}
   /* Teks dibungkus mengikuti lebar kertas */

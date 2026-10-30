@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PrintButton, getPrintOrientation } from "./ReportPrint";
+import { PrintButton } from "./ReportPrint";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, BookOpen, ClipboardList, Download, DoorOpen, FileSpreadsheet, Users } from "lucide-react";
 import { api, fmt } from "../lib";
@@ -16,10 +16,9 @@ function presetRange(k) {
 }
 
 async function downloadSummary(ext, start, end, group) {
-  const orientation = getPrintOrientation();
-  const res = await api.get(`/reports/summary.${ext}`, { params: { start, end, group, orientation }, responseType: "blob" });
+  const res = await api.get(`/reports/summary.${ext}`, { params: { start, end, group }, responseType: "blob" });
   const url = URL.createObjectURL(res.data); const a = document.createElement("a");
-  a.href = url; a.download = `laporan-ringkasan-${start}-${end}${ext === "pdf" ? `-${orientation === "landscape" ? "lanskap" : "potret"}` : ""}.${ext}`;
+  a.href = url; a.download = `laporan-ringkasan-${start}-${end}.${ext}`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }

@@ -13,7 +13,7 @@ NAVY = colors.HexColor("#0f2745")
 BLUE = colors.HexColor("#0284c7")
 LIGHT = colors.HexColor("#f1f5f9")
 
-TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung"}
+TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung", "peringkat-pinjam": "Peringkat Rajin Meminjam"}
 PERIODS = {"semua": "Semua waktu", "harian": "Harian", "bulanan": "Bulanan", "7hari": "7 hari terakhir", "30hari": "30 hari terakhir"}
 CHECKOUT_LABEL = {"scan": "Scan", "manual": "Petugas", "otomatis": "Otomatis"}
 
@@ -69,9 +69,9 @@ def build_loans(transactions):
 
 def table_rows(kind, rows):
     if kind == "transaksi":
-        header = ["No", "Anggota", "Kelas", "Buku", "Kode", "Tgl Pinjam", "Tgl Kembali", "Status"]
-        widths = [10 * mm, 44 * mm, 24 * mm, 62 * mm, 24 * mm, 34 * mm, 34 * mm, 26 * mm]
-        plain = [[r["member_name"], r.get("class_name") or "-", r["book_title"], r["book_id"], fmt_date(r["borrowed_at"], True), fmt_date(r["returned_at"], True), r["status"]] for r in rows]
+        header = ["No", "Anggota", "Kelas", "Buku", "Tgl Pinjam", "Tgl Kembali", "Status"]
+        widths = [10 * mm, 44 * mm, 24 * mm, 86 * mm, 34 * mm, 34 * mm, 26 * mm]
+        plain = [[r["member_name"], r.get("class_name") or "-", r["book_title"], fmt_date(r["borrowed_at"], True), fmt_date(r["returned_at"], True), r["status"]] for r in rows]
         borrowed = sum(1 for r in rows if r["status"] == "Dipinjam"); summary = f"Total peminjaman: {len(rows)} · Masih dipinjam: {borrowed} · Dikembalikan: {len(rows) - borrowed}"
     elif kind == "masuk":
         header = ["No", "Judul Buku", "Penulis", "Jumlah", "Sumber", "Rak", "Tanggal", "Dicatat oleh"]
@@ -96,10 +96,16 @@ def table_rows(kind, rows):
         plain = [[s_["name"], s_["class_name"], str(s_["visits"]), str(s_["days"]), f"{s_.get('minutes', 0) // 60} j {s_.get('minutes', 0) % 60} m", f"{s_['pct']:.1f}%"] for s_ in lb["students"]]
         top_cls = lb["classes"][0]["class_name"] if lb["classes"] else "-"
         summary = f"{lb['label']} · Total pengunjung anggota: {lb['total_visits']} · Siswa aktif: {lb['active_students']} · Kelas teraktif: {top_cls}"
+    elif kind == "peringkat-pinjam":
+        lb = rows; header = ["Peringkat", "Nama Siswa", "Kelas", "Peminjaman", "Judul berbeda", "Hari meminjam", "Persentase"]
+        widths = [22 * mm, 70 * mm, 40 * mm, 30 * mm, 32 * mm, 32 * mm, 30 * mm]
+        plain = [[s_["name"], s_["class_name"], str(s_["loans"]), str(s_["books"]), str(s_["days"]), f"{s_['pct']:.1f}%"] for s_ in lb["students"]]
+        top_cls = lb["classes"][0]["class_name"] if lb["classes"] else "-"
+        summary = f"{lb['label']} · Total peminjaman: {lb['total_loans']} · Siswa meminjam: {lb['active_students']} · Kelas terajin: {top_cls}"
     else:
-        header = ["No", "Judul Buku", "Kode", "Catatan", "Tgl Lapor", "Status", "Ditemukan", "Pelapor"]
-        widths = [10 * mm, 62 * mm, 24 * mm, 56 * mm, 30 * mm, 22 * mm, 30 * mm, 30 * mm]
-        plain = [[r["title"], r["code"], r.get("detail") if r.get("detail") != r.get("code") else "-", fmt_date(r["date"]), r["status"], fmt_date(r.get("found_at")), r.get("reported_by", "-")] for r in rows]
+        header = ["No", "Judul Buku", "Catatan", "Tgl Lapor", "Status", "Ditemukan", "Pelapor"]
+        widths = [10 * mm, 86 * mm, 56 * mm, 30 * mm, 22 * mm, 30 * mm, 30 * mm]
+        plain = [[r["title"], r.get("detail") if r.get("detail") != r.get("code") else "-", fmt_date(r["date"]), r["status"], fmt_date(r.get("found_at")), r.get("reported_by", "-")] for r in rows]
         lost = sum(1 for r in rows if r["status"] == "Hilang"); summary = f"Total laporan: {len(rows)} · Masih hilang: {lost} · Ditemukan: {len(rows) - lost}"
     return header, widths, plain, summary
 
@@ -132,13 +138,14 @@ def render_report_xlsx(kind, period, rows, settings, officer, orientation="lands
             c = ws.cell(row=7 + i, column=j, value=v); c.border = border; c.alignment = Alignment(vertical="center", wrap_text=True)
             if i % 2 == 0: c.fill = PatternFill("solid", fgColor="F1F5F9")
     if not plain: ws.cell(row=8, column=2, value="Belum ada data pada periode ini")
-    if kind == "peringkat" and rows["classes"]:
+    if kind in ("peringkat", "peringkat-pinjam") and rows["classes"]:
+        loan = kind == "peringkat-pinjam"; ck = "loans" if loan else "visits"
         start = 7 + max(len(plain), 1) + 3
         ws.cell(row=start - 1, column=1, value="Peringkat kelas").font = Font(bold=True, color="0F2745")
-        for j, h in enumerate(["Peringkat", "Kelas", "Pengunjung", "Siswa berkunjung", "Persentase"], 1):
+        for j, h in enumerate(["Peringkat", "Kelas", "Peminjaman" if loan else "Pengunjung", "Siswa meminjam" if loan else "Siswa berkunjung", "Persentase"], 1):
             c = ws.cell(row=start, column=j, value=h); c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745"); c.border = border
         for i, cl in enumerate(rows["classes"], 1):
-            for j, v in enumerate([cl["rank"], cl["class_name"], cl["visits"], cl["members"], f"{cl['pct']:.1f}%"], 1):
+            for j, v in enumerate([cl["rank"], cl["class_name"], cl[ck], cl["members"], f"{cl['pct']:.1f}%"], 1):
                 c = ws.cell(row=start + i, column=j, value=v); c.border = border
     if kind == "statistik":
         start = 7 + max(len(plain), 1) + 3
@@ -219,7 +226,7 @@ def render_report_pdf(kind, period, rows, settings, officer, orientation="landsc
     kop.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LINEBELOW", (0, 0), (-1, 0), 1.5, NAVY), ("BOTTOMPADDING", (0, 0), (-1, 0), 6)]))
 
     title = Paragraph(f"{TITLES[kind]} — {PERIODS.get(period, period or 'Semua waktu')}", ParagraphStyle("t", parent=h1, fontSize=12 if portrait else 13, spaceBefore=8))
-    meta = Paragraph(f"Dicetak {fmt_long(now, True)} WIB · {len(rows) if isinstance(rows, list) else rows.get('total', rows.get('total_visits', 0))} data · oleh {officer} · A4 {'potret' if portrait else 'lanskap'}", sub)
+    meta = Paragraph(f"Dicetak {fmt_long(now, True)} WIB · {len(rows) if isinstance(rows, list) else rows.get('total', rows.get('total_visits', rows.get('total_loans', 0)))} data · oleh {officer} · A4 {'potret' if portrait else 'lanskap'}", sub)
 
     header, widths, plain, summary = table_rows(kind, rows)
     body = [[Paragraph(str(i + 1), cell)] + [Paragraph(str(v), cellb if j == 0 else cell) for j, v in enumerate(r)] for i, r in enumerate(plain)]
@@ -238,8 +245,9 @@ def render_report_pdf(kind, period, rows, settings, officer, orientation="landsc
         tot = rows["total"] or 1
         dt = side_table(["Tanggal", "Total", "Anggota", "Tamu", "Persentase"], [[fmt_date(d["date"]), d["total"], d["anggota"], d["tamu"], f"{d['total'] * 100 / tot:.1f}%"] for d in days], [60, 40, 40, 40, 40])
         extra = [Spacer(1, 12), Paragraph("Pengunjung per hari", ParagraphStyle("t2", parent=h1, fontSize=11)), Spacer(1, 4), dt]
-    if kind == "peringkat" and rows["classes"]:
-        ct = side_table(["Peringkat", "Kelas", "Pengunjung", "Siswa berkunjung", "Persentase"], [[c["rank"], c["class_name"], c["visits"], c["members"], f"{c['pct']:.1f}%"] for c in rows["classes"]], [30, 70, 40, 50, 40])
+    if kind in ("peringkat", "peringkat-pinjam") and rows["classes"]:
+        loan = kind == "peringkat-pinjam"; ck = "loans" if loan else "visits"
+        ct = side_table(["Peringkat", "Kelas", "Peminjaman" if loan else "Pengunjung", "Siswa meminjam" if loan else "Siswa berkunjung", "Persentase"], [[c["rank"], c["class_name"], c[ck], c["members"], f"{c['pct']:.1f}%"] for c in rows["classes"]], [30, 70, 40, 50, 40])
         extra = [Spacer(1, 12), Paragraph("Peringkat kelas", ParagraphStyle("t3", parent=h1, fontSize=11)), Spacer(1, 4), ct]
     sign = Table([["", Paragraph(f"Pekurun Selatan, {fmt_long(now)}<br/>Petugas Perpustakaan,<br/><br/><br/><br/><b>{officer}</b>", ParagraphStyle("s", parent=cell, fontSize=9, leading=12, alignment=1))]], colWidths=[avail - 70 * mm, 70 * mm])
     doc.build([kop, title, meta, Spacer(1, 4), Paragraph(summary, ParagraphStyle("sum", parent=sub, textColor=BLUE, fontName="Helvetica-Bold")), Spacer(1, 6), table, *extra, Spacer(1, 14), sign])

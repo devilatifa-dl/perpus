@@ -3,7 +3,7 @@ import { CoverZoom } from "./CoverZoom";
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { BookOpen, Boxes, BookmarkPlus, ChevronRight, ListChecks, LogOut, MapPin, Search, X, Camera, Trophy, Lock, Maximize2 } from "lucide-react";
-import { Leaderboard } from "./Leaderboard";
+import { StudentLeaderboards } from "./Leaderboard";
 import { fmtDate } from "../lib";
 import { api, saveToken, fmt, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { Login } from "./Login";
@@ -95,7 +95,7 @@ export default function StudentPortal() {
       </>}
       {tab === "profil" && linked && <StudentProfile settings={data.settings} notify={notify}/>}
       {tab === "rak" && <Shelves data={data} highlight={highlight}/>}
-      {tab === "peringkat" && <Leaderboard mode="siswa" meId={meId}/>}
+      {tab === "peringkat" && <StudentLeaderboards meId={meId}/>}
       {tab === "pesanan" && <div className="my-reservations" data-testid="my-reservations">
         <p className="muted" style={{ marginTop: 0 }}>Pesanan diproses petugas di meja sirkulasi. Datang membawa kartu anggotamu. Maksimal 3 pesanan aktif.</p>
         {data.mine.length === 0 && <div className="panel" data-testid="my-reservations-empty">Belum ada pesanan. Pilih buku di katalog lalu tekan “Pesan buku”.</div>}
