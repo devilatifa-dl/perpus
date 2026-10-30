@@ -265,11 +265,11 @@ def render_summary_pdf(d, settings, officer, orientation="portrait"):
     kv = ParagraphStyle("kv", fontName="Helvetica-Bold", fontSize=15 if portrait else 16, textColor=NAVY, leading=18)
 
     logo = 15 * mm
-    kop = Table([[logo_flowable(settings.get("school_logo"), "logo-sekolah.jpg", logo), [Paragraph("PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara · Tanpa denda, budaya membaca", sub)], logo_flowable(settings.get("library_logo"), "logo-perpustakaan.jpg", logo)]], colWidths=[logo + 4 * mm, avail - 2 * (logo + 4 * mm), logo + 4 * mm])
+    kop = Table([[logo_flowable(settings.get("school_logo"), "logo-sekolah.jpg", logo), [Paragraph("PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara", sub)], logo_flowable(settings.get("library_logo"), "logo-perpustakaan.jpg", logo)]], colWidths=[logo + 4 * mm, avail - 2 * (logo + 4 * mm), logo + 4 * mm])
     kop.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LINEBELOW", (0, 0), (-1, 0), 1.5, NAVY), ("BOTTOMPADDING", (0, 0), (-1, 0), 6)]))
     per = "per bulan" if d["group"] == "month" else "per hari"
     title = Paragraph("Laporan Ringkasan &amp; Grafik", ParagraphStyle("t", parent=h1, fontSize=12 if portrait else 13, spaceBefore=8))
-    meta = Paragraph(f"Periode {_fmt_day(d['start'])} s.d. {_fmt_day(d['end'])} · data {per} · dicetak {fmt_long(now, True)} WIB oleh {officer} · A4 {'potret' if portrait else 'lanskap'}", sub)
+    meta = Paragraph(f"Periode {_fmt_day(d['start'])} s.d. {_fmt_day(d['end'])} · data {per} · dicetak {fmt_long(now, True)} WIB oleh {officer}", sub)
 
     k, t = d["kpis"], d["totals"]
     cards = [("Total buku", k["books"], f"{k['titles']} judul"), ("Anggota", k["members"], "terdaftar"), ("Peminjaman aktif", k["active_loans"], "belum dikembalikan"), ("Buku terlambat", k["overdue"], "lewat batas pinjam"), ("Pengunjung hari ini", k["visits_today"], "tercatat"),

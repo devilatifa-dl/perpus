@@ -184,3 +184,4 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Removed per-class "Cetak kartu" button on Anggota class rows (MemberClassList). Kept "Cetak massal" (BulkCardPrint with class select) and single-card print.
 - New "Peringkat rajin meminjam": backend/loan_rank.py GET /api/loans/leaderboard?month=YYYY-MM (counts action=pinjam per WIB month; students loans/books/days, classes). Export type `peringkat-pinjam` (PDF/Excel). Admin Laporan tab `peringkat-pinjam`; siswa portal Peringkat tab has switch Rajin berkunjung / Rajin meminjam.
 - PDF/Excel downloads no longer show book codes (BK-xxxx): removed "Kode" column from Transaksi & Buku hilang (reports_pdf.table_rows) and from "Buku terpopuler" in summary PDF/Excel (summary.py). On-screen views unchanged.
+- PDF header/meta no longer show "Tanpa denda, budaya membaca" or "A4 potret/lanskap" (reports_pdf.py, summary.py).
