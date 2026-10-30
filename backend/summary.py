@@ -1,7 +1,7 @@
 import io
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Response
-from reports_pdf import WIB, build_loans, fmt_long, _logo_bytes
+from reports_pdf import WIB, build_loans, fmt_long, _logo_bytes, SCHOOL_NPSN
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
 
@@ -265,7 +265,7 @@ def render_summary_pdf(d, settings, officer, orientation="portrait"):
     kv = ParagraphStyle("kv", fontName="Helvetica-Bold", fontSize=15 if portrait else 16, textColor=NAVY, leading=18)
 
     logo = 15 * mm
-    kop = Table([[logo_flowable(settings.get("school_logo"), "logo-sekolah.jpg", logo), [Paragraph("PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara", sub)], logo_flowable(settings.get("library_logo"), "logo-perpustakaan.jpg", logo)]], colWidths=[logo + 4 * mm, avail - 2 * (logo + 4 * mm), logo + 4 * mm])
+    kop = Table([[logo_flowable(settings.get("school_logo"), "logo-sekolah.jpg", logo), [Paragraph("PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara", sub), Paragraph(f"NPSN: {SCHOOL_NPSN}", sub)], logo_flowable(settings.get("library_logo"), "logo-perpustakaan.jpg", logo)]], colWidths=[logo + 4 * mm, avail - 2 * (logo + 4 * mm), logo + 4 * mm])
     kop.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LINEBELOW", (0, 0), (-1, 0), 1.5, NAVY), ("BOTTOMPADDING", (0, 0), (-1, 0), 6)]))
     per = "per bulan" if d["group"] == "month" else "per hari"
     title = Paragraph("Laporan Ringkasan &amp; Grafik", ParagraphStyle("t", parent=h1, fontSize=12 if portrait else 13, spaceBefore=8))

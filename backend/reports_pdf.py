@@ -12,6 +12,7 @@ WIB = timezone(timedelta(hours=7))
 NAVY = colors.HexColor("#0f2745")
 BLUE = colors.HexColor("#0284c7")
 LIGHT = colors.HexColor("#f1f5f9")
+SCHOOL_NPSN = "69948538"  # ditampilkan di kop PDF
 
 TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung", "peringkat-pinjam": "Peringkat Rajin Meminjam"}
 PERIODS = {"semua": "Semua waktu", "harian": "Harian", "bulanan": "Bulanan", "7hari": "7 hari terakhir", "30hari": "30 hari terakhir"}
@@ -222,7 +223,7 @@ def render_report_pdf(kind, period, rows, settings, officer, orientation="landsc
     head = ParagraphStyle("head", fontName="Helvetica-Bold", fontSize=fs - 0.6, leading=fs + 1.5, textColor=colors.white)
 
     logo = 15 * mm if portrait else 16 * mm
-    kop = Table([[_logo(settings.get("school_logo"), "logo-sekolah.jpg", logo), [Paragraph("PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara", sub)], _logo(settings.get("library_logo"), "logo-perpustakaan.jpg", logo)]], colWidths=[logo + 4 * mm, avail - 2 * (logo + 4 * mm), logo + 4 * mm])
+    kop = Table([[_logo(settings.get("school_logo"), "logo-sekolah.jpg", logo), [Paragraph("PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara", sub), Paragraph(f"NPSN: {SCHOOL_NPSN}", sub)], _logo(settings.get("library_logo"), "logo-perpustakaan.jpg", logo)]], colWidths=[logo + 4 * mm, avail - 2 * (logo + 4 * mm), logo + 4 * mm])
     kop.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LINEBELOW", (0, 0), (-1, 0), 1.5, NAVY), ("BOTTOMPADDING", (0, 0), (-1, 0), 6)]))
 
     title = Paragraph(f"{TITLES[kind]} — {PERIODS.get(period, period or 'Semua waktu')}", ParagraphStyle("t", parent=h1, fontSize=12 if portrait else 13, spaceBefore=8))
