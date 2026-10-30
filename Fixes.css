@@ -1,0 +1,50 @@
+.scan-corners{pointer-events:none!important}
+.app-frame[data-user-role="siswa"] [data-testid="add-book-button"],.app-frame[data-user-role="siswa"] [data-testid="add-member-button"]{display:none!important}
+@media(max-width:640px){.sidebar{transition:left .2s}.sidebar.mobile-open{left:0}}
+/* Student profile photo in portal hero */
+.student-hero{display:flex;justify-content:space-between;align-items:center;gap:24px;flex-wrap:wrap}
+.student-profile{display:flex;flex-direction:column;align-items:center;gap:10px;flex-shrink:0}
+.student-profile-avatar{width:92px;height:92px;border-radius:20px;overflow:hidden;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;color:#fff;border:2px solid rgba(255,255,255,.35)}
+.student-profile-avatar img{width:100%;height:100%;object-fit:cover}
+
+/* Data & maintenance section in AccountManager */
+.data-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.data-reset-zone{border-top:1px dashed #e2e8f0;padding-top:14px;display:flex;flex-direction:column;gap:10px}
+.reset-books-check{display:flex;align-items:center;gap:8px;font-size:14px;color:#334155}
+.reset-books-check input{width:auto}
+.danger-btn{display:inline-flex;align-items:center;gap:7px;align-self:flex-start;background:#dc2626;color:#fff;border:none;padding:9px 16px;border-radius:10px;font-weight:600;cursor:pointer}
+.danger-btn:hover{background:#b91c1c}
+.danger-btn:disabled{opacity:.6;cursor:not-allowed}
+.reset-warn{display:flex;align-items:center;gap:6px;color:#b45309;margin:0}
+
+/* Student photo upload modal - member select + card preview */
+.photo-member-select{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#334155;margin-bottom:12px}
+.photo-member-select select{padding:10px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-weight:500;background:#fff}
+.photo-card-preview{margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.photo-card-preview .eyebrow{align-self:flex-start}
+
+/* Student identity selector bar (who is ordering) */
+.student-identity{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px 16px;margin:16px 0 4px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.student-identity .identity-label{font-weight:700;color:#0f172a;font-size:14px}
+.student-identity select{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-weight:600;background:#f8fafc;min-width:220px;color:#0f172a}
+.student-identity .identity-current{font-weight:600;color:#0d9488;font-size:14px}
+.student-identity .identity-hint{color:#b45309;font-size:13px}
+
+/* Student identity type-ahead combobox */
+.identity-combo{position:relative;min-width:260px}
+.identity-combo input{width:100%;padding:9px 32px 9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-weight:600;background:#f8fafc;color:#0f172a}
+.identity-combo input:focus{outline:none;border-color:#0d9488;background:#fff}
+.identity-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:#e2e8f0;color:#334155;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center}
+.identity-clear:hover{background:#cbd5e1}
+.identity-suggest{position:absolute;z-index:40;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.14);max-height:260px;overflow-y:auto;padding:6px}
+.identity-suggest-item{display:block;width:100%;text-align:left;border:none;background:transparent;padding:9px 10px;border-radius:8px;cursor:pointer;color:#0f172a;font-size:14px}
+.identity-suggest-item:hover{background:#f0fdfa}
+.identity-suggest-item small{color:#64748b;font-weight:500}
+.identity-empty{padding:10px;color:#94a3b8;font-size:13px}
+.photo-member-select .member-results{position:static;max-height:none;margin-top:4px}
+.photo-member-select .member-search{font-weight:500}
+.searchbox input,.searchbox input:focus,.searchbox input:focus-visible,html[data-theme="dark"] .searchbox input,html[data-theme="dark"] .searchbox input:focus{background:transparent!important;border:0!important;box-shadow:none!important;outline:none!important}
+.book-thumb{overflow:hidden;background:#ede9fe;color:#7c3aed}
+.book-thumb img{width:100%;height:100%;object-fit:cover}
+.circulation-grid{position:relative;z-index:3}
+.circulation-panel{position:relative;z-index:2}

@@ -1,0 +1,134 @@
+/* =====================================================================
+   Mode gelap ungu — token & penyesuaian manual.
+   Override warna otomatis ada di DarkAuto.css (hasil scripts/gen_dark_css.py).
+   Hanya berlaku di layar; cetak & PDF tetap terang.
+   ===================================================================== */
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --page:#0f0c1d;--surface:#17132b;--surface-2:#120f23;--sunk:#221c3d;--raised:#1d1835;
+  --line:#2a2447;--line-strong:#3b3461;
+  --ink:#eeebfb;--ink-2:#cfc9e8;--muted:#a49dc3;--muted-2:#7f78a1;
+  --sh-sm:0 1px 2px rgba(0,0,0,.35);
+  --sh-md:0 14px 30px -16px rgba(0,0,0,.7);
+  --sh-lg:0 30px 70px -30px rgba(0,0,0,.85);
+  --grad:linear-gradient(125deg,#2e1065 0%,#4c1d95 50%,#6d28d9 100%);
+}
+
+/* Toggle tombol (selalu ada, terang & gelap) */
+.theme-toggle{display:inline-grid;place-items:center;border:1px solid var(--line);background:#fff;color:var(--v700);width:40px;height:40px;border-radius:12px;cursor:pointer;transition:background-color .2s,color .2s,border-color .2s,transform .15s;flex-shrink:0}
+.theme-toggle:hover{background:var(--v50);border-color:var(--v200);transform:translateY(-1px)}
+.theme-toggle:active{transform:translateY(0)}
+.theme-toggle:focus-visible{outline:2px solid var(--v600);outline-offset:2px}
+.theme-toggle-icon{display:grid;place-items:center;animation:themeIconIn .22s ease-out}
+.theme-toggle.floating{position:fixed;top:16px;right:16px;z-index:50;width:auto;height:42px;padding:0 14px 0 12px;display:inline-flex;align-items:center;gap:8px;border-radius:999px;font-size:12.5px;font-weight:700;background:rgba(255,255,255,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 10px 26px -14px rgba(46,16,101,.5)}
+@keyframes themeIconIn{from{opacity:0;transform:rotate(-60deg) scale(.7)}to{opacity:1;transform:none}}
+@media(max-width:640px){.theme-toggle{width:44px;height:44px}.theme-toggle.floating{top:12px;right:12px;height:44px;padding:0 12px}.theme-toggle.floating .theme-toggle-text{display:none}}
+@media print{.theme-toggle{display:none!important}}
+@media(max-width:640px){.student-user>img{display:none}.student-user{gap:6px}}
+
+@media screen{
+  html[data-theme="dark"] .theme-toggle{background:var(--raised);border-color:var(--line-strong);color:#fcd34d}
+  html[data-theme="dark"] .theme-toggle:hover{background:var(--sunk);border-color:rgba(167,139,250,.45)}
+  html[data-theme="dark"] .theme-toggle.floating{background:rgba(23,19,43,.85);color:#fcd34d;box-shadow:0 10px 26px -12px rgba(0,0,0,.8)}
+  html[data-theme="dark"] .theme-toggle.floating .theme-toggle-text{color:var(--ink)}
+
+  /* Dasar */
+  html[data-theme="dark"] body,html[data-theme="dark"] .loading,html[data-theme="dark"] .student-shell{background:var(--page)}
+  html[data-theme="dark"] ::selection{background:#6d28d9;color:#fff}
+  :where(html[data-theme="dark"]) :is(h1,h2,h3,strong){color:var(--ink)}
+  html[data-theme="dark"] .welcome-banner h1,html[data-theme="dark"] .student-hero h1,html[data-theme="dark"] .login-visual h1,html[data-theme="dark"] .lb-hero h2,html[data-theme="dark"] .visit-stat.big strong,html[data-theme="dark"] .id-card h3{color:#fff}
+  html[data-theme="dark"] input::placeholder,html[data-theme="dark"] textarea::placeholder{color:var(--muted-2)}
+  html[data-theme="dark"] textarea{background:var(--surface);color:var(--ink)}
+  html[data-theme="dark"] input:focus,html[data-theme="dark"] select:focus,html[data-theme="dark"] textarea:focus{border-color:#8b5cf6;box-shadow:0 0 0 4px rgba(139,92,246,.22)}
+  html[data-theme="dark"] select option{background:var(--surface);color:var(--ink)}
+  html[data-theme="dark"] input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.8)}
+
+  /* Tombol */
+  html[data-theme="dark"] .primary{box-shadow:0 10px 22px -12px rgba(139,92,246,.75)}
+  html[data-theme="dark"] .secondary{background:var(--raised);border-color:var(--line-strong);color:var(--ink-2)}
+  html[data-theme="dark"] .secondary:hover{background:rgba(139,92,246,.16);border-color:rgba(167,139,250,.45);color:#ede9fe}
+  html[data-theme="dark"] .banner-button{background:#fff;color:#5b21b6}
+
+  /* Sidebar & topbar */
+  html[data-theme="dark"] .sidebar{background:var(--surface);border-right-color:var(--line)}
+  html[data-theme="dark"] .side-brand{color:var(--ink)}
+  html[data-theme="dark"] .nav-item{color:var(--muted)}
+  html[data-theme="dark"] .nav-item:hover{background:rgba(139,92,246,.14);color:#ede9fe}
+  html[data-theme="dark"] .nav-item.active{background:#7c3aed;color:#fff}
+  html[data-theme="dark"] .logout:hover{background:rgba(239,68,68,.14);color:#fca5a5}
+  html[data-theme="dark"] .topbar,html[data-theme="dark"] .student-top{background:rgba(23,19,43,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom-color:var(--line)}
+  html[data-theme="dark"] .mobile-menu{color:var(--ink-2)}
+  html[data-theme="dark"] .logo-img,html[data-theme="dark"] .student-brand img,html[data-theme="dark"] .student-user img{background:#fff;border-radius:50%}
+
+  /* Kartu, tabel, tab */
+  html[data-theme="dark"] .stat-card:hover{box-shadow:0 18px 34px -18px rgba(0,0,0,.9);border-color:rgba(167,139,250,.35)}
+  html[data-theme="dark"] tbody tr:hover td{background:rgba(139,92,246,.07)}
+  html[data-theme="dark"] td b{color:var(--ink)}
+  html[data-theme="dark"] .mode-switch,html[data-theme="dark"] .student-nav,html[data-theme="dark"] .period-select{background:var(--sunk)}
+  html[data-theme="dark"] .mode-switch button.selected,html[data-theme="dark"] .student-nav button.active,html[data-theme="dark"] .period-select button.active{background:var(--raised);color:#ddd6fe;box-shadow:0 1px 2px rgba(0,0,0,.5),inset 0 0 0 1px rgba(167,139,250,.3)}
+  html[data-theme="dark"] .report-tabs button.active{color:#c4b5fd;border-bottom-color:#a78bfa}
+  html[data-theme="dark"] .member-row.selected{background:rgba(139,92,246,.14)}
+  html[data-theme="dark"] .status.kembali,html[data-theme="dark"] .status.keluar{background:rgba(139,92,246,.2);color:#ddd6fe}
+  html[data-theme="dark"] .scanner-box h3,html[data-theme="dark"] .visit-scan-idle b{color:var(--ink)}
+
+  /* Modal & notifikasi */
+  html[data-theme="dark"] .modal,html[data-theme="dark"] .crop-modal{background:rgba(23,19,43,.96);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-color:var(--line-strong)}
+  html[data-theme="dark"] .modal-backdrop{background:rgba(5,3,12,.7)}
+  html[data-theme="dark"] .toast{background:#2e1065;border:1px solid rgba(167,139,250,.35);color:#f5f3ff}
+  html[data-theme="dark"] .identity-suggest,html[data-theme="dark"] .visit-suggest{background:var(--raised);border-color:var(--line-strong)}
+  html[data-theme="dark"] .visit-suggest button{background:transparent}
+  html[data-theme="dark"] .visit-suggest button:hover,html[data-theme="dark"] .visit-suggest button.active{background:rgba(139,92,246,.16)}
+
+  /* Login */
+  html[data-theme="dark"] .login-panel{background:var(--page)}
+  html[data-theme="dark"] .login-visual{background:linear-gradient(135deg,rgba(18,10,40,.95),rgba(76,29,149,.82)),url('https://images.unsplash.com/photo-1544185310-0b3cf501672b?auto=format&fit=crop&w=1400&q=80') center/cover}
+  html[data-theme="dark"] .login-shell.student .login-visual{background:linear-gradient(135deg,rgba(24,12,52,.95),rgba(109,40,217,.78)),url('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1400&q=80') center/cover}
+  html[data-theme="dark"] .login-logos img{background:#fff}
+
+  /* Pemilih portal */
+  html[data-theme="dark"] .chooser{background:radial-gradient(900px 500px at 15% 0%,rgba(109,40,217,.35) 0,rgba(109,40,217,0) 60%),radial-gradient(800px 500px at 100% 100%,rgba(76,29,149,.35) 0,rgba(76,29,149,0) 60%),var(--page)}
+  html[data-theme="dark"] .chooser-head h1 em{color:#c4b5fd}
+  html[data-theme="dark"] .chooser-card{background:var(--surface);border-color:var(--line)}
+  html[data-theme="dark"] .chooser-card:hover{border-color:rgba(167,139,250,.5);box-shadow:0 26px 60px -28px rgba(124,58,237,.6)}
+  html[data-theme="dark"] .chooser-card p:not(.eyebrow){color:var(--muted)}
+  html[data-theme="dark"] .chooser-card h2,html[data-theme="dark"] .chooser-card.student h2{color:#c4b5fd}
+
+  /* Portal siswa */
+  html[data-theme="dark"] .catalog-card{background:var(--surface);border-color:var(--line)}
+  html[data-theme="dark"] .catalog-card:hover{border-color:rgba(167,139,250,.45);box-shadow:0 18px 34px -18px rgba(0,0,0,.9)}
+  html[data-theme="dark"] .catalog-cover{background:rgba(139,92,246,.12);color:#a78bfa}
+  html[data-theme="dark"] .shelf-chips button{background:var(--raised);color:var(--ink-2);border-color:var(--line-strong)}
+  html[data-theme="dark"] .shelf-chips button.active{background:#7c3aed;color:#fff;border-color:#7c3aed}
+  html[data-theme="dark"] .reserve-btn{background:transparent;border-color:#8b5cf6;color:#c4b5fd}
+  html[data-theme="dark"] .reserve-btn:hover{background:#7c3aed;color:#fff}
+  html[data-theme="dark"] .student-hero .reserve-btn{background:#fff;border-color:#fff;color:#5b21b6}
+  html[data-theme="dark"] .student-hero .reserve-btn:hover{background:#ede9fe;color:#4c1d95}
+  html[data-theme="dark"] .student-hero .reserve-btn.locked{background:rgba(255,255,255,.18)!important;border-color:rgba(255,255,255,.35)!important;color:#ede9fe!important}
+
+  /* Grafik (recharts) */
+  html[data-theme="dark"] .recharts-cartesian-grid line{stroke:#2a2447}
+  html[data-theme="dark"] .recharts-cartesian-axis-tick text,html[data-theme="dark"] .recharts-text{fill:#a49dc3}
+  html[data-theme="dark"] .recharts-cartesian-axis-line,html[data-theme="dark"] .recharts-cartesian-axis-tick-line{stroke:#3b3461}
+  html[data-theme="dark"] .recharts-default-tooltip{background:#1d1835!important;border-color:#3b3461!important;color:#eeebfb}
+  html[data-theme="dark"] .recharts-tooltip-label{color:#eeebfb}
+  html[data-theme="dark"] .recharts-legend-item-text{color:#cfc9e8!important}
+  html[data-theme="dark"] .recharts-tooltip-cursor{fill:rgba(139,92,246,.12)}
+
+  /* Peringkat */
+  html[data-theme="dark"] .lb-avatar{border-color:var(--surface)}
+  html[data-theme="dark"] .lb-row.me{background:rgba(139,92,246,.14);outline-color:rgba(167,139,250,.35)}
+  html[data-theme="dark"] .lb-step b,html[data-theme="dark"] .lb-score strong,html[data-theme="dark"] .lb-num b,html[data-theme="dark"] .lb-empty b{color:var(--ink)}
+  html[data-theme="dark"] .lb-step.me b{color:#c4b5fd}
+
+  /* Pratinjau cetak massal tetap seperti kertas */
+  html[data-theme="dark"] .bulk-print{background:#0b0916}
+  html[data-theme="dark"] .bulk-toolbar{background:var(--surface);border-bottom-color:var(--line)}
+  html[data-theme="dark"] .bulk-toolbar h3,html[data-theme="dark"] .bulk-toolbar label{color:var(--ink)}
+
+  /* Menu samping HP */
+  html[data-theme="dark"] .sidebar-backdrop{background:rgba(5,3,12,.65)}
+
+  /* Transisi halus saat berganti mode */
+  html.theme-anim body,html.theme-anim .sidebar,html.theme-anim .topbar,html.theme-anim .panel,html.theme-anim .stat-card,html.theme-anim .catalog-card,html.theme-anim .chooser-card,html.theme-anim .login-panel,html.theme-anim .student-top{transition:background-color .25s ease,border-color .25s ease,color .25s ease}
+}
+@media (prefers-reduced-motion:reduce){.theme-toggle,.theme-toggle-icon{transition:none!important;animation:none!important}}
