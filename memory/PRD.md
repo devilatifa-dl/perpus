@@ -186,3 +186,4 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - PDF/Excel downloads no longer show book codes (BK-xxxx): removed "Kode" column from Transaksi & Buku hilang (reports_pdf.table_rows) and from "Buku terpopuler" in summary PDF/Excel (summary.py). On-screen views unchanged.
 - PDF header/meta no longer show "Tanpa denda, budaya membaca" or "A4 potret/lanskap" (reports_pdf.py, summary.py).
 - PDF kop shows "NPSN: 69948538" under the address (SCHOOL_NPSN in reports_pdf.py, used by summary.py). School has no phone/email -> not shown.
+- Koleksi buku: "Cetak QR massal" (components/BulkBookQrPrint.js, BookQr.css; qrcode.react offline SVG). Semua buku / pilih per buku, filter rak, 1 label per judul atau sesuai eksemplar, opsi tampilkan kode; 24 label per A4. QR modal per buku punya tombol cetak sesuai eksemplar.
