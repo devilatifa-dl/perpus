@@ -1,7 +1,7 @@
 """Pulihkan data dari cadangan berukuran berapa pun.
 
 Alur (dipakai menu Akun -> Pulihkan data):
-  1. POST /admin/restore/start   {code, filename, size, chunks}  -> verifikasi kode email, buat sesi unggah
+  1. POST /admin/restore/start   {filename, size, chunks}  -> buat sesi unggah (admin, tanpa kode email)
   2. PUT  /admin/restore/chunk?upload_id=..&index=..  (body = potongan berkas, maks CHUNK_SIZE)
   3. POST /admin/restore/finish  {upload_id}  -> proses di latar belakang
   4. GET  /admin/restore/status/{upload_id}  -> pantau kemajuan / hasil
@@ -27,7 +27,7 @@ JSON_MEMBER = "data-cadangan.json"
 
 
 class StartInput(BaseModel):
-    code: str
+    code: str = ""
     filename: str = ""
     size: int = 0
     chunks: int
@@ -215,7 +215,7 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
             raise HTTPException(400, "Berkas cadangan kosong")
         if await db.restore_uploads.find_one({"status": "processing"}, {"_id": 0, "id": 1}):
             raise HTTPException(409, "Pemulihan lain sedang berjalan. Tunggu sampai selesai.")
-        await verify_reset_code(data.code, "restore")
+        # Tanpa kode email (keputusan pengguna): cukup admin + konfirmasi di aplikasi
         # Bersihkan sisa sesi lama yang tidak selesai
         old = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
         for j in await db.restore_uploads.find({"created_at": {"$lt": old}}, {"_id": 0, "id": 1}).to_list(1000):
@@ -260,7 +260,6 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
     @r.post("/admin/restore")
     async def restore_once(file: UploadFile = File(...), code: str = Form(""), user=Depends(current_user)):
         admin_only(user)
-        await verify_reset_code(code, "restore")
         fd, path = tempfile.mkstemp(prefix="perpus-restore-", suffix=".bin")
         try:
             with os.fdopen(fd, "wb") as out:

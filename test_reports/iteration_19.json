@@ -1,0 +1,22 @@
+{
+  "summary": "Tested 'Hapus laporan' (report purge) feature end-to-end. Backend: 21/21 pytest pass (admin-only 403 for petugas, preview counts for tahun/rentang/pilih, validation 400/422, active loan protected, open visit protected, backup.xlsx valid with rows for all 4 types, wrong code 400, correct code deletes, completed-loan purge removes both pinjam+kembali docs, book stock unchanged, active loan untouched, pilih deletes only given ids, code single-use, purge_logs written). Frontend: admin sees checkbox column + Hapus button on Transaksi/Buku masuk/Buku hilang/Pengunjung, not on Statistik; Dipinjam row checkbox disabled; select-all picks only allowed rows (6 of 7); button shows 'Hapus (n)'; picked selection resets on tab switch; modal pilih/tahun/rentang modes, preview count, Excel backup downloads, code-sent shown, wrong code shows purge-error, correct code deletes, modal closes, toast shown, table refreshes; rentang start>end shows backend error; empty year shows 0 and hides backup button; print media hides checkbox and Hapus button; petugas sees neither checkboxes nor Hapus button. /api/admin/reset-code was mocked in the browser via page.route (no real emails sent). The code was set with seed_old_reports.py code.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [{"screen": "ReportPurge modal (Rentang tanggal)", "issues": ["Uses the browser's native <input type=date> picker (mm/dd/yyyy shown in English locale) instead of a shadcn calendar. Minor inconsistency for Indonesian users."]}]
+  },
+  "test_report_links": ["/app/backend/tests/test_report_purge.py", "/app/test_reports/pytest/pytest_purge.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Edge case: GET /api/reports builds loans from only the latest 500 transactions. If a loan's pinjam record falls outside that window, the UI shows an orphan 'return' row whose id is the kembali tx id. purge.collect rebuilds loans from ALL transactions, where that loan's id is the pinjam id, so a 'pilih' purge of that row would match nothing. This is low impact and only matters with more than 500 transactions.",
+    "Purging 'hilang' rows whose status is still 'Hilang' removes the report record but leaves book.lost unchanged. Consider protecting rows with status Hilang, or warn the user, the same way active loans are protected.",
+    "Purge flow verify_reset_code is called after collect; fine. A wrong code increments attempts (max 5) as expected."
+  ],
+  "updated_files": ["/app/backend/tests/test_report_purge.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Re-seeded 2024 sample data with seed_old_reports.py at the end of testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: export REACT_APP_BACKEND_URL=... && pytest tests/test_report_purge.py (auto re-seeds per test and sets the purge code with the seed 'code' command, so no email is sent). In UI tests, mock **/api/admin/reset-code** with page.route and run seed 'code' beforehand."
+}

@@ -666,7 +666,16 @@ async def member_options(user=Depends(current_user)):
 @api.post("/members")
 async def add_member(data: MemberInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah anggota")
-    doc=data.model_dump(); doc.update({"id":"MB-"+str(uuid.uuid4())[:8].upper()}); await db.members.insert_one(doc); return public(doc)
+    doc=data.model_dump(); doc["student_id"] = (doc.get("student_id") or "").strip()
+    await ensure_unique_nis(doc["student_id"])
+    doc.update({"id":"MB-"+str(uuid.uuid4())[:8].upper()}); await db.members.insert_one(doc); return public(doc)
+
+async def ensure_unique_nis(sid: str, exclude_id: str = None):
+    if not sid: return
+    q = {"student_id": sid}
+    if exclude_id: q["id"] = {"$ne": exclude_id}
+    other = await db.members.find_one(q, {"_id": 0, "name": 1, "class_name": 1})
+    if other: raise HTTPException(400, f"NIS {sid} sudah dipakai {other.get('name','anggota lain')} ({other.get('class_name','-')})")
 
 def _cell_text(c):
     if c is None:
@@ -734,7 +743,8 @@ async def member_import_template(user=Depends(current_user)):
         "1. Isi data di lembar 'Anggota'. Jangan ubah judul kolom: nama, nis, kelas.",
         "2. Satu baris = satu anggota. Boleh banyak kelas dalam satu berkas.",
         "3. Hapus 3 baris contoh (Budi, Siti, Rudi) sebelum mengimpor.",
-        "4. NIS yang sudah terdaftar akan dilewati otomatis.",
+        "4. NIS yang sudah terdaftar TIDAK dibuat baru: kelasnya diperbarui (kenaikan kelas).",
+        "   NIS tidak boleh ganda dalam satu berkas.",
         "5. Simpan sebagai .xlsx lalu unggah di menu Anggota → Impor.",
     ], start=1):
         c = info.cell(row=i, column=1, value=t)
@@ -749,6 +759,15 @@ def _pick(d, *keys):
             return d[k]
     return ""
 
+async def freeze_old_class(member_ids, old_class: str):
+    """Sebelum kelas anggota diganti: kunci kelas lama di riwayat yang belum mencatat kelas,
+    agar laporan lama tetap memakai kelas saat transaksi terjadi."""
+    if not member_ids or not (old_class or "").strip(): return
+    empty = {"$or": [{"class_name": {"$exists": False}}, {"class_name": ""}, {"class_name": None}]}
+    flt = {"member_id": {"$in": list(member_ids)}, **empty}
+    await db.transactions.update_many(flt, {"$set": {"class_name": old_class}})
+    await db.visits.update_many(flt, {"$set": {"class_name": old_class}})
+
 @api.post("/members/import")
 async def import_members(file: UploadFile = File(...), user=Depends(current_user)):
     staff_only(user)
@@ -760,24 +779,51 @@ async def import_members(file: UploadFile = File(...), user=Depends(current_user
         raise HTTPException(400, "Berkas kosong atau tidak memiliki data")
     if len(rows) > 2000:
         raise HTTPException(400, "Maksimal 2000 baris per impor")
-    existing = {m.get("student_id") for m in await db.members.find({}, {"_id": 0, "student_id": 1}).to_list(None) if m.get("student_id")}
-    seen = set()
-    to_insert, errors, skipped = [], [], 0
+    all_members = await db.members.find({}, {"_id": 0, "id": 1, "name": 1, "student_id": 1, "class_name": 1}).to_list(None)
+    by_nis = {}
+    for m in all_members:
+        sid = (m.get("student_id") or "").strip()
+        if sid:
+            by_nis.setdefault(sid, []).append(m)
+    seen, matched_ids = set(), set()
+    to_insert, updates, errors, skipped, unchanged = [], [], [], 0, 0
     for idx, d in enumerate(rows, start=2):
-        name = _pick(d, "nama", "name", "nama lengkap", "nama_lengkap")
-        sid = _pick(d, "nis", "student_id", "nomor induk", "no induk", "nomor_induk", "no_induk")
-        cls = _pick(d, "kelas", "class_name", "class", "rombel")
-        reason = "Nama atau kelas kosong" if not name or not cls else (f"NIS {sid} sudah terdaftar" if sid and (sid in existing or sid in seen) else None)
+        name = _pick(d, "nama", "name", "nama lengkap", "nama_lengkap").strip()
+        sid = _pick(d, "nis", "student_id", "nomor induk", "no induk", "nomor_induk", "no_induk").strip()
+        cls = _pick(d, "kelas", "class_name", "class", "rombel").strip()
+        reason = None
+        if not cls or (not name and sid not in by_nis):
+            reason = "Nama atau kelas kosong"
+        elif sid and sid in seen:
+            reason = f"NIS {sid} ganda di dalam berkas"
         if reason:
             skipped += 1
             errors.append({"row": idx, "nama": name, "nis": sid, "kelas": cls, "alasan": reason})
             continue
         if sid:
             seen.add(sid)
+        if sid and sid in by_nis:
+            # Sudah terdaftar: ID anggota (dan QR kartu) tetap, hanya kelas yang disesuaikan
+            for m in by_nis[sid]:
+                matched_ids.add(m["id"])
+                if (m.get("class_name") or "").strip() != cls:
+                    updates.append({"id": m["id"], "name": m.get("name", ""), "nis": sid, "from": m.get("class_name", ""), "to": cls})
+                else:
+                    unchanged += 1
+            continue
         to_insert.append({"id": "MB-" + str(uuid.uuid4())[:8].upper(), "name": name, "student_id": sid, "class_name": cls, "photo": ""})
     if to_insert:
         await db.members.insert_many(to_insert)
-    return {"imported": len(to_insert), "skipped": skipped, "total": len(rows), "errors": errors}
+    for u in updates:
+        await freeze_old_class([u["id"]], u["from"])
+        await db.members.update_one({"id": u["id"]}, {"$set": {"class_name": u["to"]}})
+        await db.users.update_many({"member_id": u["id"], "role": "siswa"}, {"$set": {"class_name": u["to"]}})
+        await db.reservations.update_many({"member_id": u["id"], "status": "Menunggu"}, {"$set": {"class_name": u["to"]}})
+    not_in_file = [{"id": m["id"], "name": m.get("name", ""), "nis": m.get("student_id", ""), "kelas": m.get("class_name", "")}
+                   for m in all_members if m["id"] not in matched_ids]
+    not_in_file.sort(key=lambda x: (x["kelas"], x["name"]))
+    return {"imported": len(to_insert), "updated": len(updates), "unchanged": unchanged, "skipped": skipped, "total": len(rows),
+            "errors": errors, "class_changes": updates, "not_in_file": not_in_file}
 
 class FailedRow(BaseModel):
     row: int
@@ -804,7 +850,12 @@ async def update_member(member_id: str, data: MemberInput, user=Depends(current_
     staff_only(user)
     member = await db.members.find_one({"id": member_id}, {"_id":0})
     if not member: raise HTTPException(404, "Anggota tidak ditemukan")
-    await db.members.update_one({"id": member_id}, {"$set": data.model_dump()})
+    upd = data.model_dump(); upd["student_id"] = (upd.get("student_id") or "").strip()
+    await ensure_unique_nis(upd["student_id"], member_id)
+    if (member.get("class_name") or "") != upd["class_name"]:
+        await freeze_old_class([member_id], member.get("class_name", ""))
+        await db.users.update_many({"member_id": member_id, "role": "siswa"}, {"$set": {"class_name": upd["class_name"]}})
+    await db.members.update_one({"id": member_id}, {"$set": upd})
     updated = await db.members.find_one({"id": member_id}, {"_id":0})
     return updated
 
@@ -830,7 +881,10 @@ async def promote_members(data: PromoteInput, user=Depends(current_user)):
     count = await db.members.count_documents({"class_name": from_c})
     if count == 0:
         raise HTTPException(404, "Tidak ada anggota pada kelas asal tersebut")
+    ids = [m["id"] for m in await db.members.find({"class_name": from_c}, {"_id": 0, "id": 1}).to_list(None)]
+    await freeze_old_class(ids, from_c)
     result = await db.members.update_many({"class_name": from_c}, {"$set": {"class_name": to_c}})
+    await db.users.update_many({"member_id": {"$in": ids}, "role": "siswa"}, {"$set": {"class_name": to_c}})
     return {"ok": True, "moved": result.modified_count, "from_class": from_c, "to_class": to_c}
 
 @api.post("/members/bulk-delete")
@@ -857,7 +911,7 @@ def _mask_email(e):
     name, _, dom = e.partition("@")
     return f"{name[:3]}{'*' * max(len(name) - 3, 1)}@{dom}"
 
-CODE_PURPOSES = {"reset": "reset data", "restore": "pemulihan data dari cadangan"}
+CODE_PURPOSES = {"reset": "reset data", "restore": "pemulihan data dari cadangan", "purge": "penghapusan laporan lama"}
 
 @api.post("/admin/reset-code")
 async def send_reset_code(purpose: str = "reset", user=Depends(current_user)):
@@ -1165,6 +1219,8 @@ from loan_rank import build_router as loan_rank_router, loan_leaderboard
 from restore_big import build_router as restore_router
 api.include_router(restore_router(db, current_user, verify_reset_code, normalize_books, BACKUP_COLLECTIONS))
 api.include_router(loan_rank_router(db, current_user))
+from purge import build_router as purge_router
+api.include_router(purge_router(db, current_user, verify_reset_code, visits_auto_close))
 api.include_router(media_router(db, current_user))
 api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
 app.include_router(api)

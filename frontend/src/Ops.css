@@ -106,3 +106,25 @@
 :where(html[data-theme="dark"]) .failed-table th{background:var(--surface-2);color:var(--ink-2)}
 :where(html[data-theme="dark"]) .failed-table td{border-color:var(--line)}
 :where(html[data-theme="dark"]) .failed-table td.reason,:where(html[data-theme="dark"]) .failed-head span{color:#fbbf24}
+.import-box>*{min-width:0}.import-result{min-width:0}.failed-rows{min-width:0;max-width:100%}.failed-table-wrap{max-width:100%}.modal:has([data-testid="member-import"]){width:min(640px,100%)}
+@media print{.print-hide{display:none!important}}
+
+.purge-box{display:grid;gap:13px;min-width:0}
+.purge-modes{display:flex;gap:6px;background:#f1f5f9;padding:4px;border-radius:10px}
+.purge-modes button{flex:1;background:transparent;border:0;padding:9px 8px;border-radius:8px;font-size:12px;font-weight:700;color:#64748b;cursor:pointer}
+.purge-modes button.active{background:#fff;color:#6d28d9;box-shadow:0 1px 3px #0f172a18}
+.purge-range{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.purge-preview{display:flex;gap:11px;align-items:flex-start;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:10px;padding:12px}
+.purge-preview.empty{background:#f8fafc;border-color:#e2e8f0;color:#64748b}
+.purge-preview b,.purge-preview small{display:block}.purge-preview b{font-size:14px}.purge-preview small{font-size:12px;color:#64748b;margin-top:3px}
+.purge-preview small.purge-protected{color:#b45309}
+.purge-sent{font-size:12px;color:#475569;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.link-btn{background:transparent;border:0;color:#6d28d9;font-weight:600;font-size:12px;cursor:pointer;justify-self:center}
+.purge-col{width:34px;text-align:center}.purge-col input{width:16px;height:16px;accent-color:#7c3aed;cursor:pointer}
+.purge-open{color:#dc2626!important}
+:where(html[data-theme="dark"]) .purge-modes{background:var(--surface-2)}
+:where(html[data-theme="dark"]) .purge-modes button.active{background:var(--surface)}
+:where(html[data-theme="dark"]) .purge-preview{background:#450a0a55;border-color:#7f1d1d}
+
+.purge-note{font-size:11px;color:#64748b;text-align:center}
+.purge-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.purge-actions button{width:100%}

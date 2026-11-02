@@ -31,7 +31,7 @@ export function AccountManager({ user, close, notify }) {
     } finally { setBusyData(""); }
   };
 
-  const [restoreFile, setRestoreFile] = useState(null); const [restoreTo, setRestoreTo] = useState(""); const [restoreCode, setRestoreCode] = useState("");
+  const [restoreFile, setRestoreFile] = useState(null);
 
   const sendCode = async (purpose) => {
     const { data } = await api.post(`/admin/reset-code?purpose=${purpose}`);
@@ -44,23 +44,21 @@ export function AccountManager({ user, close, notify }) {
     e.target.value = "";
     if (!file) return;
     if (!window.confirm(`Pulihkan data dari "${file.name}"? Seluruh data saat ini akan digantikan oleh isi berkas cadangan.`)) return;
-    setBusyData("restore-code");
-    try { setRestoreTo(await sendCode("restore")); setRestoreFile(file); setRestoreCode(""); }
-    catch (err) { notify(err.response?.data?.detail || "Gagal mengirim kode verifikasi"); }
-    finally { setBusyData(""); }
+    setRestoreFile(file);
+    restore(file);
   };
 
   const [restoreProg, setRestoreProg] = useState(null);
   // Berkas dikirim dalam potongan kecil sehingga cadangan berukuran berapa pun bisa dipulihkan.
-  const restore = async () => {
+  const restore = async (restoreFile) => {
     setBusyData("restore");
     const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
     try {
       const guessChunk = 8 * 1024 * 1024;
       const chunks = Math.max(1, Math.ceil(restoreFile.size / guessChunk));
-      setRestoreProg({ pct: 0, text: "Memverifikasi kode..." });
-      const { data: st } = await api.post("/admin/restore/start", { code: restoreCode, filename: restoreFile.name, size: restoreFile.size, chunks });
+      setRestoreProg({ pct: 0, text: `Menyiapkan ${restoreFile.name}...` });
+      const { data: st } = await api.post("/admin/restore/start", { filename: restoreFile.name, size: restoreFile.size, chunks });
       const size = st.chunk_size || guessChunk;
       if (size !== guessChunk) throw new Error("Ukuran potongan tidak cocok, muat ulang halaman lalu coba lagi");
       for (let i = 0; i < chunks; i++) {
@@ -192,10 +190,10 @@ export function AccountManager({ user, close, notify }) {
         <p className="account-hint" data-testid="backup-contents-hint"><b>Unduh cadangan</b> menghasilkan satu berkas ZIP: data untuk pemulihan + semua laporan (Excel &amp; PDF) — transaksi, buku masuk, buku hilang, pengunjung, dan peringkat rajin berkunjung per bulan.</p>
         <div className="data-actions">
           <button type="button" className="secondary" data-testid="backup-data-button" disabled={busyData !== ""} onClick={backup}><Download size={15}/> {busyData === "backup" ? "Menyiapkan cadangan & laporan..." : "Unduh cadangan"}</button>
-          <button type="button" className="secondary" data-testid="restore-data-button" disabled={busyData !== ""} onClick={() => restoreRef.current?.click()}><Upload size={15}/> {busyData === "restore-code" ? "Mengirim kode..." : busyData === "restore" ? "Memulihkan..." : "Pulihkan data"}</button>
+          <button type="button" className="secondary" data-testid="restore-data-button" disabled={busyData !== ""} onClick={() => restoreRef.current?.click()}><Upload size={15}/> {busyData === "restore" ? "Memulihkan..." : "Pulihkan data"}</button>
           <input ref={restoreRef} type="file" accept="application/json,.json,application/zip,.zip" hidden data-testid="restore-file-input" onChange={pickRestore}/>
         </div>
-        {restoreFile && <CodeBox prefix="restore" to={restoreTo} code={restoreCode} setCode={setRestoreCode} busy={busyData !== ""} label={busyData === "restore" ? "Memulihkan..." : "Konfirmasi pulihkan"} note={`Berkas: ${restoreFile.name} (${fmtSize(restoreFile.size)})`} onConfirm={restore} onCancel={() => { setRestoreFile(null); setRestoreTo(""); setRestoreCode(""); setRestoreProg(null); }}/>}
+        {restoreFile && <p className="account-hint" data-testid="restore-file-name">Berkas: <b>{restoreFile.name}</b> ({fmtSize(restoreFile.size)})</p>}
         {restoreProg && <div className={`restore-progress${restoreProg.error ? " error" : ""}${restoreProg.done ? " done" : ""}`} data-testid="restore-progress">
           <div className="restore-progress-track"><div className={restoreProg.processing ? "busy" : ""} style={{ width: `${restoreProg.pct}%` }}/></div>
           <p className="account-hint" data-testid="restore-progress-text">{restoreProg.text}</p>

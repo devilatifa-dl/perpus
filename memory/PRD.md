@@ -188,3 +188,12 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - PDF kop shows "NPSN: 69948538" under the address (SCHOOL_NPSN in reports_pdf.py, used by summary.py). School has no phone/email -> not shown.
 - Koleksi buku: "Cetak QR massal" (components/BulkBookQrPrint.js, BookQr.css; qrcode.react offline SVG). Semua buku / pilih per buku, filter rak, 1 label per judul atau sesuai eksemplar, opsi tampilkan kode; 24 label per A4. QR modal per buku punya tombol cetak sesuai eksemplar.
 - Pulihkan data tanpa batas ukuran: backend/restore_big.py (start/chunk/finish/status, chunk 8MB disimpan di Mongo restore_chunks, streaming ijson -> koleksi _restore_tmp_* -> $out, data lama aman bila gagal). /admin/restore lama tetap ada tanpa batas. Frontend AccountManager: unggah bertahap + progress. Hosting emergent.host menolak unggahan tunggal >~100MB (413) -> karena itu dipotong.
+
+### 1 Nov 2026 — Impor kenaikan kelas
+- POST /api/members/import: NIS sudah terdaftar → hanya kelas diperbarui (ID/QR tetap, nama tidak diubah); NIS ganda dalam berkas ditolak; respons + `updated`, `unchanged`, `class_changes`, `not_in_file` (anggota terdaftar yang tidak ada di berkas, tidak diubah).
+- NIS unik juga di tambah/edit anggota (`ensure_unique_nis`).
+- `freeze_old_class`: sebelum kelas diganti (impor/promote/edit), transaksi & kunjungan lama tanpa kelas dikunci ke kelas lama → laporan memakai kelas saat transaksi terjadi. Akun siswa ikut kelas baru.
+- 1 Nov 2026: Laporan Pengunjung PDF/Excel tanpa kolom Jenis & Cara keluar; cetak langsung (kelas .print-hide) sembunyikan kolom Cara keluar + teks "Anggota · NIS"; cetak Transaksi sembunyikan kode buku. Label peringkat "Rajin Peminjaman".
+- 1 Nov 2026: Hapus laporan (backend/purge.py, components/ReportPurge.js): admin + kode email (purpose "purge"); transaksi/kunjungan/masuk/hilang; mode terpilih (checkbox)/tahun/rentang; cadangan Excel otomatis; pinjaman aktif & pengunjung di dalam dilindungi; log di purge_logs.
+- 1 Nov 2026: Hapus 1-5 data tanpa kode email (NO_CODE_MAX=5, preview.needs_code); tombol "Unduh cadangan Excel saja" tanpa kode.
+- 1 Nov 2026: Kode email DIHAPUS untuk hapus laporan & pulihkan data (keputusan user: terlalu ribet). Modal hapus: tombol "Hapus N data" (window.confirm) + "Unduh Excel". Reset data masih pakai kode email.

@@ -14,7 +14,7 @@ BLUE = colors.HexColor("#0284c7")
 LIGHT = colors.HexColor("#f1f5f9")
 SCHOOL_NPSN = "69948538"  # ditampilkan di kop PDF
 
-TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung", "peringkat-pinjam": "Peringkat Rajin Meminjam"}
+TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung", "peringkat-pinjam": "Peringkat Rajin Peminjaman"}
 PERIODS = {"semua": "Semua waktu", "harian": "Harian", "bulanan": "Bulanan", "7hari": "7 hari terakhir", "30hari": "30 hari terakhir"}
 CHECKOUT_LABEL = {"scan": "Scan", "manual": "Petugas", "otomatis": "Otomatis"}
 
@@ -61,7 +61,7 @@ def build_loans(transactions):
             stack = open_by_book.get(t["book_id"]) or []
             if stack:
                 idx = next((i for i, l in enumerate(stack) if l["member_id"] == t["member_id"]), 0)
-                loan = stack.pop(idx); loan.update(returned_at=t["date"], status="Dikembalikan")
+                loan = stack.pop(idx); loan.update(returned_at=t["date"], status="Dikembalikan", return_id=t["id"])
             else:
                 loans.append({"id": t["id"], "member_id": t["member_id"], "member_name": t["member_name"], "class_name": t.get("class_name", ""), "book_id": t["book_id"], "book_title": t["book_title"], "borrowed_at": None, "returned_at": t["date"], "status": "Dikembalikan", "date": t["date"]})
     loans.sort(key=lambda l: l["returned_at"] or l["borrowed_at"] or "", reverse=True)
@@ -80,9 +80,9 @@ def table_rows(kind, rows):
         plain = [[r["title"], r.get("author", "-"), f"{r['quantity']} eks", r.get("source") or "-", r.get("shelf", "-"), fmt_date(r["date"]), r.get("recorded_by", "-")] for r in rows]
         summary = f"Total penerimaan: {len(rows)} · Total eksemplar: {sum(r.get('quantity', 0) for r in rows)}"
     elif kind == "kunjungan":
-        header = ["No", "Nama", "Jenis", "Kelas / Asal", "Keperluan", "Masuk", "Keluar", "Cara keluar"]
-        widths = [10 * mm, 52 * mm, 20 * mm, 36 * mm, 46 * mm, 34 * mm, 34 * mm, 28 * mm]
-        plain = [[r["name"], "Anggota" if r.get("kind") == "anggota" else "Tamu", (r.get("class_name") if r.get("kind") == "anggota" else (r.get("origin") or "Tamu")) or "-", r.get("purpose") or "-", fmt_date(r.get("check_in"), True), fmt_date(r.get("check_out"), True) if r.get("check_out") else "Masih di dalam", CHECKOUT_LABEL.get(r.get("checkout_type"), "-")] for r in rows]
+        header = ["No", "Nama", "Kelas / Asal", "Keperluan", "Masuk", "Keluar"]
+        widths = [10 * mm, 66 * mm, 44 * mm, 60 * mm, 39 * mm, 39 * mm]
+        plain = [[r["name"], (r.get("class_name") if r.get("kind") == "anggota" else (r.get("origin") or "Tamu")) or "-", r.get("purpose") or "-", fmt_date(r.get("check_in"), True), fmt_date(r.get("check_out"), True) if r.get("check_out") else "Masih di dalam"] for r in rows]
         mem = sum(1 for r in rows if r.get("kind") == "anggota"); n = len(rows) or 1
         summary = f"Total pengunjung: {len(rows)} · Anggota: {mem} ({mem * 100 / n:.1f}%) · Tamu: {len(rows) - mem} ({(len(rows) - mem) * 100 / n:.1f}%)" if rows else "Total pengunjung: 0"
     elif kind == "statistik":

@@ -24,7 +24,7 @@ const KINDS = {
   },
   pinjam: {
     url: "/loans/leaderboard", exportType: "peringkat-pinjam", key: "loans", total: "total_loans",
-    eyebrow: "PERINGKAT RAJIN MEMINJAM",
+    eyebrow: "PERINGKAT RAJIN PEMINJAMAN",
     title: (l) => `Siapa paling rajin meminjam buku bulan ${l}?`,
     intro: (lb) => `${lb.total_loans} peminjaman buku oleh ${lb.active_students} siswa. Pinjam buku dengan kartumu agar tercatat!`,
     unit: "buku dipinjam", sub: (s) => `${s.books} judul · ${s.days} hari`,
@@ -43,7 +43,7 @@ function Avatar({ s, size = 56 }) {
 export function LeaderboardSwitch({ value, onChange }) {
   return <div className="lb-switch" role="radiogroup" aria-label="Jenis peringkat" data-testid="leaderboard-kind-switch">
     <button type="button" role="radio" aria-checked={value === "kunjungan"} className={value === "kunjungan" ? "active" : ""} data-testid="leaderboard-kind-kunjungan" onClick={() => onChange("kunjungan")}><DoorOpen size={15}/> Rajin berkunjung</button>
-    <button type="button" role="radio" aria-checked={value === "pinjam"} className={value === "pinjam" ? "active" : ""} data-testid="leaderboard-kind-pinjam" onClick={() => onChange("pinjam")}><BookOpen size={15}/> Rajin meminjam</button>
+    <button type="button" role="radio" aria-checked={value === "pinjam"} className={value === "pinjam" ? "active" : ""} data-testid="leaderboard-kind-pinjam" onClick={() => onChange("pinjam")}><BookOpen size={15}/> Rajin Peminjaman</button>
   </div>;
 }
 
