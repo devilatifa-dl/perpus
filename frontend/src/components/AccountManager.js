@@ -33,12 +33,6 @@ export function AccountManager({ user, close, notify }) {
 
   const [restoreFile, setRestoreFile] = useState(null);
 
-  const sendCode = async (purpose) => {
-    const { data } = await api.post(`/admin/reset-code?purpose=${purpose}`);
-    notify(`Kode verifikasi dikirim ke ${data.sent_to}`);
-    return data.sent_to;
-  };
-
   const pickRestore = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -108,26 +102,14 @@ export function AccountManager({ user, close, notify }) {
     }
   };
 
-  const [codeTo, setCodeTo] = useState(""); const [code, setCode] = useState("");
-
-  const requestCode = async () => {
+  const reset = async () => {
     const msg = resetBooks
       ? "Reset SEMUA data termasuk koleksi buku? Tindakan ini tidak dapat dibatalkan."
       : "Reset data (anggota, transaksi, pesanan, dll) kecuali koleksi buku? Tindakan ini tidak dapat dibatalkan.";
     if (!window.confirm(msg)) return;
-    setBusyData("code");
-    try {
-      setCodeTo(await sendCode("reset")); setCode("");
-    } catch (err) {
-      notify(err.response?.data?.detail || "Gagal mengirim kode verifikasi");
-    } finally { setBusyData(""); }
-  };
-
-  const reset = async () => {
-    if (code.trim().length !== 6) return notify("Masukkan 6 digit kode verifikasi");
     setBusyData("reset");
     try {
-      await api.post("/admin/reset-data", { include_books: resetBooks, code: code.trim() });
+      await api.post("/admin/reset-data", { include_books: resetBooks });
       notify("Data berhasil direset. Memuat ulang...");
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
@@ -201,8 +183,7 @@ export function AccountManager({ user, close, notify }) {
         <p className="account-hint" data-testid="restore-size-hint">Cadangan berukuran berapa pun bisa dipulihkan. Berkas besar dikirim bertahap — jangan tutup halaman sampai selesai.</p>
         <div className="data-reset-zone">
           <label className="reset-books-check"><input type="checkbox" data-testid="reset-include-books" checked={resetBooks} onChange={e => setResetBooks(e.target.checked)}/> Ikut hapus koleksi buku</label>
-          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={requestCode}><Trash2 size={15}/> {busyData === "code" ? "Mengirim kode..." : codeTo ? "Kirim ulang kode" : "Reset data"}</button>
-          {codeTo && <CodeBox prefix="reset" to={codeTo} code={code} setCode={setCode} busy={busyData !== ""} label={busyData === "reset" ? "Mereset..." : "Konfirmasi reset"} onConfirm={reset} onCancel={() => { setCodeTo(""); setCode(""); }}/>}
+          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={reset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Reset data"}</button>
           <p className="account-hint reset-warn"><AlertTriangle size={13}/> Reset &amp; pulihkan akan mengganti data saat ini dan tidak dapat dibatalkan.</p>
         </div>
       </div>}
@@ -217,11 +198,3 @@ function fmtSize(n) {
   return `${Math.max(1, Math.round(n / 1024))} KB`;
 }
 
-function CodeBox({ prefix, to, code, setCode, busy, label, note, onConfirm, onCancel }) {
-  return <div className={`${prefix}-code-box`} data-testid={`${prefix}-code-box`} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 10 }}>
-    <p className="account-hint" data-testid={`${prefix}-code-sent-to`} style={{ width: "100%" }}>{note ? `${note}. ` : ""}Kode verifikasi 6 digit sudah dikirim ke <b>{to}</b>. Berlaku 10 menit.</p>
-    <input data-testid={`${prefix}-code-input`} inputMode="numeric" maxLength={6} placeholder="Kode verifikasi" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ""))} style={{ maxWidth: 180, letterSpacing: 4 }}/>
-    <button type="button" className="danger-btn" data-testid={`${prefix}-confirm-button`} disabled={busy || code.length !== 6} onClick={onConfirm}>{label}</button>
-    <button type="button" className="secondary" data-testid={`${prefix}-cancel-button`} disabled={busy} onClick={onCancel}>Batal</button>
-  </div>;
-}

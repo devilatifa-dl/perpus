@@ -10,7 +10,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os, re, uuid, bcrypt, jwt, io, csv, json, logging, secrets
 from openpyxl import load_workbook
-from media import init_storage, photo_upload_allowed, build_router as media_router
+from media import photo_upload_allowed, build_router as media_router
 from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx, fmt_long
 
 ROOT_DIR = Path(__file__).parent
@@ -281,10 +281,6 @@ async def ensure_indexes():
 async def startup():
     await seed()
     await db.users.create_index("email", unique=True)
-    try:
-        init_storage()
-    except Exception as e:
-        print(f"Storage init failed: {e}")
     await ensure_indexes()
 
 @api.get("/")
@@ -907,35 +903,6 @@ async def delete_member(member_id: str, user=Depends(current_user)):
     await db.reservations.update_many({"member_id": member_id, "status": "Menunggu"}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
     return {"ok": True}
 
-def _mask_email(e):
-    name, _, dom = e.partition("@")
-    return f"{name[:3]}{'*' * max(len(name) - 3, 1)}@{dom}"
-
-CODE_PURPOSES = {"reset": "reset data", "restore": "pemulihan data dari cadangan", "purge": "penghapusan laporan lama"}
-
-@api.post("/admin/reset-code")
-async def send_reset_code(purpose: str = "reset", user=Depends(current_user)):
-    if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mereset atau memulihkan data")
-    if purpose not in CODE_PURPOSES: raise HTTPException(400, "Jenis kode tidak dikenal")
-    action = CODE_PURPOSES[purpose]
-    from mailer import send_email
-    from html import escape
-    last = await db.reset_codes.find_one({"id": purpose}, {"_id": 0})
-    if last and last.get("sent_at", "") > (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat():
-        raise HTTPException(429, "Tunggu 1 menit sebelum meminta kode baru")
-    code = f"{secrets.randbelow(1000000):06d}"
-    to = os.environ["RESET_VERIFY_EMAIL"]
-    html = ('<table role="presentation" width="100%"><tr><td style="padding:24px;font-family:Arial,sans-serif;color:#1f1640">'
-            f'<p style="font-size:16px;margin:0 0 12px">Permintaan <b>{action}</b> perpustakaan oleh '
-            f'{escape(user["name"])}.</p><p style="margin:0 0 8px">Kode verifikasi Anda:</p>'
-            f'<p style="font-size:32px;letter-spacing:8px;font-weight:bold;color:#6d28d9;margin:0 0 12px">{code}</p>'
-            '<p style="margin:0 0 12px">Kode berlaku 10 menit dan hanya bisa dipakai sekali. Jika Anda tidak memintanya, abaikan email ini dan jangan bagikan kode kepada siapa pun.</p>'
-            f'<p style="font-size:12px;color:#888">Dikirim oleh {escape(os.environ["EMAIL_FROM_NAME"])}.</p></td></tr></table>')
-    await send_email(to=to, subject=f"Kode verifikasi {action} perpustakaan", html=html)
-    await db.reset_codes.update_one({"id": purpose}, {"$set": {"id": purpose, "code_hash": bcrypt.hashpw(code.encode(), bcrypt.gensalt()).decode(),
-        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(), "sent_at": datetime.now(timezone.utc).isoformat(), "attempts": 0}}, upsert=True)
-    return {"ok": True, "sent_to": _mask_email(to)}
-
 async def verify_reset_code(code: str, purpose: str = "reset"):
     rec = await db.reset_codes.find_one({"id": purpose}, {"_id": 0})
     if not rec or rec["expires_at"] < datetime.now(timezone.utc).isoformat():
@@ -951,7 +918,6 @@ async def verify_reset_code(code: str, purpose: str = "reset"):
 @api.post("/admin/reset-data")
 async def reset_data(data: ResetInput, user=Depends(current_user)):
     if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mereset data")
-    await verify_reset_code(data.code)
     members = (await db.members.delete_many({})).deleted_count
     await db.users.delete_many({"role": "siswa", "member_id": {"$exists": True}})
     transactions = (await db.transactions.delete_many({})).deleted_count

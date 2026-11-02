@@ -11,13 +11,10 @@ Jangan ubah kode, desain, atau fitur. Cukup lakukan langkah ini:
    - `cd /app/frontend && yarn install` (pakai yarn, bukan npm)
 3. Tambahkan ke `/app/backend/.env` (jangan hapus MONGO_URL, DB_NAME, CORS_ORIGINS):
    - `JWT_SECRET` = string acak panjang
-   - `EMERGENT_LLM_KEY` = Emergent LLM key (dari `emergent_integrations_manager`), dipakai untuk penyimpanan foto
-   - `EMERGENT_EMAIL_KEY` = kunci Emergent Managed Resend (dari integration_expert, playbook Resend)
-   - `EMAIL_FROM_NAME="Perpustakaan SMAN 1"`
-   - `RESET_VERIFY_EMAIL=latifadevii@gmail.com` (penerima kode verifikasi reset & pulihkan data)
    - `FRONTEND_URL` = nilai REACT_APP_BACKEND_URL dari `/app/frontend/.env`
 4. `sudo supervisorctl restart backend frontend`
-5. Cek: `POST /api/auth/login` dengan akun di `memory/test_credentials.md`.
+5. Foto anggota kini disimpan di MongoDB (koleksi `files`) dan Reset data tidak lagi memakai email: tidak ada kunci Emergent yang dibutuhkan.
+6. Cek: `POST /api/auth/login` dengan akun di `memory/test_credentials.md`.
 
 Saat database masih kosong, akun admin/petugas/siswa dan data contoh dibuat otomatis.
 

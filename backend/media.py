@@ -1,6 +1,5 @@
-import io, os, uuid, logging
+import io, uuid, logging
 from datetime import datetime, timezone
-import requests
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from PIL import Image, ImageOps
 import pillow_heif
@@ -8,41 +7,11 @@ import pillow_heif
 pillow_heif.register_heif_opener()
 logger = logging.getLogger("media")
 
-STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
-STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+# Foto disimpan langsung di MongoDB (koleksi "files"), tanpa layanan penyimpanan luar.
 APP_NAME = "perpus-smansa"
 MAX_SIDE = 1080
 TARGET_BYTES = 500 * 1024
 MAX_UPLOAD = 25 * 1024 * 1024
-_storage_key = None
-
-
-def init_storage(force: bool = False):
-    global _storage_key
-    if _storage_key and not force:
-        return _storage_key
-    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": os.environ["EMERGENT_LLM_KEY"]}, timeout=30)
-    resp.raise_for_status()
-    _storage_key = resp.json()["storage_key"]
-    return _storage_key
-
-
-def _request(method, path, retry=True, **kw):
-    resp = requests.request(method, f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": init_storage(), **kw.pop("headers", {})}, **kw)
-    if resp.status_code == 404 and retry and method == "PUT":
-        init_storage(force=True)
-        return _request(method, path, retry=False, **kw)
-    resp.raise_for_status()
-    return resp
-
-
-def put_object(path, data, content_type):
-    return _request("PUT", path, headers={"Content-Type": content_type}, data=data, timeout=120).json()
-
-
-def get_object(path):
-    resp = _request("GET", path, timeout=60)
-    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
 
 def compress_photo(raw: bytes):
@@ -103,19 +72,17 @@ def build_router(db, current_user):
         data, (w, h) = compress_photo(raw)
         path = f"{APP_NAME}/photos/{uuid.uuid4()}.jpg"
         try:
-            result = put_object(path, data, "image/jpeg")
+            await db.files.insert_one({"id": str(uuid.uuid4()), "storage_path": path, "data": data, "original_filename": file.filename, "original_size": len(raw), "content_type": "image/jpeg", "size": len(data), "width": w, "height": h, "uploaded_by": user["id"], "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat()})
         except Exception as e:
-            logger.error(f"Upload storage gagal: {e}")
-            raise HTTPException(502, "Penyimpanan foto sedang bermasalah. Coba lagi.")
-        await db.files.insert_one({"id": str(uuid.uuid4()), "storage_path": result["path"], "original_filename": file.filename, "original_size": len(raw), "content_type": "image/jpeg", "size": len(data), "width": w, "height": h, "uploaded_by": user["id"], "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat()})
-        return {"url": f"/api/files/{result['path']}", "size": len(data), "original_size": len(raw), "width": w, "height": h}
+            logger.error(f"Simpan foto gagal: {e}")
+            raise HTTPException(500, "Foto gagal disimpan. Coba lagi.")
+        return {"url": f"/api/files/{path}", "size": len(data), "original_size": len(raw), "width": w, "height": h}
 
     @r.get("/files/{path:path}")
     async def download(path: str, user=Depends(current_user)):
         record = await db.files.find_one({"storage_path": path, "is_deleted": False}, {"_id": 0})
-        if not record:
+        if not record or not record.get("data"):
             raise HTTPException(404, "Berkas tidak ditemukan")
-        data, _ = get_object(path)
-        return Response(content=data, media_type=record.get("content_type", "image/jpeg"), headers={"Cache-Control": "private, max-age=86400"})
+        return Response(content=bytes(record["data"]), media_type=record.get("content_type", "image/jpeg"), headers={"Cache-Control": "private, max-age=86400"})
 
     return r
