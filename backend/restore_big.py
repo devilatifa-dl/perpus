@@ -11,7 +11,7 @@ Potongan disimpan di MongoDB (aman bila server punya lebih dari satu instance), 
 (ijson) dan dimasukkan ke koleksi sementara. Data lama baru diganti setelah SELURUH isi cadangan berhasil dibaca,
 sehingga cadangan yang rusak tidak menghapus data yang ada.
 """
-import asyncio, io, logging, os, tempfile, uuid, zipfile
+import asyncio, io, logging, mmap, os, struct, tempfile, uuid, zipfile, zlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -54,20 +54,107 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _is_json_member(name):
+    return name == JSON_MEMBER or name.endswith("/" + JSON_MEMBER)
+
+
+class _LocalMemberReader(io.RawIOBase):
+    """Baca satu berkas di dalam ZIP langsung dari 'local file header'.
+    Dipakai bila ZIP terpotong (daftar isi di akhir berkas hilang) — data-cadangan.json selalu ditulis
+    paling awal sehingga biasanya masih utuh dan bisa diselamatkan."""
+
+    def __init__(self, fh, method, csize):
+        super().__init__()
+        self.fh, self.method = fh, method
+        self.left = csize if csize else None
+        self.d = zlib.decompressobj(-15) if method == 8 else None
+        self.buf, self.eof = b"", False
+
+    def readable(self):
+        return True
+
+    def readinto(self, b):
+        while not self.buf and not self.eof:
+            n = 1 << 20 if self.left is None else min(1 << 20, self.left)
+            raw = self.fh.read(n) if n > 0 else b""
+            if self.left is not None:
+                self.left -= len(raw)
+            if not raw:
+                if self.d:
+                    self.buf += self.d.flush()
+                self.eof = True
+                break
+            if self.d:
+                self.buf += self.d.decompress(raw)
+                if self.d.eof:
+                    self.eof = True
+            else:
+                self.buf += raw
+        n = min(len(b), len(self.buf))
+        b[:n] = self.buf[:n]
+        self.buf = self.buf[n:]
+        return n
+
+    def close(self):
+        try:
+            self.fh.close()
+        finally:
+            super().close()
+
+
+def _open_from_local_header(path):
+    """Cari data-cadangan.json lewat tanda 'PK\\x03\\x04' (tanpa daftar isi ZIP)."""
+    with open(path, "rb") as fh:
+        with mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+            pos = mm.find(b"PK\x03\x04")
+            while pos != -1 and pos + 30 <= len(mm):
+                (_sig, _ver, flag, method, _t, _d, _crc, csize, _usize, nlen, elen) = struct.unpack("<4sHHHHHIIIHH", mm[pos:pos + 30])
+                name = mm[pos + 30:pos + 30 + nlen].decode("utf-8", "replace")
+                if _is_json_member(name) and method in (0, 8):
+                    start = pos + 30 + nlen + elen
+                    if flag & 0x08 or csize == 0xFFFFFFFF:
+                        csize = 0  # ukuran tidak tercatat di header -> baca sampai aliran deflate selesai
+                    f = open(path, "rb")
+                    f.seek(start)
+                    return io.BufferedReader(_LocalMemberReader(f, method, csize), buffer_size=1024 * 1024)
+                pos = mm.find(b"PK\x03\x04", pos + 4)
+    return None
+
+
+def _zip_damaged(path):
+    """True bila berkas berupa ZIP tetapi daftar isinya rusak/terpotong."""
+    try:
+        with open(path, "rb") as fh:
+            if fh.read(2) != b"PK":
+                return False
+        zipfile.ZipFile(path).close()
+        return False
+    except zipfile.BadZipFile:
+        return True
+    except Exception:
+        return False
+
+
 def _open_json(path):
-    """Buka isi JSON dari berkas cadangan (.zip dari 'Unduh cadangan' atau .json lama). Lewati BOM UTF-8."""
+    """Buka isi JSON dari berkas cadangan (.zip dari 'Unduh cadangan' atau .json lama). Lewati BOM UTF-8.
+    ZIP yang terpotong (unduhan tidak selesai) tetap dicoba diselamatkan."""
     with open(path, "rb") as fh:
         is_zip = fh.read(2) == b"PK"
     if is_zip:
+        f = None
         try:
             z = zipfile.ZipFile(path)
+            member = next((n for n in z.namelist() if _is_json_member(n)), None)
+            if not member:
+                z.close()
+                raise RestoreError(f"ZIP cadangan tidak berisi {JSON_MEMBER}")
+            f = z.open(member)
+            f._zip_parent = z  # tutup ZIP bersama berkasnya
         except zipfile.BadZipFile:
-            raise RestoreError("Berkas ZIP cadangan rusak")
-        if JSON_MEMBER not in z.namelist():
-            z.close()
-            raise RestoreError(f"ZIP cadangan tidak berisi {JSON_MEMBER}")
-        f = z.open(JSON_MEMBER)
-        f._zip_parent = z  # tutup ZIP bersama berkasnya
+            f = _open_from_local_header(path)
+            if f is None:
+                raise RestoreError("Berkas ZIP cadangan rusak/terpotong dan data-cadangan.json tidak ditemukan. Unduh ulang cadangan lalu coba lagi.")
+            logger.warning("ZIP cadangan tidak utuh, memakai pemulihan dari local header: %s", path)
     else:
         f = open(path, "rb")
     buf = io.BufferedReader(f, buffer_size=1024 * 1024) if not hasattr(f, "peek") else f
@@ -118,7 +205,9 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
                     kinds[pending] = event
                     pending = None
         except ijson.JSONError:
-            raise RestoreError("Berkas cadangan tidak valid (bukan JSON atau terpotong)")
+            raise RestoreError("Isi data-cadangan.json tidak lengkap (berkas terpotong) atau bukan JSON. Unduh ulang cadangan lalu coba lagi.")
+        except (zlib.error, zipfile.BadZipFile, EOFError):
+            raise RestoreError("Berkas ZIP cadangan rusak/terpotong. Unduh ulang cadangan lalu coba lagi.")
         finally:
             _close(f)
         if not has_collections:
@@ -189,7 +278,7 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
                 await set_job(upload_id, progress=kw)
 
             restored = await process_file(path, progress)
-            await set_job(upload_id, status="done", restored=restored, finished_at=_now())
+            await set_job(upload_id, status="done", restored=restored, salvaged=_zip_damaged(path), finished_at=_now())
         except RestoreError as e:
             await set_job(upload_id, status="error", error=str(e))
         except Exception as e:  # jangan biarkan sesi menggantung tanpa kabar
@@ -254,7 +343,7 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
     async def status(upload_id: str, user=Depends(current_user)):
         admin_only(user)
         job = await own_upload(upload_id, user)
-        return {k: job.get(k) for k in ("id", "status", "progress", "restored", "error", "filename", "size")}
+        return {k: job.get(k) for k in ("id", "status", "progress", "restored", "error", "filename", "size", "salvaged")}
 
     # Unggahan sekali kirim (kompatibel dengan versi lama) — tanpa batas ukuran dari aplikasi.
     @r.post("/admin/restore")
@@ -272,7 +361,7 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
                 restored = await process_file(path)
             except RestoreError as e:
                 raise HTTPException(400, str(e))
-            return {"ok": True, "restored": restored}
+            return {"ok": True, "restored": restored, "salvaged": _zip_damaged(path)}
         finally:
             if os.path.exists(path):
                 os.remove(path)

@@ -2,8 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
+import "@/styles";
 import "@/theme";
-import App from "@/App";
+import App from "@/Root";
+import { registerServiceWorker } from "@/pwa";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,3 +24,5 @@ root.render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+registerServiceWorker();

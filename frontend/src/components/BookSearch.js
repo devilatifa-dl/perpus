@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { BookOpen, Search, X } from "lucide-react";
 
-const Thumb = ({ b }) => <div className="avatar book-thumb">{b.cover ? <img src={b.cover} alt=""/> : <BookOpen size={15}/>}</div>;
+const Thumb = ({ b }) => <div className="avatar book-thumb">{b.cover ? <img src={b.cover} alt="" loading="lazy" decoding="async"/> : <BookOpen size={15}/>}</div>;
 const info = (b) => `${b.id} · stok ${b.available}/${b.stock}${b.author ? ` · ${b.author}` : ""}`;
 
 export function BookSearch({ books, value, onChange, selectedBook, emptyText }) {

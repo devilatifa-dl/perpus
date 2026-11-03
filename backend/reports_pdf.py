@@ -14,7 +14,7 @@ BLUE = colors.HexColor("#0284c7")
 LIGHT = colors.HexColor("#f1f5f9")
 SCHOOL_NPSN = "69948538"  # ditampilkan di kop PDF
 
-TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung", "peringkat-pinjam": "Peringkat Rajin Peminjaman"}
+TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung", "peringkat-pinjam": "Peringkat Rajin Meminjam"}
 PERIODS = {"semua": "Semua waktu", "harian": "Harian", "bulanan": "Bulanan", "7hari": "7 hari terakhir", "30hari": "30 hari terakhir"}
 CHECKOUT_LABEL = {"scan": "Scan", "manual": "Petugas", "otomatis": "Otomatis"}
 

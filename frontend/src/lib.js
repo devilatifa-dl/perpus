@@ -1,10 +1,15 @@
 import axios from "axios";
+import { clearApiCache, emit } from "./pwa";
 
 export const API = `${process.env.REACT_APP_BACKEND_URL || ""}/api`;
 export const api = axios.create({ baseURL: API, withCredentials: true });
 const TOKEN_KEY = "perpus_token";
-export const saveToken = (t) => { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* abaikan */ } };
+// Setiap login/keluar, data API tersimpan (cache offline) dibersihkan agar tidak tercampur antar akun
+export const saveToken = (t) => { try { clearApiCache(); t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* abaikan */ } };
 api.interceptors.request.use((cfg) => { const t = localStorage.getItem(TOKEN_KEY); if (t) cfg.headers.Authorization = `Bearer ${t}`; return cfg; });
+// Tandai data yang dilayani dari cache offline oleh service worker
+api.interceptors.response.use((res) => { if (res?.headers?.["x-sw-cache"] === "hit") emit("perpus:cached-data", { cachedAt: res.headers["x-sw-cached-at"] }); return res; });
+export const isOffline = () => typeof navigator !== "undefined" && navigator.onLine === false;
 export const fmt = (value) => new Intl.NumberFormat("id-ID").format(value || 0);
 export const fmtDate = (d, opts = { day: "numeric", month: "short", year: "numeric" }) => d ? new Date(d).toLocaleDateString("id-ID", opts) : "-";
 

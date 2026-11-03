@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#7c3aed" />
+<title>Sedang offline · Ruang Baca SMANSA</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:"Plus Jakarta Sans",Inter,system-ui,sans-serif;background:#f7f7fb;color:#16132b;padding:24px}
+  .card{max-width:420px;width:100%;background:#fff;border:1px solid #e9e8f3;border-radius:22px;padding:36px 30px;text-align:center;box-shadow:0 30px 70px -30px rgba(46,16,101,.45)}
+  img{width:84px;height:84px;object-fit:contain}
+  p.k{color:#7c3aed;letter-spacing:.14em;font-weight:800;font-size:11px;margin:20px 0 6px}
+  h1{font-size:24px;margin:0 0 10px;letter-spacing:-.02em}
+  p{color:#6b6880;line-height:1.6;font-size:14px;margin:0}
+  button{margin-top:24px;border:0;background:#7c3aed;color:#fff;font-weight:700;padding:12px 20px;border-radius:10px;font-size:14px;cursor:pointer}
+  @media (prefers-color-scheme: dark){body{background:#0f0c1d;color:#f4f2ff}.card{background:#1a1630;border-color:#2c2748}p{color:#b7b2d3}}
+</style>
+</head>
+<body>
+  <main class="card" data-testid="offline-fallback-page">
+    <img src="/icons/icon-192.png" alt="Logo perpustakaan" />
+    <p class="k">SEDANG OFFLINE</p>
+    <h1>Halaman ini belum tersimpan</h1>
+    <p>Buka halaman ini sekali saat ada internet, berikutnya bisa dilihat walau offline. Login dan data terbaru tetap membutuhkan koneksi.</p>
+    <button onclick="location.reload()" data-testid="offline-retry-button">Coba lagi</button>
+  </main>
+</body>
+</html>

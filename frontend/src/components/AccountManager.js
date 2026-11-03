@@ -15,19 +15,58 @@ export function AccountManager({ user, close, notify }) {
     if (isAdmin) api.get("/users").then(r => setUsers(r.data)).catch(() => {});
   }, [isAdmin]);
 
+  const saveBlob = (blob, name) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1500);
+  };
+  const errMsg = async (err, fallback) => {
+    if (!err?.response && err?.message) return err.message;
+    try { return JSON.parse(await err.response.data.text()).detail || fallback; } catch (e) { return fallback; }
+  };
+
+  const fetchZip = async () => {
+    const res = await api.get("/admin/backup.zip", { responseType: "blob", timeout: 0 });
+    const expected = Number(res.headers?.["x-backup-bytes"] || 0);
+    // Pastikan berkas utuh sebelum disimpan (unduhan yang terputus membuat ZIP rusak saat dipulihkan)
+    if ((expected && res.data.size !== expected) || !(await isCompleteZip(res.data))) {
+      const e = new Error(`Unduhan cadangan terpotong (${fmtSize(res.data.size)}${expected ? ` dari ${fmtSize(expected)}` : ""})`);
+      e.truncated = true; throw e;
+    }
+    return res.data;
+  };
+  const fetchJson = async () => {
+    const res = await api.get("/admin/backup", { responseType: "blob", timeout: 0 });
+    const text = await res.data.text();
+    JSON.parse(text); // gagal bila terpotong
+    return new Blob([text], { type: "application/json" });
+  };
+
+  // Satu tombol: ZIP lengkap (data + laporan). Bila unduhan ZIP gagal/terpotong, coba sekali lagi,
+  // lalu otomatis simpan data cadangan (.json) yang tetap cukup untuk "Pulihkan data".
   const backup = async () => {
     setBusyData("backup");
+    const day = new Date().toISOString().slice(0, 10);
     try {
-      const res = await api.get("/admin/backup.zip", { responseType: "blob" });
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement("a");
-      a.href = url; a.download = `backup-perpustakaan-${new Date().toISOString().slice(0, 10)}.zip`;
-      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1500);
-      notify("Cadangan data + semua laporan berhasil diunduh");
+      let zip = null, lastErr = null;
+      for (let attempt = 0; attempt < 2 && !zip; attempt++) {
+        try { zip = await fetchZip(); } catch (err) {
+          lastErr = err;
+          if (err.response && err.response.status < 500) throw err; // mis. bukan admin
+        }
+      }
+      if (zip) {
+        saveBlob(zip, `backup-perpustakaan-${day}.zip`);
+        notify(`Cadangan data + semua laporan berhasil diunduh (${fmtSize(zip.size)}, berkas utuh)`);
+        return;
+      }
+      setBusyData("backup-json");
+      const json = await fetchJson();
+      saveBlob(json, `data-cadangan-${day}.json`);
+      notify(`${lastErr?.truncated ? "Unduhan ZIP terputus" : "ZIP gagal diunduh"}, jadi data cadangan disimpan sebagai berkas .json (${fmtSize(json.size)}). Berkas ini cukup untuk Pulihkan data.`);
     } catch (err) {
-      let msg = "Gagal mengunduh cadangan";
-      try { msg = JSON.parse(await err.response.data.text()).detail || msg; } catch (e) { /* bukan JSON */ }
-      notify(msg);
+      notify(err instanceof SyntaxError ? "Unduhan data terputus. Periksa koneksi lalu coba lagi." : await errMsg(err, "Gagal mengunduh cadangan"));
     } finally { setBusyData(""); }
   };
 
@@ -82,10 +121,11 @@ export function AccountManager({ user, close, notify }) {
         catch (err) { if (++fails > 30) throw err; continue; }
         if (job.status === "done") {
           const total = Object.values(job.restored || {}).reduce((a, b) => a + b, 0);
-          setRestoreProg({ pct: 100, text: `Selesai: ${total} entri dipulihkan`, done: true });
-          notify(`Data berhasil dipulihkan (${total} entri). Memuat ulang...`);
+          const note = job.salvaged ? " (ZIP tidak utuh, tetapi data berhasil diselamatkan)" : "";
+          setRestoreProg({ pct: 100, text: `Selesai: ${total} entri dipulihkan${note}`, done: true });
+          notify(`Data berhasil dipulihkan (${total} entri)${note}. Memuat ulang...`);
           window.removeEventListener("beforeunload", warn);
-          setTimeout(() => window.location.reload(), 1500);
+          setTimeout(() => window.location.reload(), job.salvaged ? 3500 : 1500);
           return;
         }
         if (job.status === "error") throw new Error(job.error || "Gagal memulihkan data");
@@ -169,9 +209,9 @@ export function AccountManager({ user, close, notify }) {
       {isAdmin && <div className="account-users" data-testid="data-maintenance">
         <div className="account-section-head"><Database size={16}/> <span>Data &amp; pemeliharaan</span></div>
         <p className="account-hint">Unduh cadangan seluruh data, pulihkan dari berkas cadangan, atau reset data perpustakaan.</p>
-        <p className="account-hint" data-testid="backup-contents-hint"><b>Unduh cadangan</b> menghasilkan satu berkas ZIP: data untuk pemulihan + semua laporan (Excel &amp; PDF) — transaksi, buku masuk, buku hilang, pengunjung, dan peringkat rajin berkunjung per bulan.</p>
+        <p className="account-hint" data-testid="backup-contents-hint"><b>Unduh cadangan</b> menghasilkan satu berkas ZIP: data untuk pemulihan + semua laporan (Excel &amp; PDF) — transaksi, buku masuk, buku hilang, pengunjung, peringkat rajin berkunjung, dan peringkat rajin meminjam per bulan. Keutuhan berkas diperiksa otomatis; bila koneksi terputus, data tetap disimpan sebagai berkas .json yang bisa dipulihkan.</p>
         <div className="data-actions">
-          <button type="button" className="secondary" data-testid="backup-data-button" disabled={busyData !== ""} onClick={backup}><Download size={15}/> {busyData === "backup" ? "Menyiapkan cadangan & laporan..." : "Unduh cadangan"}</button>
+          <button type="button" className="secondary" data-testid="backup-data-button" disabled={busyData !== ""} onClick={backup}><Download size={15}/> {busyData === "backup" ? "Menyiapkan cadangan & laporan..." : busyData === "backup-json" ? "Menyimpan data cadangan..." : "Unduh cadangan"}</button>
           <button type="button" className="secondary" data-testid="restore-data-button" disabled={busyData !== ""} onClick={() => restoreRef.current?.click()}><Upload size={15}/> {busyData === "restore" ? "Memulihkan..." : "Pulihkan data"}</button>
           <input ref={restoreRef} type="file" accept="application/json,.json,application/zip,.zip" hidden data-testid="restore-file-input" onChange={pickRestore}/>
         </div>
@@ -189,6 +229,16 @@ export function AccountManager({ user, close, notify }) {
       </div>}
     </div>
   </Modal>;
+}
+
+async function isCompleteZip(blob) {
+  // ZIP yang utuh selalu diakhiri tanda "end of central directory" (PK\x05\x06)
+  if (!blob || blob.size < 22) return false;
+  const tail = new Uint8Array(await blob.slice(Math.max(0, blob.size - 66000)).arrayBuffer());
+  for (let i = tail.length - 22; i >= 0; i--) {
+    if (tail[i] === 0x50 && tail[i + 1] === 0x4b && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) return true;
+  }
+  return false;
 }
 
 function fmtSize(n) {

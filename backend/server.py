@@ -3,12 +3,14 @@ load_dotenv(override=False)
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Response, UploadFile, File, Form
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-import os, re, uuid, bcrypt, jwt, io, csv, json, logging, secrets
+import os, re, uuid, bcrypt, jwt, io, csv, json, logging, secrets, zlib, base64, asyncio
+from collections import OrderedDict
 from openpyxl import load_workbook
 from media import photo_upload_allowed, build_router as media_router
 from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx, fmt_long
@@ -155,7 +157,66 @@ async def refresh_book(book_id):
     if not doc: return None
     state = compute_state(doc)
     await db.books.update_one({"id": book_id}, {"$set": state})
-    return {**doc, **state}
+    return slim_book({**doc, **state})
+
+# ---------- Sampul buku: dikirim terpisah sebagai gambar kecil (bukan teks base64 di daftar buku) ----------
+def _cover_version(length, tail):
+    return format(zlib.crc32(f"{length}:{tail}".encode()) & 0xFFFFFFFF, "08x")
+
+def cover_ref(book_id, version, size="thumb"):
+    return f"/api/books/{book_id}/cover?v={version}&s={size}"
+
+def is_cover_ref(value):
+    return isinstance(value, str) and value.startswith("/api/books/") and "/cover" in value
+
+def real_cover(value):
+    """Nilai sampul dari formulir: URL sampul kita sendiri berarti 'tidak berubah'."""
+    return "" if is_cover_ref(value) else (value or "")
+
+def slim_book(b):
+    b = dict(b)
+    c = b.get("cover") or ""
+    if isinstance(c, str) and c.startswith("data:"):
+        b["cover"] = cover_ref(b["id"], _cover_version(len(c), c[-48:]))
+    return b
+
+BOOK_LIST_STAGES = [
+    {"$addFields": {"_c": {"$ifNull": ["$cover", ""]}}},
+    {"$addFields": {"_c": {"$cond": [{"$eq": [{"$type": "$_c"}, "string"]}, "$_c", ""]}}},
+    {"$addFields": {"_dc": {"$eq": [{"$substrCP": ["$_c", 0, 5]}, "data:"]}, "_len": {"$strLenCP": "$_c"}}},
+    {"$addFields": {"_tail": {"$cond": ["$_dc", {"$substrCP": ["$_c", {"$max": [0, {"$subtract": ["$_len", 48]}]}, 48]}, ""]},
+                    "cover": {"$cond": ["$_dc", "", "$_c"]}}},
+    {"$project": {"_id": 0, "_c": 0}},
+]
+
+async def list_books_slim(match=None, limit=500):
+    rows = await db.books.aggregate([{"$match": match or {}}, {"$sort": {"created_at": -1}}, {"$limit": limit}, *BOOK_LIST_STAGES]).to_list(limit)
+    for b in rows:
+        b.pop("_id", None)
+        if b.pop("_dc", False):
+            b["cover"] = cover_ref(b["id"], _cover_version(b.get("_len", 0), b.get("_tail", "")))
+        b.pop("_len", None); b.pop("_tail", None)
+    return rows
+
+_cover_cache = OrderedDict()
+_COVER_CACHE_MAX = 400
+
+def _render_cover(data_url, size):
+    head, _, b64 = data_url.partition(",")
+    raw = base64.b64decode(b64)
+    mime = head[5:].split(";")[0] or "image/jpeg"
+    if size == "full":
+        return raw, mime
+    from PIL import Image
+    im = Image.open(io.BytesIO(raw))
+    im.thumbnail((300, 440))
+    if im.mode not in ("RGB", "L"):
+        bg = Image.new("RGB", im.size, (255, 255, 255))
+        bg.paste(im, mask=im.convert("RGBA").split()[-1])
+        im = bg
+    out = io.BytesIO()
+    im.convert("RGB").save(out, "JPEG", quality=74, optimize=True, progressive=True)
+    return out.getvalue(), "image/jpeg"
 
 async def find_same_book(title, author):
     key = (title.strip().lower(), author.strip().lower())
@@ -559,20 +620,45 @@ async def put_student_photo(data: StudentPhotoConfig, user=Depends(current_user)
 
 @api.get("/books")
 async def books(user=Depends(current_user)):
-    rows = await db.books.find({}, {"_id":0}).sort("created_at", -1).to_list(500)
+    rows = await list_books_slim()
     waiting = {r["_id"]: r["n"] for r in await db.reservations.aggregate([{"$match":{"status":"Menunggu"}},{"$group":{"_id":"$book_id","n":{"$sum":1}}}]).to_list(500)}
     for b in rows: b["waiting"] = waiting.get(b["id"], 0)
     return rows
 
+@api.get("/books/{book_id}/cover")
+async def book_cover(book_id: str, v: str = "", s: str = "thumb"):
+    """Gambar sampul (publik, tanpa data sensitif). URL memuat versi -> aman di-cache lama oleh browser/HP."""
+    size = "full" if s == "full" else "thumb"
+    key = (book_id, v, size)
+    hit = _cover_cache.get(key) if v else None
+    if not hit:
+        doc = await db.books.find_one({"id": book_id}, {"_id": 0, "cover": 1})
+        c = (doc or {}).get("cover") or ""
+        if not isinstance(c, str) or not c.startswith("data:"):
+            raise HTTPException(404, "Sampul tidak ditemukan")
+        try:
+            hit = await asyncio.to_thread(_render_cover, c, size)
+        except Exception:
+            raise HTTPException(404, "Sampul tidak dapat dibaca")
+        if v:
+            _cover_cache[key] = hit
+            while len(_cover_cache) > _COVER_CACHE_MAX: _cover_cache.popitem(last=False)
+    else:
+        _cover_cache.move_to_end(key)
+    body, mime = hit
+    cache = "public, max-age=31536000, immutable" if v else "public, max-age=300"
+    return Response(content=body, media_type=mime, headers={"Cache-Control": cache})
+
 @api.post("/books")
 async def add_book(data: BookInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah buku")
+    data.cover = real_cover(data.cover)
     same = await find_same_book(data.title, data.author)
     if same:
         await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.stock}, **({"$set": {"cover": data.cover}} if data.cover and not same.get("cover") else {})})
         return {**(await refresh_book(same["id"])), "merged": True, "added": data.stock}
     doc = data.model_dump(); doc.update({"id":"BK-"+str(uuid.uuid4())[:8].upper(),"created_at":now_iso(),"borrowed":0,"lost":0}); doc.update(compute_state(doc))
-    await db.books.insert_one(doc); return {**public(doc), "merged": False, "added": data.stock}
+    await db.books.insert_one(doc); return {**slim_book(public(doc)), "merged": False, "added": data.stock}
 
 @api.put("/books/{book_id}")
 async def update_book(book_id: str, data: BookUpdate, user=Depends(current_user)):
@@ -583,7 +669,8 @@ async def update_book(book_id: str, data: BookUpdate, user=Depends(current_user)
     title, author = data.title.strip(), data.author.strip()
     same = await find_same_book(title, author)
     if same and same["id"] != book_id: raise HTTPException(400, f"Judul & penulis ini sudah ada ({same['id']}). Gunakan Atur stok untuk menambah eksemplar.")
-    upd = {"title": title, "author": author, "category": data.category.strip() or "Umum", "shelf": data.shelf, "isbn": data.isbn.strip(), "cover": data.cover, "updated_at": now_iso()}
+    upd = {"title": title, "author": author, "category": data.category.strip() or "Umum", "shelf": data.shelf, "isbn": data.isbn.strip(), "updated_at": now_iso()}
+    if not is_cover_ref(data.cover): upd["cover"] = data.cover or ""  # URL sampul kita sendiri = sampul tidak diubah
     await db.books.update_one({"id": book_id}, {"$set": upd})
     if title != book["title"]:
         await db.transactions.update_many({"book_id": book_id}, {"$set": {"book_title": title}})
@@ -637,6 +724,7 @@ async def incoming_list(user=Depends(current_user)):
 async def add_incoming(data: IncomingInput, user=Depends(current_user)):
     staff_only(user)
     date = data.date or now_iso()[:10]
+    data.cover = real_cover(data.cover)
     same = await find_same_book(data.title, data.author)
     if same:
         await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.quantity}, **({"$set": {"cover": data.cover}} if data.cover and not same.get("cover") else {})})
@@ -903,18 +991,6 @@ async def delete_member(member_id: str, user=Depends(current_user)):
     await db.reservations.update_many({"member_id": member_id, "status": "Menunggu"}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
     return {"ok": True}
 
-async def verify_reset_code(code: str, purpose: str = "reset"):
-    rec = await db.reset_codes.find_one({"id": purpose}, {"_id": 0})
-    if not rec or rec["expires_at"] < datetime.now(timezone.utc).isoformat():
-        raise HTTPException(400, "Kode verifikasi tidak ada atau sudah kedaluwarsa. Minta kode baru.")
-    if rec.get("attempts", 0) >= 5:
-        await db.reset_codes.delete_one({"id": purpose})
-        raise HTTPException(400, "Terlalu banyak percobaan. Minta kode baru.")
-    if not code.strip() or not bcrypt.checkpw(code.strip().encode(), rec["code_hash"].encode()):
-        await db.reset_codes.update_one({"id": purpose}, {"$inc": {"attempts": 1}})
-        raise HTTPException(400, "Kode verifikasi salah")
-    await db.reset_codes.delete_one({"id": purpose})
-
 @api.post("/admin/reset-data")
 async def reset_data(data: ResetInput, user=Depends(current_user)):
     if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mereset data")
@@ -950,7 +1026,7 @@ BACKUP_REPORTS = [("transaksi", "01-Laporan-Transaksi"), ("masuk", "02-Laporan-B
 async def backup_zip(user=Depends(current_user)):
     """Cadangan lengkap: data (JSON, bisa dipulihkan) + semua laporan siap baca (Excel & PDF)."""
     if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mengunduh cadangan data")
-    import zipfile, asyncio
+    import zipfile
     payload = await backup_data(user)
     now = datetime.now(WIB); stamp = now.strftime("%Y-%m-%d")
     jobs, notes = [], []
@@ -963,6 +1039,12 @@ async def backup_zip(user=Depends(current_user)):
         if lb["total_visits"] == 0 and month != now.strftime("%Y-%m"):
             continue
         jobs.append((f"laporan/05-Peringkat-Rajin-Berkunjung/Peringkat-{month}", "peringkat", lb["label"], lb, settings, len(lb["students"])))
+    loan_months = (await loan_leaderboard(None, limit=1))["months"]
+    for month in loan_months:
+        lb, settings, _ = await export_rows("peringkat-pinjam", month)
+        if lb["total_loans"] == 0 and month != now.strftime("%Y-%m"):
+            continue
+        jobs.append((f"laporan/06-Peringkat-Rajin-Meminjam/Peringkat-{month}", "peringkat-pinjam", lb["label"], lb, settings, len(lb["students"])))
 
     def build():
         buf = io.BytesIO()
@@ -989,7 +1071,7 @@ async def backup_zip(user=Depends(current_user)):
         return buf.getvalue()
 
     data = await asyncio.to_thread(build)
-    return Response(content=data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="backup-perpustakaan-{stamp}.zip"'})
+    return Response(content=data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="backup-perpustakaan-{stamp}.zip"', "X-Backup-Bytes": str(len(data)), "Cache-Control": "no-store, no-transform"})
 
 # Pemulihan data dari cadangan: lihat restore_big.py (tanpa batas ukuran, unggah bertahap).
 
@@ -1183,16 +1265,29 @@ api.include_router(build_router(db, current_user, staff_only, now_iso))
 from summary import build_router as summary_router
 from loan_rank import build_router as loan_rank_router, loan_leaderboard
 from restore_big import build_router as restore_router
-api.include_router(restore_router(db, current_user, verify_reset_code, normalize_books, BACKUP_COLLECTIONS))
+api.include_router(restore_router(db, current_user, None, normalize_books, BACKUP_COLLECTIONS))  # tanpa kode email
 api.include_router(loan_rank_router(db, current_user))
 from purge import build_router as purge_router
-api.include_router(purge_router(db, current_user, verify_reset_code, visits_auto_close))
+api.include_router(purge_router(db, current_user, None, visits_auto_close))  # tanpa kode email
 api.include_router(media_router(db, current_user))
 api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
 app.include_router(api)
 _cors = [o.strip() for o in (os.environ.get("FRONTEND_URL", "") + "," + os.environ.get("CORS_ORIGINS", "")).split(",") if o.strip() and o.strip() != "*"]
 # Frontend di perpusmansa.vercel.app (proxy /api) atau preview Emergent; CORS hanya untuk asal tambahan
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_origin_regex=r"https://([a-z0-9-]+\.)*(emergentagent\.com|emergent\.host|vercel\.app)", allow_methods=["*"], allow_headers=["*"])
+
+class SelectiveGZip:
+    """Kompres respons JSON/teks (data jauh lebih kecil di HP). Berkas yang sudah terkompresi (ZIP, PDF, Excel, gambar) dilewati."""
+    SKIP = re.compile(r"(\.zip|\.pdf|\.xlsx|/cover$|/files/|/restore/)")
+    def __init__(self, app):
+        self.app = app
+        self.gz = GZipMiddleware(app, minimum_size=800, compresslevel=6)
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and not self.SKIP.search(scope.get("path", "")):
+            return await self.gz(scope, receive, send)
+        return await self.app(scope, receive, send)
+
+app.add_middleware(SelectiveGZip)
 
 @app.on_event("shutdown")
 async def shutdown(): client.close()

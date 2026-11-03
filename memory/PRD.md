@@ -197,3 +197,13 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - 1 Nov 2026: Hapus laporan (backend/purge.py, components/ReportPurge.js): admin + kode email (purpose "purge"); transaksi/kunjungan/masuk/hilang; mode terpilih (checkbox)/tahun/rentang; cadangan Excel otomatis; pinjaman aktif & pengunjung di dalam dilindungi; log di purge_logs.
 - 1 Nov 2026: Hapus 1-5 data tanpa kode email (NO_CODE_MAX=5, preview.needs_code); tombol "Unduh cadangan Excel saja" tanpa kode.
 - 1 Nov 2026: Kode email DIHAPUS untuk hapus laporan & pulihkan data (keputusan user: terlalu ribet). Modal hapus: tombol "Hapus N data" (window.confirm) + "Unduh Excel". Reset data masih pakai kode email.
+
+## 3 Nov 2026
+- PWA: service-worker.js (cache halaman, aset, data API GET network-first), manifest.json + ikon, banner offline/online, kartu pasang aplikasi, cache API dibersihkan saat login/keluar. Lolos uji iteration_21.
+- Teks "Rajin Peminjaman" diganti "Rajin meminjam" (tab laporan, tombol peringkat, judul PDF).
+- Sisa fungsi kode verifikasi email (verify_reset_code) dihapus; Reset/Pulihkan/Hapus laporan cukup konfirmasi di aplikasi.
+- Pulihkan data: ZIP terpotong (unduhan tidak selesai) kini diselamatkan lewat local header bila data-cadangan.json masih utuh; pesan error jelas bila JSON ikut terpotong; status mengembalikan salvaged. Unduh cadangan memeriksa keutuhan ZIP (X-Backup-Bytes + tanda EOCD); tombol baru "Unduh data saja (.json)".
+- Cadangan ZIP kini berisi laporan/06-Peringkat-Rajin-Meminjam per bulan (PDF + Excel). Lolos uji iteration_22.
+- Catatan: koleksi files (foto anggota) belum ikut cadangan.
+- Satu tombol "Unduh cadangan": ZIP lengkap dengan cek keutuhan, coba ulang 1x, lalu otomatis simpan data-cadangan.json bila ZIP gagal.
+- Lebih cepat di HP: /api/books 24,6 MB -> 35 KB (sampul base64 diganti URL /api/books/{id}/cover?v=&s=thumb|full, thumbnail JPEG ~25 KB, cache permanen via SW v2); GZip untuk JSON; halaman admin/siswa/grafik/kamera dimuat terpisah (Root.js, styles.js); font tidak menahan tampilan; layar pembuka di index.html; gambar loading=lazy. Lolos uji iteration_23.

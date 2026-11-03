@@ -1,0 +1,66 @@
+/* ===== PWA: status offline, kartu pasang aplikasi, pembaruan ===== */
+.pwa-layer{position:fixed;inset:0;pointer-events:none;z-index:9000}
+.pwa-top{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);pointer-events:auto;animation:pwa-drop .35s cubic-bezier(.2,.8,.2,1)}
+.pwa-pill{display:flex;align-items:center;gap:10px;padding:9px 10px 9px 15px;border-radius:999px;font-size:12.5px;line-height:1.35;box-shadow:0 18px 40px -18px rgba(46,16,101,.55);border:1px solid transparent;background:#fff;color:#16132b}
+.pwa-pill span{min-width:0}
+.pwa-pill b{font-weight:700}
+.pwa-pill.offline{background:#1f1640;color:#f5f3ff;border-color:#3b2a7a;padding-right:16px}
+.pwa-pill.offline svg{color:#fcd34d;flex-shrink:0}
+.pwa-pill.online{background:#ecfdf5;color:#065f46;border-color:#a7f3d0}
+.pwa-pill.cached{background:#fffbeb;color:#78350f;border-color:#fde68a}
+.pwa-pill button{border:0;background:rgba(255,255,255,.75);color:inherit;font-weight:700;font-size:12px;padding:6px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap}
+.pwa-pill.online button:not(.pwa-x){background:#059669;color:#fff}
+.pwa-pill.online button:not(.pwa-x):hover{background:#047857}
+.pwa-pill.cached button:not(.pwa-x){background:#d97706;color:#fff}
+.pwa-pill .pwa-x{background:transparent;padding:5px;opacity:.7}
+.pwa-pill .pwa-x:hover{opacity:1}
+
+.pwa-bottom{position:absolute;right:20px;bottom:20px;display:grid;gap:10px;width:min(380px,calc(100vw - 32px));pointer-events:none}
+.pwa-card{pointer-events:auto;display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line,#e9e8f3);border-radius:18px;padding:14px;box-shadow:0 30px 70px -30px rgba(46,16,101,.55);animation:pwa-rise .4s cubic-bezier(.2,.8,.2,1)}
+.pwa-card.install{flex-wrap:wrap}
+.pwa-card-logo{width:46px;height:46px;border-radius:12px;object-fit:contain;background:#f5f3ff;padding:3px;flex-shrink:0}
+.pwa-card-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#ede9fe;color:#7c3aed;flex-shrink:0}
+.pwa-card-text,.pwa-card>div:not(.pwa-card-actions){flex:1;min-width:0}
+.pwa-card b{display:block;font-size:13.5px;color:var(--ink,#16132b)}
+.pwa-card small{display:block;font-size:12px;color:var(--muted,#6b6880);margin-top:3px;line-height:1.45}
+.pwa-card small b{display:inline;font-size:12px}
+.pwa-card small svg{vertical-align:-2px}
+.pwa-card-actions{display:flex;gap:8px;width:100%;justify-content:flex-end}
+.pwa-btn{border:0;background:#7c3aed;color:#fff;font-weight:700;font-size:12.5px;padding:9px 14px;border-radius:10px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:background .2s,transform .2s;white-space:nowrap}
+.pwa-btn:hover{background:#6d28d9;transform:translateY(-1px)}
+.pwa-btn.ghost{background:#f5f3ff;color:#6d28d9}
+.pwa-btn.ghost:hover{background:#ede9fe}
+
+.pwa-inline-wrap{display:grid;justify-items:center;gap:8px;margin-top:14px}
+.pwa-inline-install{border:1px solid var(--v200,#ddd6fe);background:#fff;color:#6d28d9;font-weight:700;font-size:12.5px;padding:9px 15px;border-radius:999px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;transition:background .2s,border-color .2s}
+.pwa-inline-install:hover{background:#f5f3ff;border-color:#c4b5fd}
+.pwa-inline-hint{font-size:12px;color:var(--muted,#6b6880);text-align:center;max-width:300px}
+.pwa-inline-hint svg{vertical-align:-2px}
+
+@keyframes pwa-drop{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes pwa-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+@media (max-width:640px){
+  .pwa-top{top:10px}
+  .pwa-pill{font-size:12px;border-radius:16px;flex-wrap:wrap}
+  .pwa-bottom{right:12px;left:12px;bottom:12px;width:auto}
+}
+@media (prefers-reduced-motion:reduce){.pwa-top,.pwa-card{animation:none}}
+@media print{.pwa-layer{display:none!important}}
+
+html[data-theme="dark"] .pwa-card{background:#1a1630;border-color:#2c2748}
+html[data-theme="dark"] .pwa-card b{color:#f4f2ff}
+html[data-theme="dark"] .pwa-card small{color:#b7b2d3}
+html[data-theme="dark"] .pwa-card-logo,html[data-theme="dark"] .pwa-card-icon{background:#2a2350}
+html[data-theme="dark"] .pwa-btn.ghost{background:#2a2350;color:#c4b5fd}
+html[data-theme="dark"] .pwa-inline-install{background:#1a1630;border-color:#3b2a7a;color:#c4b5fd}
+html[data-theme="dark"] .pwa-pill.online{background:#052e24;color:#a7f3d0;border-color:#065f46}
+html[data-theme="dark"] .pwa-pill.cached{background:#3a2606;color:#fde68a;border-color:#78350f}
+html[data-theme="dark"] .pwa-pill button.pwa-x{color:inherit}
+
+/* ===== Pemuatan bertahap ===== */
+.boot-loader{display:grid;justify-items:center;gap:14px;font-weight:700;font-size:15px}
+.boot-loader img{width:64px;height:64px;animation:pwa-boot 1.4s ease-in-out infinite}
+@keyframes pwa-boot{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:1;transform:scale(1)}}
+.lazy-panel{min-height:220px;display:grid;place-items:center;color:var(--muted,#6b6880);font-size:13px}
+.cam-lazy{aspect-ratio:4/3;width:100%;display:grid;place-items:center;border-radius:14px;background:#1f1640;color:#ddd6fe;font-size:13px}

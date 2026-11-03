@@ -10,7 +10,7 @@ export function Login({ onLogin, portal }) {
   const student = portal === "siswa";
   const roles = student ? ["siswa"] : ["admin", "petugas"];
   const [email, setEmail] = useState(student ? ACCOUNTS.siswa[0] : ""); const [password, setPassword] = useState(student ? ACCOUNTS.siswa[1] : ""); const [error, setError] = useState("");
-  const submit = async (e) => { e.preventDefault(); try { const { data } = await api.post("/auth/login", { email, password, portal }); const { token, ...user } = data; saveToken(token); onLogin(user); } catch (err) { const d = err.response?.data?.detail; setError(typeof d === "string" ? d : err.response ? "Email atau kata sandi salah" : "Server tidak dapat dihubungi. Coba lagi."); } };
+  const submit = async (e) => { e.preventDefault(); try { const { data } = await api.post("/auth/login", { email, password, portal }); const { token, ...user } = data; saveToken(token); onLogin(user); } catch (err) { const d = err.response?.data?.detail; setError(typeof navigator !== "undefined" && navigator.onLine === false ? "Kamu sedang offline. Login membutuhkan koneksi internet." : typeof d === "string" ? d : err.response ? "Email atau kata sandi salah" : "Server tidak dapat dihubungi. Coba lagi."); } };
   const demo = (role) => { setEmail(ACCOUNTS[role][0]); setPassword(ACCOUNTS[role][1]); setError(""); };
   return <main className={student ? "login-shell student" : "login-shell"} data-testid={`login-page-${portal}`}>
     <ThemeToggle variant="floating" testId="login-theme-toggle"/>

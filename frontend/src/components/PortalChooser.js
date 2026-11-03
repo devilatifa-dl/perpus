@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ChevronRight, GraduationCap, ShieldCheck } from "lucide-react";
 import { LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 import { ThemeToggle } from "./ThemeToggle";
+import { InstallAppButton } from "./PwaStatus";
 
 export default function PortalChooser() {
   return <main className="chooser" data-testid="portal-chooser">
@@ -11,6 +12,7 @@ export default function PortalChooser() {
       <Link to="/admin" className="chooser-card" data-testid="chooser-admin-link"><span className="chooser-icon"><ShieldCheck size={26}/></span><p className="eyebrow">ADMIN & PETUGAS</p><h2>/admin</h2><p>Kelola koleksi, anggota, sirkulasi QR, dan laporan.</p><b>Masuk <ChevronRight size={15}/></b></Link>
       <Link to="/siswa" className="chooser-card student" data-testid="chooser-student-link"><span className="chooser-icon"><GraduationCap size={26}/></span><p className="eyebrow">SISWA</p><h2>/siswa</h2><p>Hanya melihat katalog buku dan susunan rak.</p><b>Masuk <ChevronRight size={15}/></b></Link>
     </div>
+    <InstallAppButton/>
     <p className="chooser-foot">Jln Raya Subik, Desa Pekurun Selatan</p>
   </main>;
 }
