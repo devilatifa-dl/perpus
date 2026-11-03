@@ -75,9 +75,9 @@ def table_rows(kind, rows):
         plain = [[r["member_name"], r.get("class_name") or "-", r["book_title"], fmt_date(r["borrowed_at"], True), fmt_date(r["returned_at"], True), r["status"]] for r in rows]
         borrowed = sum(1 for r in rows if r["status"] == "Dipinjam"); summary = f"Total peminjaman: {len(rows)} · Masih dipinjam: {borrowed} · Dikembalikan: {len(rows) - borrowed}"
     elif kind == "masuk":
-        header = ["No", "Judul Buku", "Penulis", "Jumlah", "Sumber", "Rak", "Tanggal", "Dicatat oleh"]
-        widths = [10 * mm, 70 * mm, 45 * mm, 18 * mm, 32 * mm, 16 * mm, 30 * mm, 36 * mm]
-        plain = [[r["title"], r.get("author", "-"), f"{r['quantity']} eks", r.get("source") or "-", r.get("shelf", "-"), fmt_date(r["date"]), r.get("recorded_by", "-")] for r in rows]
+        header = ["No", "Judul Buku", "Penulis", "Jumlah", "Sumber", "Tanggal"]
+        widths = [12 * mm, 90 * mm, 60 * mm, 22 * mm, 38 * mm, 35 * mm]
+        plain = [[r["title"], r.get("author") or "-", f"{r.get('quantity', 0)} eks", r.get("source") or "-", fmt_date(r["date"])] for r in rows]
         summary = f"Total penerimaan: {len(rows)} · Total eksemplar: {sum(r.get('quantity', 0) for r in rows)}"
     elif kind == "kunjungan":
         header = ["No", "Nama", "Kelas / Asal", "Keperluan", "Masuk", "Keluar"]
