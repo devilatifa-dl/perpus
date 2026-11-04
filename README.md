@@ -31,7 +31,7 @@ tampil tanpa pengaturan CORS, dan semua fitur berjalan sama persis seperti di pr
 
 | Platform | Cara proxy `/api` | Diatur lewat |
 |---|---|---|
-| Vercel | `middleware.js` di root repo | env **`BACKEND_URL`** di Vercel |
+| Vercel | rewrite `/api/*` di `vercel.json` (bawaan: `https://perpus-library-7.emergent.host`) + `middleware.js` | env **`BACKEND_URL`** di Vercel (opsional, menimpa bawaan) |
 | Render Static Site | rewrite `/api/*` di `render.yaml` | `routes` di `render.yaml` / Dashboard → Redirects/Rewrites |
 
 > Alternatif tanpa proxy (isi `REACT_APP_BACKEND_URL` = URL backend) tetap bisa untuk API,
