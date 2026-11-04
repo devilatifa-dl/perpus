@@ -242,3 +242,11 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Foto anggota/sampul/logo sudah di MongoDB (tidak bergantung Emergent). README.md = panduan deploy lengkap + Atlas. Lolos uji iteration_2.
 
 
+
+### 4 Nov 2026 — Pulihkan data asli ke preview
+- Data diambil (hanya baca) dari server lama library-devilatifa.emergent.host lewat `scripts/pull_from_old_server.py` (kredensial: OLD_SERVER_ADMIN_EMAIL / OLD_SERVER_ADMIN_PASSWORD di backend/.env), lalu dipulihkan lewat POST /api/admin/restore.
+- Hasil: 101 judul buku (425 eksemplar), 410 anggota, 100 transaksi, 105 pengunjung, 3 rak, pengaturan kartu. 3 foto anggota disalin ke koleksi `files` (`scripts/import_old_accounts_photos.py`).
+- Akun: admin & petugas disamakan dengan server lama (sandi admin = sandi server lama; sandi petugas tetap bawaan karena sandi tidak bisa dibaca dari server lama). Server lama tidak punya akun login per siswa.
+- 4 Nov 2026: Kartu anggota — baris "Kelas" disembunyikan hanya saat dicetak (CSS @media print di Card.css); tetap tampil di layar/pratinjau. Berlaku untuk cetak satu kartu, cetak massal, dan kartu di portal siswa.
+- 4 Nov 2026: Kartu anggota — nama sekolah & judul kartu (KARTU ANGGOTA PERPUSTAKAAN) rata tengah di layar, desain kartu, dan cetak (Card.css).
+- 4 Nov 2026: Desain kartu → grup "Teks & ukuran teks di kartu" (components/CardTextControls.js): edit nama sekolah, judul kartu, label di atas nama (card_owner_label), label Kelas/NIS (card_class_label, card_nis_label), alamat (card_address); ukuran per teks 50-200% (card_text_sizes: school,title,owner,name,fields,address,code,back_title,back_rules,back_web) via CSS var --k-* (Card.css, kelas fs-on). Backend SettingsInput menyimpan & membatasi nilai.

@@ -5,8 +5,8 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Respons
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Dict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 import os, re, uuid, bcrypt, jwt, io, csv, json, logging, secrets, zlib, base64, asyncio
@@ -125,6 +125,18 @@ class SettingsInput(BaseModel):
     card_back_title: str = Field("PERATURAN & TATA TERTIB PERPUSTAKAAN", max_length=120)
     card_back_rules: str = Field("Kartu ini wajib dibawa setiap meminjam dan mengembalikan buku.\nKembalikan buku tepat waktu sesuai tanggal yang ditentukan petugas.\nJaga buku tetap bersih; dilarang melipat, mencoret, atau merobek.\nBuku yang hilang atau rusak wajib diganti dengan judul yang sama.\nKartu tidak boleh dipinjamkan kepada orang lain.\nJika kartu ini ditemukan, mohon kembalikan ke Perpustakaan SMANSA.", max_length=2000)
     card_back_web: str = Field("perpustakaan.sman1abungtengah.sch.id", max_length=150)
+    # Teks yang bisa diubah di kartu & ukuran per teks (persen dari ukuran bawaan, 50-200)
+    card_owner_label: str = Field("PEMILIK KARTU", max_length=40)
+    card_class_label: str = Field("Kelas", max_length=20)
+    card_nis_label: str = Field("NIS", max_length=20)
+    card_address: str = Field("Jln Raya Subik, Desa Pekurun Selatan", max_length=120)
+    card_text_sizes: Dict[str, int] = Field(default_factory=dict)
+
+    @field_validator("card_text_sizes")
+    @classmethod
+    def _clamp_sizes(cls, v):
+        allowed = {"school", "title", "owner", "name", "fields", "address", "code", "back_title", "back_rules", "back_web"}
+        return {k: max(50, min(200, int(val))) for k, val in (v or {}).items() if k in allowed}
 
 DEFAULT_SETTINGS = SettingsInput().model_dump()
 

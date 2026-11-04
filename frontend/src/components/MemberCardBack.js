@@ -1,9 +1,9 @@
-import { DEFAULT_SETTINGS, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
+import { DEFAULT_SETTINGS, LIBRARY_LOGO, SCHOOL_LOGO, cardSizeVars } from "../lib";
 
 export function MemberCardBack({ settings, testId = "member-card-back" }) {
   const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   const rules = (s.card_back_rules || "").split("\n").map((r) => r.trim()).filter(Boolean);
-  return <div className={`id-card id-card-back theme-${s.card_theme} layout-${s.card_layout} font-${s.card_font} size-${s.card_font_size}`} data-testid={testId}>
+  return <div className={`id-card id-card-back fs-on theme-${s.card_theme} layout-${s.card_layout} font-${s.card_font} size-${s.card_font_size}`} data-testid={testId} style={cardSizeVars(s)}>
     <div className="back-head">
       <img src={s.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/>
       <b data-testid="card-back-title">{s.card_back_title}</b>
