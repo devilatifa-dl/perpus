@@ -207,3 +207,31 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Catatan: koleksi files (foto anggota) belum ikut cadangan.
 - Satu tombol "Unduh cadangan": ZIP lengkap dengan cek keutuhan, coba ulang 1x, lalu otomatis simpan data-cadangan.json bila ZIP gagal.
 - Lebih cepat di HP: /api/books 24,6 MB -> 35 KB (sampul base64 diganti URL /api/books/{id}/cover?v=&s=thumb|full, thumbnail JPEG ~25 KB, cache permanen via SW v2); GZip untuk JSON; halaman admin/siswa/grafik/kamera dimuat terpisah (Root.js, styles.js); font tidak menahan tampilan; layar pembuka di index.html; gambar loading=lazy. Lolos uji iteration_23.
+
+## 4 Nov 2026 — Pemulihan dari ZIP "perpus-main (2)" ke workspace baru
+- Source asli disalin apa adanya (backend, frontend src/public/plugins, package.json, yarn.lock, .yarnrc, docs, memory, plan, scripts, deployer-agent-docs). Tidak ada fitur/desain yang diubah.
+- pip install -r requirements.txt, yarn install. backend/.env ditambah JWT_SECRET (baru) + FRONTEND_URL (preview).
+- Tidak ada di ZIP: .env, isi database, .env.example (disebut di PROJECT_CONTEXT tapi tidak ada), mailer.py (disebut tapi tidak dipakai lagi). Foto kini di MongoDB (koleksi files) → tidak butuh EMERGENT_LLM_KEY; kode email sudah dihapus → tidak butuh EMERGENT_EMAIL_KEY. GITHUB_TOKEN belum ada (hanya untuk scripts/push_to_github.sh).
+- Folder root tests/, test_reports/ lama & backend_test*.py root tidak disalin (folder dikunci sistem uji workspace).
+- DB baru di-seed otomatis (akun + data contoh). Regresi iteration_1: backend 23/23, UI semua alur lulus.
+
+## 4 Nov 2026 — Siap hosting eksternal (Vercel / Render)
+- CORS dari env: FRONTEND_URL + CORS_ORIGINS ("*" = semua) + CORS_ORIGIN_REGEX; regex Emergent/Vercel yang ditanam dihapus.
+- backend/.env.example & frontend/.env.example terdokumentasi; backend/requirements.prod.txt (paket runtime saja, diuji di venv bersih).
+- Vercel: middleware.js (root) proxy /api/* → env BACKEND_URL; vercel.json tanpa URL backend, pakai yarn. Deployment perpusmansa.vercel.app WAJIB menambah env BACKEND_URL sebelum push berikutnya.
+- render.yaml: perpus-backend (python) + perpus-frontend (static, rewrite /api/* → https://perpus-backend.onrender.com, sesuaikan).
+- index.html: skrip Emergent (emergent-main.js, posthog) hanya dimuat di *.emergentagent.com / *.emergent.host.
+
+## 4 Nov 2026 — .env aman & QR kartu offline
+- .gitignore mengabaikan .env / .env.* (kecuali .env.example); scripts/push_to_github.sh tetap mengirim .env.example.
+- QR kartu anggota (MemberCard) dibuat di browser dengan qrcode.react (QRCodeSVG), tidak lagi memanggil api.qrserver.com. QR modal buku di Koleksi masih memakai api.qrserver.com.
+
+## 4 Nov 2026 — Notifikasi 3 detik & sandi admin untuk reset
+- PwaStatus: banner "Sedang offline" & "Server lambat" hilang sendiri setelah 3 detik (banner "Kembali online" tetap).
+- Reset data: modal konfirmasi (portal ke body) wajib isi sandi admin; backend /api/admin/reset-data menolak 400 bila sandi kosong/salah.
+- Menu "Akun & sandi" di HP kini menutup sidebar. Lolos uji iteration_3 (jalur sandi benar tidak dijalankan agar data tidak terhapus).
+
+
+- Foto anggota/sampul/logo sudah di MongoDB (tidak bergantung Emergent). README.md = panduan deploy lengkap + Atlas. Lolos uji iteration_2.
+
+

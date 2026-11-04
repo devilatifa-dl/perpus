@@ -76,6 +76,7 @@ class PhotoInput(BaseModel):
 class ResetInput(BaseModel):
     include_books: bool = False
     code: str = ""
+    password: str = ""
 
 class PasswordChangeInput(BaseModel):
     current_password: str
@@ -994,6 +995,8 @@ async def delete_member(member_id: str, user=Depends(current_user)):
 @api.post("/admin/reset-data")
 async def reset_data(data: ResetInput, user=Depends(current_user)):
     if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mereset data")
+    if not data.password or not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()):
+        raise HTTPException(400, "Sandi admin salah. Data tidak direset.")
     members = (await db.members.delete_many({})).deleted_count
     await db.users.delete_many({"role": "siswa", "member_id": {"$exists": True}})
     transactions = (await db.transactions.delete_many({})).deleted_count
@@ -1272,9 +1275,11 @@ api.include_router(purge_router(db, current_user, None, visits_auto_close))  # t
 api.include_router(media_router(db, current_user))
 api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
 app.include_router(api)
-_cors = [o.strip() for o in (os.environ.get("FRONTEND_URL", "") + "," + os.environ.get("CORS_ORIGINS", "")).split(",") if o.strip() and o.strip() != "*"]
-# Frontend di perpusmansa.vercel.app (proxy /api) atau preview Emergent; CORS hanya untuk asal tambahan
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_origin_regex=r"https://([a-z0-9-]+\.)*(emergentagent\.com|emergent\.host|vercel\.app)", allow_methods=["*"], allow_headers=["*"])
+# CORS sepenuhnya dari env: FRONTEND_URL + CORS_ORIGINS (dipisah koma, "*" = semua asal) + CORS_ORIGIN_REGEX (opsional)
+_cors_all = [o.strip().rstrip("/") for o in (os.environ.get("FRONTEND_URL", "") + "," + os.environ.get("CORS_ORIGINS", "")).split(",") if o.strip()]
+_cors = [o for o in _cors_all if o != "*"]
+_cors_regex = ".*" if "*" in _cors_all else (os.environ.get("CORS_ORIGIN_REGEX", "").strip() or None)
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_origin_regex=_cors_regex, allow_methods=["*"], allow_headers=["*"], expose_headers=["Content-Disposition", "X-Backup-Bytes"])
 
 class SelectiveGZip:
     """Kompres respons JSON/teks (data jauh lebih kecil di HP). Berkas yang sudah terkompresi (ZIP, PDF, Excel, gambar) dilewati."""

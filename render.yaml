@@ -1,23 +1,52 @@
-# Konfigurasi Render untuk backend (FastAPI). Dipakai lewat New + > Blueprint.
+# Blueprint Render: backend (FastAPI) + frontend (static site). Dipakai lewat New + > Blueprint.
+# Semua nilai rahasia diisi di dashboard (sync: false). Lihat README.md bagian "Deploy di Render".
 services:
   - type: web
     name: perpus-backend
     runtime: python
     plan: free
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.prod.txt
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/
     envVars:
       - key: PYTHON_VERSION
-        value: "3.12.7"
-      - key: MONGO_URL        # isi dari MongoDB Atlas (lihat PANDUAN_DEPLOY.md)
+        value: "3.11.9"
+      - key: MONGO_URL          # dari MongoDB Atlas
         sync: false
       - key: DB_NAME
         value: perpus
       - key: JWT_SECRET
         generateValue: true
-      - key: FRONTEND_URL
-        value: https://perpusmansa.vercel.app
-      - key: CORS_ORIGINS
-        value: https://perpusmansa.vercel.app
+      - key: FRONTEND_URL       # alamat frontend, mis. https://perpus-frontend.onrender.com
+        sync: false
+      - key: CORS_ORIGINS       # opsional, dipisah koma
+        sync: false
+
+  - type: web
+    name: perpus-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: yarn install --network-timeout 600000 && CI=false yarn build
+    staticPublishPath: build
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: REACT_APP_BACKEND_URL   # kosongkan: frontend memakai rewrite /api di bawah
+        value: ""
+    headers:
+      - path: /service-worker.js
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+      - path: /static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      # GANTI alamat ini dengan URL layanan perpus-backend Anda bila berbeda
+      # (bisa juga diubah di Dashboard > perpus-frontend > Redirects/Rewrites).
+      - type: rewrite
+        source: /api/*
+        destination: https://perpus-backend.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { KeyRound, ShieldCheck, Save, Database, Download, Upload, Trash2, AlertTriangle } from "lucide-react";
 import { api } from "../lib";
 import { Modal } from "./Shared";
@@ -142,18 +143,19 @@ export function AccountManager({ user, close, notify }) {
     }
   };
 
-  const reset = async () => {
-    const msg = resetBooks
-      ? "Reset SEMUA data termasuk koleksi buku? Tindakan ini tidak dapat dibatalkan."
-      : "Reset data (anggota, transaksi, pesanan, dll) kecuali koleksi buku? Tindakan ini tidak dapat dibatalkan.";
-    if (!window.confirm(msg)) return;
-    setBusyData("reset");
+  const [resetOpen, setResetOpen] = useState(false); const [resetPw, setResetPw] = useState(""); const [resetErr, setResetErr] = useState("");
+  const openReset = () => { setResetPw(""); setResetErr(""); setResetOpen(true); };
+  const reset = async (e) => {
+    e.preventDefault();
+    if (!resetPw) { setResetErr("Masukkan sandi admin"); return; }
+    setBusyData("reset"); setResetErr("");
     try {
-      await api.post("/admin/reset-data", { include_books: resetBooks });
+      await api.post("/admin/reset-data", { include_books: resetBooks, password: resetPw });
+      setResetOpen(false);
       notify("Data berhasil direset. Memuat ulang...");
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
-      notify(err.response?.data?.detail || "Gagal mereset data");
+      setResetErr(err.response?.data?.detail || "Gagal mereset data");
     } finally { setBusyData(""); }
   };
 
@@ -223,11 +225,20 @@ export function AccountManager({ user, close, notify }) {
         <p className="account-hint" data-testid="restore-size-hint">Cadangan berukuran berapa pun bisa dipulihkan. Berkas besar dikirim bertahap — jangan tutup halaman sampai selesai.</p>
         <div className="data-reset-zone">
           <label className="reset-books-check"><input type="checkbox" data-testid="reset-include-books" checked={resetBooks} onChange={e => setResetBooks(e.target.checked)}/> Ikut hapus koleksi buku</label>
-          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={reset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Reset data"}</button>
+          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={openReset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Reset data"}</button>
           <p className="account-hint reset-warn"><AlertTriangle size={13}/> Reset &amp; pulihkan akan mengganti data saat ini dan tidak dapat dibatalkan.</p>
         </div>
       </div>}
     </div>
+    {resetOpen && createPortal(<Modal title="Konfirmasi reset data" close={() => busyData !== "reset" && setResetOpen(false)}>
+      <form className="modal-form" onSubmit={reset} data-testid="reset-confirm-form">
+        <div className="error" data-testid="reset-confirm-warning"><AlertTriangle size={14}/> {resetBooks ? "SEMUA data termasuk koleksi buku" : "Anggota, transaksi, pesanan, pengunjung, dll (kecuali koleksi buku)"} akan dihapus permanen dan tidak dapat dibatalkan.</div>
+        <label>Sandi admin<input type="password" autoFocus autoComplete="current-password" data-testid="reset-admin-password-input" value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="Masukkan sandi akun admin Anda"/></label>
+        {resetErr && <div className="error" data-testid="reset-confirm-error">{resetErr}</div>}
+        <button type="submit" className="danger-btn full" data-testid="reset-confirm-submit" disabled={busyData === "reset"}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Ya, reset data"}</button>
+        <button type="button" className="secondary full" data-testid="reset-confirm-cancel" disabled={busyData === "reset"} onClick={() => setResetOpen(false)}>Batal</button>
+      </form>
+    </Modal>, document.body)}
   </Modal>;
 }
 

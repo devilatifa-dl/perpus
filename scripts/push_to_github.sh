@@ -49,9 +49,10 @@ else
 fi
 
 rsync -a --delete \
-  --exclude='.git/' --exclude='.emergent/' --exclude='.env' --exclude='.env.*' --exclude='*.env' \
+  --exclude='.git/' --exclude='.emergent/' --include='.env.example' --exclude='.env' --exclude='.env.*' --exclude='*.env' \
   --exclude='node_modules/' --exclude='build/' --exclude='__pycache__/' --exclude='.pytest_cache/' \
   --exclude='/yarn.lock' --exclude='*.log' \
+  --exclude='/tests/' --exclude='/test_reports/' --exclude='/backend_test*.py' --exclude='/test_result.md' --exclude='/memory/test_credentials.md' --exclude='/.gitconfig' --exclude='/.screenshots/' \
   "$SRC/" "$WORK/"
 
 git add -A
@@ -60,7 +61,7 @@ if git diff --cached --quiet; then echo "Tidak ada perubahan dibanding GitHub ($
 # Cegah kebocoran kunci rahasia.
 SECRETS=("$GITHUB_TOKEN")
 for k in EMERGENT_LLM_KEY EMERGENT_EMAIL_KEY JWT_SECRET; do
-  v="$(grep -E "^$k=" "$SRC/backend/.env" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')"
+  v="$(grep -E "^$k=" "$SRC/backend/.env" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' || true)"
   [ -n "$v" ] && SECRETS+=("$v")
 done
 for s in "${SECRETS[@]}"; do

@@ -1,10 +1,10 @@
+import { QRCodeSVG } from "qrcode.react";
 import { DEFAULT_SETTINGS, LIBRARY_LOGO, SCHOOL_LOGO } from "../lib";
 
 export function MemberCard({ member, settings }) {
   if (!member) return null;
   const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(member.id)}&margin=0&color=0f2745&bgcolor=ffffff`;
-  const qr = s.card_show_qr && <div className="id-qr-wrap"><img className="id-qr" src={qrSrc} alt={`QR ${member.id}`}/></div>;
+  const qr = s.card_show_qr && <div className="id-qr-wrap"><QRCodeSVG className="id-qr" value={member.id} size={140} level="M" marginSize={0} fgColor="#0f2745" bgColor="#ffffff" title={`QR ${member.id}`} data-testid="member-card-qr"/></div>;
   const cls = `id-card theme-${s.card_theme} layout-${s.card_layout} font-${s.card_font} size-${s.card_font_size} photo-${s.card_photo_pos} qr-${s.card_qr_pos}`;
   return <div className={cls} id="print-card" data-testid="digital-member-card">
     <div className="id-card-top">

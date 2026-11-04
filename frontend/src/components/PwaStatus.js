@@ -57,17 +57,26 @@ export default function PwaStatus() {
     return () => clearTimeout(t);
   }, [installable, installed, ios]);
 
+  // Pemberitahuan offline / server lambat hilang sendiri setelah 3 detik
+  const [noticeVisible, setNoticeVisible] = useState(true);
+  useEffect(() => {
+    if (online && !cachedAt) return undefined;
+    setNoticeVisible(true);
+    const t = setTimeout(() => setNoticeVisible(false), 3000);
+    return () => clearTimeout(t);
+  }, [online, cachedAt]);
+
   const dismissInstall = () => { try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* */ } setShowInstall(false); };
   const doInstall = async () => { const r = await install(); if (r !== "unavailable") setShowInstall(false); };
   const refresh = () => window.location.reload();
 
   let status = null;
   if (!online) {
-    status = <div className="pwa-pill offline" role="status" data-testid="pwa-offline-banner"><CloudOff size={15}/><span><b>Sedang offline</b> · menampilkan konten tersimpan{cachedAt ? ` (diperbarui ${fmtTime(cachedAt)})` : ""}</span></div>;
+    status = noticeVisible && <div className="pwa-pill offline" role="status" data-testid="pwa-offline-banner"><CloudOff size={15}/><span><b>Sedang offline</b> · menampilkan konten tersimpan{cachedAt ? ` (diperbarui ${fmtTime(cachedAt)})` : ""}</span></div>;
   } else if (backOnline) {
     status = <div className="pwa-pill online" role="status" data-testid="pwa-back-online-banner"><Wifi size={15}/><span><b>Kembali online</b></span><button type="button" data-testid="pwa-refresh-button" onClick={refresh}><RefreshCw size={13}/> Muat data terbaru</button><button type="button" className="pwa-x" aria-label="Tutup" data-testid="pwa-back-online-close" onClick={() => { setBackOnline(false); setCachedAt(""); }}><X size={14}/></button></div>;
   } else if (cachedAt) {
-    status = <div className="pwa-pill cached" role="status" data-testid="pwa-cached-banner"><CloudOff size={15}/><span>Server lambat · menampilkan data tersimpan ({fmtTime(cachedAt)})</span><button type="button" data-testid="pwa-cached-refresh-button" onClick={refresh}><RefreshCw size={13}/> Coba lagi</button><button type="button" className="pwa-x" aria-label="Tutup" onClick={() => setCachedAt("")}><X size={14}/></button></div>;
+    status = noticeVisible && <div className="pwa-pill cached" role="status" data-testid="pwa-cached-banner"><CloudOff size={15}/><span>Server lambat · menampilkan data tersimpan ({fmtTime(cachedAt)})</span><button type="button" data-testid="pwa-cached-refresh-button" onClick={refresh}><RefreshCw size={13}/> Coba lagi</button><button type="button" className="pwa-x" aria-label="Tutup" onClick={() => setCachedAt("")}><X size={14}/></button></div>;
   }
 
   return <div className="pwa-layer" data-testid="pwa-status-layer">

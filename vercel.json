@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "installCommand": "npm install --prefix frontend --force",
-  "buildCommand": "CI=false npm run build --prefix frontend",
+  "installCommand": "cd frontend && yarn install --network-timeout 600000",
+  "buildCommand": "cd frontend && CI=false yarn build",
   "outputDirectory": "frontend/build",
   "framework": null,
   "headers": [
@@ -10,7 +10,6 @@
     { "source": "/static/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
   ],
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://library-devilatifa.emergent.host/api/:path*" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
