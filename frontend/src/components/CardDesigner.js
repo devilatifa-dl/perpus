@@ -4,6 +4,7 @@ import { CARD_LAYOUTS, CARD_FONTS, CARD_FONT_SIZES, CARD_POS, CARD_PRESETS, DEFA
 import { Modal, PhotoBox } from "./Shared";
 import { MemberCard } from "./MemberCard";
 import { MemberCardBack } from "./MemberCardBack";
+import { CardTextControls } from "./CardTextControls";
 
 export function CardDesigner({ settings, member, onSave, close }) {
   const [draft, setDraft] = useState({ ...DEFAULT_SETTINGS, ...(settings || {}) });
@@ -23,6 +24,7 @@ export function CardDesigner({ settings, member, onSave, close }) {
           <label>Teks web<input data-testid="card-back-web-input" maxLength={150} placeholder="mis. perpustakaan.sekolah.sch.id" value={draft.card_back_web} onFocus={() => setSide("belakang")} onChange={(e) => set({ card_back_web: e.target.value })}/></label>
           <small className="muted">Kosongkan teks web jika tidak ingin ditampilkan.</small>
         </div>
+        <CardTextControls draft={draft} set={set} side={side} setSide={setSide}/>
         <div className="control-group"><span className="control-label">Template siap pakai</span>
           <div className="pill-options">{CARD_PRESETS.map(([id, label, preset]) => <button key={id} type="button" data-testid={`preset-${id}-button`} className="pill-option preset-pill" onClick={() => set(preset)}>{label}</button>)}</div>
           <small className="muted">Pilih template untuk mengatur tema, font, dan posisi sekaligus, lalu sesuaikan bila perlu dan tekan Simpan.</small>
@@ -48,8 +50,6 @@ export function CardDesigner({ settings, member, onSave, close }) {
         <div className="control-group"><span className="control-label">Posisi QR Code</span>
           <div className="pill-options">{CARD_POS.qr.map(([id, label]) => <button key={id} type="button" data-testid={`qrpos-${id}-button`} className={draft.card_qr_pos === id ? "pill-option active" : "pill-option"} onClick={() => set({ card_qr_pos: id })}>{label}</button>)}</div>
         </div>
-        <label>Nama sekolah<input data-testid="card-school-name-input" value={draft.card_school_name} onChange={(e) => set({ card_school_name: e.target.value })}/></label>
-        <label>Judul kartu<input data-testid="card-title-input" value={draft.card_title} onChange={(e) => set({ card_title: e.target.value.toUpperCase() })}/></label>
         <div className="toggles">
           <label className="toggle"><input type="checkbox" data-testid="card-show-qr-toggle" checked={draft.card_show_qr} onChange={(e) => set({ card_show_qr: e.target.checked })}/> Tampilkan QR Code</label>
           <label className="toggle"><input type="checkbox" data-testid="card-show-address-toggle" checked={draft.card_show_address} onChange={(e) => set({ card_show_address: e.target.checked })}/> Tampilkan alamat sekolah</label>
