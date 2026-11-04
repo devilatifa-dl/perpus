@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ShowMore } from "../lib/showMore";
 import { CameraOff, CheckCircle2, ChevronDown, Search, Users } from "lucide-react";
 
 const NO_CLASS = "(Tanpa kelas)";
@@ -51,7 +52,7 @@ export function MemberClassList({ members, renderRow }) {
           <ChevronDown size={17} className="class-chevron"/>
         </button>
 </div>
-        {isOpen && <div className="class-body">{list.map(renderRow)}</div>}
+        {isOpen && <div className="class-body"><ShowMore items={list} step={40}>{(vis) => vis.map(renderRow)}</ShowMore></div>}
       </div>;
     })}
   </div>;

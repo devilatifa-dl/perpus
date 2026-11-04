@@ -1,4 +1,4 @@
-import io, uuid, logging
+import io, uuid, logging, base64
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from PIL import Image, ImageOps
@@ -14,7 +14,7 @@ TARGET_BYTES = 500 * 1024
 MAX_UPLOAD = 25 * 1024 * 1024
 
 
-def compress_photo(raw: bytes):
+def compress_photo(raw: bytes, max_side: int = MAX_SIDE, target: int = TARGET_BYTES):
     try:
         img = Image.open(io.BytesIO(raw))
         img.load()
@@ -28,15 +28,35 @@ def compress_photo(raw: bytes):
         img = bg
     elif img.mode != "RGB":
         img = img.convert("RGB")
-    img.thumbnail((MAX_SIDE, MAX_SIDE), Image.LANCZOS)
+    img.thumbnail((max_side, max_side), Image.LANCZOS)
     out = b""
     for q in (90, 85, 80, 74, 68, 60):
         buf = io.BytesIO()
         img.save(buf, "JPEG", quality=q, optimize=True, progressive=True)
         out = buf.getvalue()
-        if len(out) <= TARGET_BYTES:
+        if len(out) <= target:
             break
     return out, img.size
+
+
+COVER_SIDE = 1000
+COVER_TARGET = 400 * 1024
+
+
+def shrink_data_url(value: str, max_side: int = COVER_SIDE, target: int = COVER_TARGET) -> str:
+    """Sampul base64 dikompres di server bila masih besar (jaga-jaga bila browser tidak mengecilkannya)."""
+    if not isinstance(value, str) or not value.startswith("data:image") or ";base64," not in value:
+        return value
+    try:
+        raw = base64.b64decode(value.split(",", 1)[1])
+        with Image.open(io.BytesIO(raw)) as probe:
+            w, h = probe.size
+        if len(raw) <= target and max(w, h) <= max_side:
+            return value
+        data, _ = compress_photo(raw, max_side, target)
+    except Exception:
+        return value
+    return "data:image/jpeg;base64," + base64.b64encode(data).decode()
 
 
 async def photo_upload_allowed(db):

@@ -231,6 +231,13 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Reset data: modal konfirmasi (portal ke body) wajib isi sandi admin; backend /api/admin/reset-data menolak 400 bila sandi kosong/salah.
 - Menu "Akun & sandi" di HP kini menutup sidebar. Lolos uji iteration_3 (jalur sandi benar tidak dijalankan agar data tidak terhapus).
 
+## 4 Nov 2026 — Optimasi performa
+- Daftar bertahap (lib/showMore.js, ShowMore): Koleksi buku & Laporan & Pengunjung 50 baris, katalog siswa 48, anggota per kelas 40; sisanya dimuat otomatis saat digulir / tombol "Muat lebih banyak". Saat cetak (beforeprint) semua baris tampil. Data tetap diambil sekaligus dari API (payload ringan); belum ada pagination server.
+- Sampul buku dikompres juga di server (media.shrink_data_url: maks 1000px, ≤400KB JPEG) pada tambah/edit buku & buku masuk. Foto anggota sudah dikompres server (1080px, ≤500KB) + browser.
+- Indeks Mongo diperluas (books title/author/created_at/shelf/category/status, members name/class_name, transactions date/action/compound, reservations, incoming, missing, files.storage_path, restore_chunks, users, login_attempts).
+- Service worker: saat install menyimpan semua bundle ber-hash dari asset-manifest.json (halaman lazy ikut tersimpan). Lolos uji iteration_4.
+
+
 
 - Foto anggota/sampul/logo sudah di MongoDB (tidak bergantung Emergent). README.md = panduan deploy lengkap + Atlas. Lolos uji iteration_2.
 

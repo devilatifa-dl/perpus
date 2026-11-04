@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Camera, CameraOff, CheckCircle2, Clock, DoorClosed, DoorOpen, LogIn, LogOut, Maximize2, Pencil, ScanLine, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import { api } from "../lib";
+import { ShowMore } from "../lib/showMore";
 import { Modal } from "./Shared";
 import { beep, cameraError, createCamera, unlockAudio } from "../lib/camera";
 
@@ -213,7 +214,7 @@ export function Visitors({ notify }) {
         </div>
       </div>
       <div className="table-wrap"><table><thead><tr><th>PENGUNJUNG</th><th>KELAS / ASAL</th><th>KEPERLUAN</th><th>MASUK</th><th>KELUAR</th><th>DURASI</th><th>STATUS</th><th></th></tr></thead><tbody>
-        {rows.map((v) => <tr key={v.id} data-testid={`visit-row-${v.id}`}>
+        <ShowMore items={rows} colSpan={8}>{(vis) => vis.map((v) => <tr key={v.id} data-testid={`visit-row-${v.id}`}>
           <td><div className="book-cell"><div className={`avatar ${v.kind === "tamu" ? "guest" : ""}`}>{v.photo ? <img src={v.photo} alt={v.name}/> : v.name[0]}</div><div><b>{v.name}</b><span>{v.kind === "tamu" ? "Tamu" : `Anggota · ${v.student_id || v.member_id}`}</span></div></div></td>
           <td>{v.kind === "tamu" ? (v.origin || "-") : v.class_name}</td>
           <td><select className="visit-purpose-select" aria-label={`Keperluan ${v.name}`} data-testid={`visit-purpose-select-${v.id}`} value={v.purpose || ""} onChange={(e) => { const val = e.target.value; if (val === "__other") setPurposeEdit({ visit: v, text: GUEST_PURPOSES.includes(v.purpose) ? "" : (v.purpose || "") }); else changePurpose(v, val); }}><option value="">— Belum diisi —</option>{[...new Set([...GUEST_PURPOSES, ...(v.purpose ? [v.purpose] : [])])].map((p) => <option key={p} value={p}>{p}</option>)}<option value="__other">Tulis sendiri...</option></select></td>
@@ -222,7 +223,7 @@ export function Visitors({ notify }) {
           <td>{fmtDur(v.duration_min)}</td>
           <td>{v.check_out ? <span className={`status ${v.checkout_type === "otomatis" ? "dipinjam" : "keluar"}`}>{OUT_LABEL[v.checkout_type] || "Keluar"}</span> : <span className="status tersedia" data-testid={`visit-inside-${v.id}`}>Di dalam</span>}</td>
           <td><div className="row-actions">{!v.check_out && <button className="ok-icon" title="Catat keluar" data-testid={`visit-checkout-${v.id}`} onClick={() => checkout(v)}><LogOut size={15}/></button>}<button className="danger-icon" title="Hapus" data-testid={`visit-delete-${v.id}`} onClick={() => remove(v)}><Trash2 size={15}/></button></div></td>
-        </tr>)}
+        </tr>)}</ShowMore>
         {rows.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center", padding: 30, color: "#94a3b8" }} data-testid="visit-empty">{term ? `Tidak ada pengunjung bernama "${q.trim()}"` : "Belum ada pengunjung pada tanggal ini"}</td></tr>}
       </tbody></table></div>
     </div>

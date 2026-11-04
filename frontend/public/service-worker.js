@@ -49,8 +49,20 @@ self.addEventListener("install", (event) => {
         if (url === "/" && res.ok) await precacheShellAssets(await res.text());
       } catch (e) { /* abaikan, akan dicoba lagi saat runtime */ }
     }));
+    await precacheBuildChunks();
   })());
 });
+
+// Build produksi: simpan semua bundle ber-hash (termasuk halaman yang dimuat terpisah) agar kunjungan berikutnya instan
+async function precacheBuildChunks() {
+  try {
+    const res = await fetch("/asset-manifest.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const files = Object.values((await res.json()).files || {}).filter((f) => typeof f === "string" && HASHED.test(f) && !f.endsWith(".map"));
+    const cache = await caches.open(STATIC_CACHE);
+    await Promise.all(files.map(async (f) => { try { if (!(await cache.match(f))) { const r = await fetch(f); if (r.ok) await cache.put(f, r); } } catch (e) { /* */ } }));
+  } catch (e) { /* dev server: tidak ada manifest */ }
+}
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {

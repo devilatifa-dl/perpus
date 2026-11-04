@@ -12,7 +12,7 @@ from pathlib import Path
 import os, re, uuid, bcrypt, jwt, io, csv, json, logging, secrets, zlib, base64, asyncio
 from collections import OrderedDict
 from openpyxl import load_workbook
-from media import photo_upload_allowed, build_router as media_router
+from media import photo_upload_allowed, shrink_data_url, build_router as media_router
 from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx, fmt_long
 
 ROOT_DIR = Path(__file__).parent
@@ -332,12 +332,26 @@ async def seed():
         await db.meta.update_one({"id": "admin-title-v1"}, {"$set": {"id": "admin-title-v1", "done": True}}, upsert=True)
 
 async def ensure_indexes():
-    try:
-        await db.visits.create_index("check_in"); await db.visits.create_index("date"); await db.visits.create_index("member_id")
-        await db.members.create_index("id"); await db.members.create_index("student_id")
-        await db.books.create_index("id"); await db.transactions.create_index("member_id"); await db.transactions.create_index("book_id")
-    except Exception as e:  # indeks hanya untuk kecepatan, jangan gagalkan start
-        logging.getLogger(__name__).warning("Gagal membuat indeks: %s", e)
+    specs = {
+        "visits": ["check_in", "date", "member_id", [("date", -1), ("member_id", 1)]],
+        "members": ["id", "student_id", "name", "class_name"],
+        "books": ["id", "title", "author", "shelf", "category", "status", "created_at", [("title", 1), ("author", 1)]],
+        "transactions": ["id", "member_id", "book_id", "date", "action", [("member_id", 1), ("book_id", 1)], [("action", 1), ("date", -1)]],
+        "reservations": ["id", "member_id", "book_id", "status", "created_at"],
+        "incoming": ["date", "book_ids"],
+        "missing": ["date", "book_id", "status"],
+        "stocktake": ["date"],
+        "files": ["storage_path"],
+        "restore_chunks": [[("upload_id", 1), ("idx", 1)]],
+        "users": ["member_id", "role"],
+        "login_attempts": ["identifier"],
+    }
+    for coll, keys in specs.items():
+        for key in keys:
+            try:
+                await db[coll].create_index(key)
+            except Exception as e:  # indeks hanya untuk kecepatan, jangan gagalkan start
+                logging.getLogger(__name__).warning("Gagal membuat indeks %s.%s: %s", coll, key, e)
 
 @app.on_event("startup")
 async def startup():
@@ -653,7 +667,7 @@ async def book_cover(book_id: str, v: str = "", s: str = "thumb"):
 @api.post("/books")
 async def add_book(data: BookInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah buku")
-    data.cover = real_cover(data.cover)
+    data.cover = await asyncio.to_thread(shrink_data_url, real_cover(data.cover))
     same = await find_same_book(data.title, data.author)
     if same:
         await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.stock}, **({"$set": {"cover": data.cover}} if data.cover and not same.get("cover") else {})})
@@ -671,7 +685,7 @@ async def update_book(book_id: str, data: BookUpdate, user=Depends(current_user)
     same = await find_same_book(title, author)
     if same and same["id"] != book_id: raise HTTPException(400, f"Judul & penulis ini sudah ada ({same['id']}). Gunakan Atur stok untuk menambah eksemplar.")
     upd = {"title": title, "author": author, "category": data.category.strip() or "Umum", "shelf": data.shelf, "isbn": data.isbn.strip(), "updated_at": now_iso()}
-    if not is_cover_ref(data.cover): upd["cover"] = data.cover or ""  # URL sampul kita sendiri = sampul tidak diubah
+    if not is_cover_ref(data.cover): upd["cover"] = await asyncio.to_thread(shrink_data_url, data.cover or "")  # URL sampul kita sendiri = sampul tidak diubah
     await db.books.update_one({"id": book_id}, {"$set": upd})
     if title != book["title"]:
         await db.transactions.update_many({"book_id": book_id}, {"$set": {"book_title": title}})
@@ -725,7 +739,7 @@ async def incoming_list(user=Depends(current_user)):
 async def add_incoming(data: IncomingInput, user=Depends(current_user)):
     staff_only(user)
     date = data.date or now_iso()[:10]
-    data.cover = real_cover(data.cover)
+    data.cover = await asyncio.to_thread(shrink_data_url, real_cover(data.cover))
     same = await find_same_book(data.title, data.author)
     if same:
         await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.quantity}, **({"$set": {"cover": data.cover}} if data.cover and not same.get("cover") else {})})
