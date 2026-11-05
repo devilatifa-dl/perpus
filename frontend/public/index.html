@@ -7,12 +7,14 @@
         <script>(function(){try{var t=localStorage.getItem("perpus-theme");if(t!=="dark"&&t!=="light"){t=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}catch(e){}})();</script>
         <meta name="description" content="Ruang Baca SMANSA – perpustakaan digital SMA Negeri 1 Abung Tengah: katalog buku, rak, sirkulasi, dan laporan." />
         <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+        <link rel="stylesheet" href="%PUBLIC_URL%/fonts/fonts.css" />
         <link rel="icon" href="%PUBLIC_URL%/favicon.ico" sizes="any" />
         <link rel="icon" type="image/png" sizes="192x192" href="%PUBLIC_URL%/icons/icon-192.png" />
         <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/apple-touch-icon.png" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <!-- "default": konten mulai di bawah status bar iPhone (tidak tertutup jam / notch saat dibuka dari Layar Utama) -->
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Ruang Baca" />
         <meta name="application-name" content="Ruang Baca" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -15,19 +15,24 @@ export const fmtDate = (d, opts = { day: "numeric", month: "short", year: "numer
 
 export const SCHOOL_LOGO = "/logo-sekolah.png";
 export const LIBRARY_LOGO = "/logo-perpustakaan.png";
-export const DEFAULT_SETTINGS = { school_logo: "", library_logo: "", card_theme: "navy", card_layout: "classic", card_show_qr: true, card_show_address: true, card_title: "KARTU ANGGOTA PERPUSTAKAAN", card_school_name: "SMA NEGERI 1 ABUNG TENGAH", card_font: "modern", card_font_size: "sedang", card_school_spacing: 0, card_school_logo_pos: "kiri", card_library_logo_pos: "kanan", card_photo_pos: "kiri", card_qr_pos: "atas", card_back_title: "PERATURAN & TATA TERTIB PERPUSTAKAAN", card_back_rules: "Kartu ini wajib dibawa setiap meminjam dan mengembalikan buku.\nKembalikan buku tepat waktu sesuai tanggal yang ditentukan petugas.\nJaga buku tetap bersih; dilarang melipat, mencoret, atau merobek.\nBuku yang hilang atau rusak wajib diganti dengan judul yang sama.\nKartu tidak boleh dipinjamkan kepada orang lain.\nJika kartu ini ditemukan, mohon kembalikan ke Perpustakaan SMANSA.", card_back_web: "perpustakaan.sman1abungtengah.sch.id", card_owner_label: "PEMILIK KARTU", card_class_label: "Kelas", card_nis_label: "NIS", card_address: "Jln Raya Subik, Desa Pekurun Selatan", card_text_sizes: {} };
+export const DEFAULT_SETTINGS = { school_logo: "", library_logo: "", card_theme: "navy", card_layout: "classic", card_show_qr: true, card_show_address: true, card_title: "KARTU ANGGOTA PERPUSTAKAAN", card_school_name: "SMA NEGERI 1 ABUNG TENGAH", card_font: "modern", card_font_size: "sedang", card_school_spacing: 0, card_school_logo_pos: "kiri", card_library_logo_pos: "kanan", card_photo_pos: "kiri", card_qr_pos: "atas", card_back_title: "PERATURAN & TATA TERTIB PERPUSTAKAAN", card_back_rules: "Kartu ini wajib dibawa setiap meminjam dan mengembalikan buku.\nKembalikan buku tepat waktu sesuai tanggal yang ditentukan petugas.\nJaga buku tetap bersih; dilarang melipat, mencoret, atau merobek.\nBuku yang hilang atau rusak wajib diganti dengan judul yang sama.\nKartu tidak boleh dipinjamkan kepada orang lain.\nJika kartu ini ditemukan, mohon kembalikan ke Perpustakaan SMANSA.", card_back_web: "perpustakaan.sman1abungtengah.sch.id", card_owner_label: "PEMILIK KARTU", card_class_label: "Kelas", card_nis_label: "NIS", card_address: "Jln Raya Subik, Desa Pekurun Selatan", card_text_sizes: {}, card_text_fonts: {}, card_show_class: true, card_show_nis: true, card_show_code: true, card_photo_size: 100, card_photo_shape: "membulat" };
 // Ukuran teks kartu per bagian (persen dari ukuran bawaan). key -> [label, sisi]
-export const CARD_TEXT_SIZE_KEYS = ["school", "title", "owner", "name", "fields", "address", "code", "back_title", "back_rules", "back_web"];
+export const CARD_TEXT_SIZE_KEYS = ["school", "title", "owner", "name", "class", "nis", "address", "code", "back_title", "back_rules", "back_web"];
 export const cardSizeVars = (s) => {
   const sizes = (s && s.card_text_sizes) || {};
-  const k = (key) => { const v = Number(sizes[key]); return v >= 50 && v <= 200 ? v / 100 : 1; };
-  return { "--k-school": k("school"), "--k-title": k("title"), "--k-owner": k("owner"), "--k-name": k("name"), "--k-fields": k("fields"), "--k-address": k("address"), "--k-code": k("code"), "--k-btitle": k("back_title"), "--k-rules": k("back_rules"), "--k-web": k("back_web") };
+  const k = (key, fb) => { const v = Number(sizes[key] ?? (fb ? sizes[fb] : undefined)); return v >= 50 && v <= 200 ? v / 100 : 1; };
+  const ph = Number(s && s.card_photo_size); const photoK = ph >= 60 && ph <= 160 ? ph / 100 : 1;
+  // "fields" = pengaturan lama (Kelas & NIS bersama) -> dipakai bila Kelas/NIS belum diatur sendiri
+  return { "--k-school": k("school"), "--k-title": k("title"), "--k-owner": k("owner"), "--k-name": k("name"), "--k-fields": k("fields"), "--k-class": k("class", "fields"), "--k-nis": k("nis", "fields"), "--k-address": k("address"), "--k-code": k("code"), "--k-btitle": k("back_title"), "--k-rules": k("back_rules"), "--k-web": k("back_web"), "--photo-k": photoK };
 };
+// Kelas font per teks kartu (kosong = ikut font kartu)
+export const cardFontClass = (s, key) => { const f = s && s.card_text_fonts && s.card_text_fonts[key]; return f ? ` ff-${f}` : ""; };
 export const CARD_THEMES = [["navy", "Biru Navy"], ["emerald", "Hijau Zamrud"], ["maroon", "Merah Maroon"], ["sunset", "Jingga Senja"], ["midnight", "Hitam Emas"], ["light", "Putih Bersih"], ["book", "Tema Buku"]];
 export const CARD_LAYOUTS = [["classic", "Klasik", "Foto kiri, QR di atas"], ["modern", "Modern", "QR kiri, foto kanan"], ["portrait", "Potret", "Vertikal, QR di bawah"]];
-export const CARD_FONTS = [["modern", "Modern"], ["klasik", "Klasik"], ["elegan", "Elegan"], ["mono", "Monospace"]];
+export const CARD_FONTS = [["modern", "Modern"], ["klasik", "Klasik"], ["elegan", "Elegan"], ["mono", "Monospace"], ["shrikhand", "Shrikhand"], ["anton", "Anton"], ["adumu", "Adumu Regular"], ["elmessiri", "El Messiri (gaya Arab)"], ["dmsans", "DM Sans"]];
+export const CARD_PHOTO_SHAPES = [["kotak", "Kotak"], ["membulat", "Sudut membulat"], ["bulat", "Bulat"]];
 export const CARD_FONT_SIZES = [["kecil", "Kecil"], ["sedang", "Sedang"], ["besar", "Besar"]];
-export const CARD_POS = { logo: [["kiri", "Kiri"], ["kanan", "Kanan"]], photo: [["kiri", "Kiri"], ["kanan", "Kanan"]], qr: [["atas", "Atas"], ["bawah", "Bawah"]] };
+export const CARD_POS = { logo: [["kiri", "Kiri"], ["kanan", "Kanan"]], photo: [["kiri", "Kiri"], ["kanan", "Kanan"], ["atas", "Atas"]], qr: [["atas", "Atas"], ["bawah", "Bawah"]] };
 export const CARD_PRESETS = [
   ["klasik-navy", "Klasik Navy", { card_theme: "navy", card_layout: "classic", card_font: "modern", card_font_size: "sedang", card_school_logo_pos: "kiri", card_library_logo_pos: "kiri", card_photo_pos: "kiri", card_qr_pos: "atas" }],
   ["buku-elegan", "Buku Elegan", { card_theme: "book", card_layout: "classic", card_font: "elegan", card_font_size: "besar", card_school_logo_pos: "kiri", card_library_logo_pos: "kanan", card_photo_pos: "kiri", card_qr_pos: "atas" }],

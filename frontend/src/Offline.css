@@ -1,0 +1,72 @@
+/* Indikator status koneksi & antrean data offline */
+.offline-bar{border:1px solid #bbf7d0;background:#f0fdf4;border-radius:12px;padding:10px 14px;margin-bottom:16px;transition:background .25s,border-color .25s}
+.offline-bar.is-offline{border-color:#fcd34d;background:#fffbeb}
+.offline-bar.is-syncing{border-color:#c4b5fd;background:#f5f3ff}
+.ob-main{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ob-icon{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:#dcfce7;color:#15803d;flex-shrink:0}
+.is-offline .ob-icon{background:#fef3c7;color:#b45309}
+.is-syncing .ob-icon{background:#ede9fe;color:#6d28d9}
+.ob-text{flex:1;min-width:180px;display:grid;gap:2px}
+.ob-text b{display:flex;align-items:center;gap:7px;font-size:13px;color:#14532d}
+.is-offline .ob-text b{color:#92400e}
+.is-syncing .ob-text b{color:#5b21b6}
+.ob-text small{font-size:11.5px;color:#475569}
+.ob-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 3px #22c55e33;display:inline-block}
+.is-offline .ob-dot{background:#f59e0b;box-shadow:0 0 0 3px #f59e0b33;animation:obPulse 1.6s infinite}
+.is-syncing .ob-dot{background:#8b5cf6;box-shadow:0 0 0 3px #8b5cf633}
+@keyframes obPulse{50%{opacity:.35}}
+.ob-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:20px;padding:5px 10px}
+.ob-actions{display:flex;gap:8px;align-items:center}
+.ob-link{border:0;background:transparent;color:#6d28d9;font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;padding:6px 4px}
+.ob-link .rot{transform:rotate(180deg)}
+.ob-btn{border:0;background:#7c3aed;color:#fff;font-weight:700;font-size:12px;border-radius:8px;padding:8px 12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.ob-btn:disabled{opacity:.55;cursor:default}
+.spin{animation:obSpin 1s linear infinite}
+@keyframes obSpin{to{transform:rotate(360deg)}}
+.ob-list{margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:8px;display:grid;gap:6px;max-height:380px;overflow:auto}
+.ob-item{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;font-size:12px;background:#fff;border:1px solid #eef2f7;border-radius:8px;padding:7px 10px}
+.ob-item em{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6d28d9;background:#f5f3ff;border-radius:6px;padding:3px 7px}
+.ob-item span{color:#334155;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ob-item time{color:#94a3b8;font-size:11px}
+.ob-item.bad em{color:#b91c1c;background:#fee2e2}
+.ob-item.bad i{color:#b91c1c;font-style:normal}
+.ob-empty{font-size:12px;color:#64748b;margin:0}
+.ob-dropped{display:grid;gap:6px;margin-top:4px}
+.ob-dropped-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#b91c1c}
+.ob-dropped-head b{display:inline-flex;align-items:center;gap:6px}
+.ob-section-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#5b21b6}
+.ob-section-head small{color:#94a3b8;font-size:11px}
+.ob-hint{margin:0;font-size:11.5px;color:#64748b;line-height:1.45}
+.ob-meta{display:block;font-size:10.5px;color:#94a3b8;margin-top:2px}
+.ob-item.bad{grid-template-columns:auto 1fr auto;border-color:#fecaca;background:#fffafa}
+.ob-item-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.ob-mini{border:1px solid #ddd6fe;background:#f5f3ff;color:#6d28d9;font-weight:700;font-size:11px;border-radius:7px;padding:6px 9px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;min-height:30px;white-space:nowrap;transition:transform .15s ease,opacity .15s ease}
+.ob-mini:hover:not(:disabled){transform:translateY(-1px)}
+.ob-mini:active:not(:disabled){transform:translateY(0)}
+.ob-mini:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
+.ob-mini:disabled{opacity:.5;cursor:default}
+.ob-mini.danger{border-color:#fecaca;background:#fff5f5;color:#b91c1c}
+.ob-mini.danger.confirm{background:#b91c1c;color:#fff;border-color:#b91c1c}
+.ob-chip.bad{color:#b91c1c;background:#fee2e2;border:0;cursor:pointer}
+.ob-msg{margin:0;font-size:12px;font-weight:600;border-radius:8px;padding:7px 10px;background:#f5f3ff;color:#5b21b6}
+.ob-msg.ok{background:#dcfce7;color:#166534}.ob-msg.warn{background:#fef3c7;color:#92400e}.ob-msg.bad{background:#fee2e2;color:#b91c1c}
+.pending-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:20px;padding:3px 8px;margin-left:6px;white-space:nowrap;vertical-align:middle}
+tr.row-pending td{background:#fffdf5}
+.visit-result .offline-note{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:20px;padding:2px 8px;margin-top:5px}
+html[data-theme="dark"] .offline-bar{background:#0f2a1c;border-color:#166534}
+html[data-theme="dark"] .offline-bar.is-offline{background:#2a1f08;border-color:#92400e}
+html[data-theme="dark"] .offline-bar.is-syncing{background:#1e1838;border-color:#5b21b6}
+html[data-theme="dark"] .ob-text b{color:#bbf7d0}
+html[data-theme="dark"] .is-offline .ob-text b{color:#fde68a}
+html[data-theme="dark"] .is-syncing .ob-text b{color:#ddd6fe}
+html[data-theme="dark"] .ob-text small{color:#cbd5e1}
+html[data-theme="dark"] .ob-item{background:#1b1638;border-color:#2f2858}
+html[data-theme="dark"] .ob-item span{color:#e2e8f0}
+html[data-theme="dark"] .ob-item.bad{background:#2a1218;border-color:#7f1d1d}
+html[data-theme="dark"] .ob-mini{background:#251d4a;border-color:#4c1d95;color:#ddd6fe}
+html[data-theme="dark"] .ob-mini.danger{background:#2a1218;border-color:#7f1d1d;color:#fca5a5}
+html[data-theme="dark"] .ob-mini.danger.confirm{background:#b91c1c;color:#fff}
+html[data-theme="dark"] .ob-hint{color:#cbd5e1}
+html[data-theme="dark"] tr.row-pending td{background:#2a1f0855}
+@media print{.offline-bar,.pending-tag{display:none!important}}
+@media(max-width:640px){.ob-chip{order:3;width:100%;justify-content:center}.ob-item,.ob-item.bad{grid-template-columns:auto 1fr}.ob-item time,.ob-item-actions{grid-column:2}.ob-item-actions{justify-content:flex-start}.ob-mini{min-height:40px}}

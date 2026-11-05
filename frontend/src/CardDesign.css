@@ -1,0 +1,128 @@
+/* ===== Kartu anggota: font (@font-face ada di public/fonts/fonts.css), foto & susunan ===== */
+/* Font utama kartu */
+.id-card.font-shrikhand{font-family:"Shrikhand",Georgia,serif}
+.id-card.font-anton{font-family:"Anton",Impact,"Arial Narrow",sans-serif;letter-spacing:.02em}
+.id-card.font-adumu{font-family:"Adumu",Impact,sans-serif;letter-spacing:.02em}
+.id-card.font-elmessiri{font-family:"El Messiri",Georgia,serif}
+.id-card.font-dmsans{font-family:"DM Sans",Inter,system-ui,sans-serif}
+
+/* Font per teks (Desain kartu -> Teks & font) */
+.id-card .ff-modern{font-family:Outfit,Inter,system-ui,sans-serif!important}
+.id-card .ff-klasik{font-family:Georgia,"Times New Roman",serif!important}
+.id-card .ff-elegan{font-family:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif!important}
+.id-card .ff-mono{font-family:"Courier New",ui-monospace,monospace!important}
+.id-card .ff-shrikhand{font-family:"Shrikhand",Georgia,serif!important}
+.id-card .ff-anton{font-family:"Anton",Impact,sans-serif!important;letter-spacing:.02em}
+.id-card .ff-adumu{font-family:"Adumu",Impact,sans-serif!important;letter-spacing:.02em}
+.id-card .ff-elmessiri{font-family:"El Messiri",Georgia,serif!important}
+.id-card .ff-dmsans{font-family:"DM Sans",Inter,sans-serif!important}
+.id-card .card-field i,.id-card .card-field em{font-family:inherit}
+
+/* Pratinjau font di tombol pilihan */
+.font-prev-modern span{font-family:Outfit,Inter,sans-serif}
+.font-prev-klasik span{font-family:Georgia,"Times New Roman",serif}
+.font-prev-elegan span{font-family:"Palatino Linotype",Palatino,Georgia,serif}
+.font-prev-mono span{font-family:"Courier New",monospace}
+.font-prev-shrikhand span{font-family:"Shrikhand",serif}
+.font-prev-anton span{font-family:"Anton",Impact,sans-serif}
+.font-prev-adumu span{font-family:"Adumu",Impact,sans-serif}
+.font-prev-elmessiri span{font-family:"El Messiri",serif}
+.font-prev-dmsans span{font-family:"DM Sans",sans-serif}
+
+/* Ukuran Kelas & NIS terpisah */
+.id-card.fs-on{--fbase:11px}
+.id-card.fs-on.size-kecil{--fbase:10px}
+.id-card.fs-on.size-besar{--fbase:13px}
+.id-card.fs-on .id-card-body .card-identity p.card-field-class{font-size:calc(var(--fbase) * var(--k-class,1))}
+.id-card.fs-on .id-card-body .card-identity p.card-field-nis{font-size:calc(var(--fbase) * var(--k-nis,1))}
+
+/* Foto anggota: ukuran, bentuk, posisi */
+.id-card.fs-on .id-card-body .photo{width:calc(75px * var(--photo-k,1));height:calc(87px * var(--photo-k,1));font-size:calc(30px * var(--photo-k,1))}
+.id-card.fs-on.layout-modern .id-card-body .photo{width:calc(84px * var(--photo-k,1));height:calc(98px * var(--photo-k,1))}
+.id-card.fs-on.layout-portrait .id-card-body .photo{width:calc(104px * var(--photo-k,1));height:calc(120px * var(--photo-k,1));font-size:calc(40px * var(--photo-k,1))}
+.id-card.shape-kotak .photo,.id-card.shape-kotak .photo img{border-radius:0!important}
+.id-card.shape-membulat .photo,.id-card.shape-membulat .photo img{border-radius:9px!important}
+.id-card.shape-bulat .photo,.id-card.shape-bulat .photo img{border-radius:50%!important}
+.id-card.fs-on.shape-bulat .id-card-body .photo{height:calc(75px * var(--photo-k,1))}
+.id-card.fs-on.shape-bulat.layout-modern .id-card-body .photo{height:calc(84px * var(--photo-k,1))}
+.id-card.fs-on.shape-bulat.layout-portrait .id-card-body .photo{height:calc(104px * var(--photo-k,1))}
+.id-card.photo-atas .id-card-body{flex-direction:column;align-items:center;text-align:center;gap:10px}
+.id-card.photo-atas .card-identity{width:100%}
+.id-card.photo-atas .card-identity .card-field{justify-content:center}
+.id-card.photo-atas .card-identity .card-field i{min-width:0}
+.print-slot .id-card.photo-atas .id-card-body{padding:8px 0;gap:6px}
+/* Di lembar cetak ukuran kartu tetap: foto "atas" diperkecil agar semua isi muat */
+.print-slot .id-card.fs-on.photo-atas .id-card-body .photo{width:calc(58px * var(--photo-k,1));height:calc(66px * var(--photo-k,1))}
+.print-slot .id-card.fs-on.photo-atas.shape-bulat .id-card-body .photo{height:calc(58px * var(--photo-k,1))}
+
+/* Cetak massal: baris Kelas tidak ditampilkan (pratinjau & hasil cetak) */
+.bulk-print .id-card .card-field-class,.bulk-print .id-card .card-field[data-testid="card-class"]{display:none!important}
+
+/* ===== Desain kartu: susunan ringkas dengan tab ===== */
+.designer.dz{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px}
+.dz .designer-preview{display:grid;gap:10px;align-content:start}
+.dz .designer-preview .id-card{margin-top:0}
+.dz-note{font-size:11px;margin-top:0}
+.dz .designer-controls{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dz-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:#f1f5f9;padding:4px;border-radius:10px}
+.dz-tabs button{border:0;background:transparent;border-radius:7px;padding:9px 6px;font-size:12px;font-weight:700;color:#64748b;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap}
+.dz-tabs button.active{background:#fff;color:#6d28d9;box-shadow:0 1px 3px #0f172a1a}
+.dz-pane{display:grid;gap:14px;max-height:min(58vh,560px);overflow:auto;padding:2px 4px 2px 0;align-content:start}
+.dz-field{display:grid;gap:7px}
+.dz-field .control-label small{font-weight:500}
+.dz-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dz-seg{display:flex;flex-wrap:wrap;gap:6px}
+.dz-seg .pill-option{padding:7px 12px}
+.pill-option.active,.layout-option.active{border-color:#7c3aed;background:#f5f3ff;color:#6d28d9}
+.dz-wrap{gap:6px}
+.dz-wrap .pill-option{padding:7px 12px}
+.dz .layout-options{gap:6px}
+.dz .layout-option{padding:8px}
+.dz-fonts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.dz-font{border:1px solid #e2e8f0;background:#fff;border-radius:9px;padding:7px 6px;display:grid;gap:1px;justify-items:center;cursor:pointer;transition:border-color .15s,background .15s}
+.dz-font span{font-size:19px;line-height:1.15;color:#1e1b4b}
+.dz-font small{font-size:10px;color:#64748b;text-align:center;line-height:1.2}
+.dz-font:hover{border-color:#c4b5fd}
+.dz-font.active{border-color:#7c3aed;background:#f5f3ff;box-shadow:0 0 0 2px #ede9fe}
+.dz-toggles{grid-template-columns:1fr 1fr;gap:8px}
+.dz-toggles .toggle{font-size:12px}
+.dz-toggles .toggle input{accent-color:#7c3aed}
+.dz-box{border:1px solid #ede9fe;background:#fbfaff;border-radius:12px;padding:12px;display:grid;gap:12px}
+.dz-box-title{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7c3aed;margin:0}
+.dz-range{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.dz-range .range-input{min-width:0;width:100%}
+.dz-range .range-input{background:#ede9fe}
+.dz-range .range-input::-webkit-slider-thumb{background:#7c3aed}
+.dz-range .range-input::-moz-range-thumb{background:#7c3aed}
+.dz-logos{grid-template-columns:1fr}
+.dz-logos .photo-box{margin:0}
+.dz-footer{display:flex;gap:8px;justify-content:flex-end;border-top:1px solid #f1f5f9;padding-top:12px}
+.dz-footer .primary{flex:1}
+/* Baris teks ringkas */
+.dz .ct-group{border:0;background:transparent;padding:0;gap:8px;display:grid}
+.dz .ct-title{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.dz .ct-title small{margin:0;font-size:11px}
+.dz .ct-row{padding:9px 10px;gap:6px}
+.dz .ct-row.is-hidden{opacity:.6;background:#f8fafc}
+.dz .ct-row textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 11px;font:inherit;font-size:13px;resize:vertical}
+.dz .ct-row input:not([type=checkbox]){height:36px}
+.ct-show{display:inline-flex!important;align-items:center;gap:5px;margin-left:auto;font-size:11px!important;font-weight:600!important;color:#64748b!important;cursor:pointer;grid-template-columns:none!important}
+.ct-show input{width:15px;height:15px!important;accent-color:#7c3aed}
+.ct-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.ct-font{height:34px!important;font-size:12px!important;padding:0 8px!important;min-width:0}
+.ct-stepper{display:inline-flex;align-items:center;gap:4px}
+.ct-stepper .ct-step{width:30px;height:30px}
+.ct-stepper .ct-val,.dz-range .ct-val{border:1px solid #e2e8f0;background:#fff;border-radius:8px;height:30px;min-width:52px;cursor:pointer;padding:0 6px}
+.ct-step:disabled,.ct-val:disabled{opacity:.45;cursor:default}
+html[data-theme="dark"] .dz-tabs{background:#1b1638}
+html[data-theme="dark"] .dz-tabs button{color:#a5a0c8}
+html[data-theme="dark"] .dz-tabs button.active{background:#2a2350;color:#ddd6fe}
+html[data-theme="dark"] .dz-font{background:#221c45;border-color:#342c63}
+html[data-theme="dark"] .dz-font span{color:#ede9fe}
+html[data-theme="dark"] .dz-font.active{background:#2f2762;border-color:#8b5cf6;box-shadow:none}
+html[data-theme="dark"] .dz-box{background:#1b1638;border-color:#2f2858}
+html[data-theme="dark"] .dz-footer{border-color:#2f2858}
+html[data-theme="dark"] .dz .ct-row.is-hidden{background:#1b1638}
+html[data-theme="dark"] .ct-stepper .ct-val,html[data-theme="dark"] .dz-range .ct-val{background:#221c45;border-color:#342c63}
+html[data-theme="dark"] .dz .ct-row textarea{background:#1b1638;border-color:#342c63;color:#ede9fe}
+@media(max-width:760px){.designer.dz{grid-template-columns:1fr}.dz .designer-preview{position:static}.dz-pane{max-height:none;overflow:visible}.dz-tabs button{font-size:11px;padding:8px 4px}.dz-tabs button svg{display:none}.dz-grid2,.dz-toggles{grid-template-columns:1fr}.dz-fonts{grid-template-columns:repeat(3,minmax(0,1fr))}.dz-footer{position:sticky;bottom:-23px;background:#fff;padding-bottom:6px}html[data-theme="dark"] .dz-footer{background:#17132e}}

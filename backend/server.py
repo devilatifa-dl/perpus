@@ -13,6 +13,7 @@ import os, re, uuid, bcrypt, jwt, io, csv, json, logging, secrets, zlib, base64,
 from collections import OrderedDict
 from openpyxl import load_workbook
 from media import photo_upload_allowed, shrink_data_url, build_router as media_router
+from offline_sync import client_dt
 from reports_pdf import WIB, build_loans, in_period, render_report_pdf, render_report_xlsx, fmt_long
 
 ROOT_DIR = Path(__file__).parent
@@ -89,6 +90,9 @@ class TransactionInput(BaseModel):
     member_id: str
     book_id: str
     action: str = "pinjam"
+    # Diisi bila transaksi dicatat saat offline lalu disinkronkan
+    client_id: str = Field("", max_length=64)
+    client_time: str = Field("", max_length=40)
 
 class IncomingInput(BaseModel):
     title: str
@@ -105,6 +109,9 @@ class StatusInput(BaseModel):
     status: str
     note: str = ""
     reporter: str = ""
+
+CARD_TEXT_KEYS = {"school", "title", "owner", "name", "fields", "class", "nis", "address", "code", "back_title", "back_rules", "back_web"}
+CARD_FONT_IDS = {"modern", "klasik", "elegan", "mono", "shrikhand", "anton", "adumu", "elmessiri", "dmsans"}
 
 class SettingsInput(BaseModel):
     school_logo: str = ""
@@ -131,12 +138,34 @@ class SettingsInput(BaseModel):
     card_nis_label: str = Field("NIS", max_length=20)
     card_address: str = Field("Jln Raya Subik, Desa Pekurun Selatan", max_length=120)
     card_text_sizes: Dict[str, int] = Field(default_factory=dict)
+    # Jenis font per teks (kosong = ikut font kartu) + tampil/sembunyi baris
+    card_text_fonts: Dict[str, str] = Field(default_factory=dict)
+    card_show_class: bool = True
+    card_show_nis: bool = True
+    card_show_code: bool = True
+    # Foto anggota di kartu: ukuran (persen), bentuk
+    card_photo_size: int = Field(100, ge=60, le=160)
+    card_photo_shape: str = "membulat"
 
     @field_validator("card_text_sizes")
     @classmethod
     def _clamp_sizes(cls, v):
-        allowed = {"school", "title", "owner", "name", "fields", "address", "code", "back_title", "back_rules", "back_web"}
-        return {k: max(50, min(200, int(val))) for k, val in (v or {}).items() if k in allowed}
+        return {k: max(50, min(200, int(val))) for k, val in (v or {}).items() if k in CARD_TEXT_KEYS}
+
+    @field_validator("card_text_fonts")
+    @classmethod
+    def _check_fonts(cls, v):
+        return {k: val for k, val in (v or {}).items() if k in CARD_TEXT_KEYS and val in CARD_FONT_IDS}
+
+    @field_validator("card_photo_shape")
+    @classmethod
+    def _check_shape(cls, v):
+        return v if v in ("kotak", "membulat", "bulat") else "membulat"
+
+    @field_validator("card_photo_pos")
+    @classmethod
+    def _check_photo_pos(cls, v):
+        return v if v in ("kiri", "kanan", "atas") else "kiri"
 
 DEFAULT_SETTINGS = SettingsInput().model_dump()
 
@@ -345,10 +374,10 @@ async def seed():
 
 async def ensure_indexes():
     specs = {
-        "visits": ["check_in", "date", "member_id", [("date", -1), ("member_id", 1)]],
+        "visits": ["check_in", "date", "member_id", "client_id", "checkout_client_id", [("date", -1), ("member_id", 1)]],
         "members": ["id", "student_id", "name", "class_name"],
         "books": ["id", "title", "author", "shelf", "category", "status", "created_at", [("title", 1), ("author", 1)]],
-        "transactions": ["id", "member_id", "book_id", "date", "action", [("member_id", 1), ("book_id", 1)], [("action", 1), ("date", -1)]],
+        "transactions": ["id", "client_id", "member_id", "book_id", "date", "action", [("member_id", 1), ("book_id", 1)], [("action", 1), ("date", -1)]],
         "reservations": ["id", "member_id", "book_id", "status", "created_at"],
         "incoming": ["date", "book_ids"],
         "missing": ["date", "book_id", "status"],
@@ -1218,6 +1247,9 @@ async def transactions(user=Depends(current_user)):
 @api.post("/transactions")
 async def transaction(data: TransactionInput, user=Depends(current_user)):
     staff_only(user)
+    if data.client_id:
+        dup = await db.transactions.find_one({"client_id": data.client_id}, {"_id":0})
+        if dup: return {**public(dup), "duplicate": True}
     member=await db.members.find_one({"id":data.member_id},{"_id":0}); book=await db.books.find_one({"id":data.book_id},{"_id":0})
     if not member or not book: raise HTTPException(404,"Anggota atau buku tidak ditemukan")
     action=data.action
@@ -1229,7 +1261,11 @@ async def transaction(data: TransactionInput, user=Depends(current_user)):
     else:
         if open_count <= 0: raise HTTPException(400,"Anggota ini tidak sedang meminjam buku ini")
         await return_copy(book["id"])
-    doc={"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":member["id"],"member_name":member["name"],"class_name":member.get("class_name",""),"book_id":book["id"],"book_title":book["title"],"action":action,"date":now_iso()}; await db.transactions.insert_one(doc); return public(doc)
+    when = client_dt(data.client_time)
+    doc={"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":member["id"],"member_name":member["name"],"class_name":member.get("class_name",""),"book_id":book["id"],"book_title":book["title"],"action":action,"date":when.isoformat() if when else now_iso()}
+    if data.client_id: doc["client_id"] = data.client_id
+    if when: doc["offline"] = True; doc["synced_at"] = now_iso()
+    await db.transactions.insert_one(doc); return public(doc)
 
 @api.get("/reports")
 async def reports(user=Depends(current_user)):
