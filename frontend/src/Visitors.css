@@ -273,3 +273,19 @@ html[data-theme="dark"] .sound-switch.on{background:#251d4a;color:#ddd6fe}
 html[data-theme="dark"] .sound-ctl .icon-button.muted{background:#2a1218;border-color:#7f1d1d;color:#fca5a5}
 html[data-theme="dark"] .sound-note,html[data-theme="dark"] .sound-pop-head small,html[data-theme="dark"] .sound-sample small{color:#a5b4c8}
 
+/* Pilihan peringkat Siswa / Guru */
+.lb-audience-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.lb-audience-bar>span{font-size:12.5px;color:#64748b;font-weight:600}
+.lb-switch.lb-audience>button.active{background:#0f766e;box-shadow:0 6px 14px -6px rgba(15,118,110,.7)}
+.lb-switch.lb-audience>button:not(.active){color:#0f766e}
+.lb-switch.lb-audience{background:#f0fdfa;border-color:rgba(15,118,110,.25)}
+.lb-switch.lb-audience>button{background:#f0fdfa}
+.lb-switch.lb-audience>button:hover{background:#ccfbf1}
+.lb-switch.lb-audience>button.active,.lb-switch.lb-audience>button.active:hover{background:#0f766e;color:#fff}
+html[data-theme="dark"] .lb-switch.lb-audience{background:#0d2522;border-color:rgba(45,212,191,.3)}
+html[data-theme="dark"] .lb-switch.lb-audience>button{background:#0d2522;color:#5eead4}
+html[data-theme="dark"] .lb-switch.lb-audience>button.active,html[data-theme="dark"] .lb-switch.lb-audience>button.active:hover{background:#0f766e;color:#fff}
+html[data-theme="dark"] .lb-switch.lb-audience>button:not(.active):hover{background:#12332f}
+html[data-theme="dark"] .lb-audience-bar>span{color:#94a3b8}
+.lb-grid.single{grid-template-columns:minmax(0,1fr)}
+@media print{.lb-audience-bar{display:none!important}body.report-print .lb-grid.single{grid-template-columns:minmax(0,1fr)!important}}

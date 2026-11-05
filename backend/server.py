@@ -60,9 +60,33 @@ class StockInput(BaseModel):
 
 class MemberInput(BaseModel):
     name: str
-    student_id: str
-    class_name: str
+    student_id: str = ""
+    class_name: str = ""
     photo: str = ""
+    member_type: str = "siswa"   # "siswa" | "guru"
+    subject: str = ""            # mata pelajaran (khusus guru)
+
+GURU_CLASS = "Guru"
+
+def normalize_member(doc: dict) -> dict:
+    """Siswa: NIS + kelas. Guru: tanpa NIS/kelas, wajib mapel; kelas diisi "Guru"
+    supaya daftar per kelas, cetak massal per kelas & laporan otomatis mengelompokkan guru."""
+    t = (doc.get("member_type") or "siswa").strip().lower()
+    if t not in ("siswa", "guru"): raise HTTPException(400, "Tipe anggota harus Siswa atau Guru")
+    doc["member_type"] = t
+    doc["name"] = (doc.get("name") or "").strip()
+    if not doc["name"]: raise HTTPException(400, "Nama lengkap wajib diisi")
+    if t == "guru":
+        doc["subject"] = (doc.get("subject") or "").strip()
+        if not doc["subject"]: raise HTTPException(400, "Mata pelajaran guru wajib diisi")
+        doc["student_id"] = ""; doc["class_name"] = GURU_CLASS
+    else:
+        doc["subject"] = ""
+        doc["student_id"] = (doc.get("student_id") or "").strip()
+        doc["class_name"] = (doc.get("class_name") or "").strip()
+        if not doc["class_name"]: raise HTTPException(400, "Kelas siswa wajib diisi")
+        if doc["class_name"].lower() == GURU_CLASS.lower(): raise HTTPException(400, 'Kelas "Guru" khusus untuk anggota tipe Guru')
+    return doc
 
 class BulkDeleteInput(BaseModel):
     class_name: str
@@ -499,7 +523,6 @@ async def my_member(user=Depends(current_user)):
 
 async def check_student_photo(user, photo, member_id=None):
     if user["role"] != "siswa": return
-    if not await photo_upload_allowed(db): raise HTTPException(403, "Unggah foto sedang ditutup oleh petugas perpustakaan")
     if photo and not photo.startswith("/api/files/"): raise HTTPException(400, "Foto harus diunggah melalui tombol unggah")
     if member_id and user.get("member_id") and user["member_id"] != member_id: raise HTTPException(403, "Kamu hanya dapat mengubah fotomu sendiri")
 
@@ -645,15 +668,15 @@ async def student_photo_config():
                 open_now = False
         except ValueError:
             pass
-    cfg["open"] = open_now
+    # Unggah foto selalu dibuka (tombol on/off dihapus); penggantian foto hanya oleh admin
+    cfg.update({"open": True, "enabled": True, "until": "", "allow_replace": False, "admin_only_replace": True})
     return cfg
 
 async def check_student_photo_allowed(member):
-    cfg = await student_photo_config()
-    if not cfg["open"]:
-        raise HTTPException(403, "Unggah foto sedang ditutup oleh petugas perpustakaan")
-    if member and member.get("photo") and not cfg["allow_replace"]:
-        raise HTTPException(403, "Foto anggota ini sudah ada. Hubungi petugas untuk menggantinya")
+    """Tombol on/off foto sudah dihapus: siswa/guru (dan petugas) boleh unggah SEKALI.
+    Setelah foto ada, hanya admin yang dapat menggantinya."""
+    if member and (member.get("photo") or "").strip():
+        raise HTTPException(403, "Foto sudah diunggah. Hanya admin yang dapat mengganti foto anggota")
 
 @api.get("/settings/student-photo")
 async def get_student_photo(user=Depends(current_user)):
@@ -799,14 +822,14 @@ async def members(user=Depends(current_user)):
 
 @api.get("/members/options")
 async def member_options(user=Depends(current_user)):
-    rows = await db.members.find({}, {"_id":0,"id":1,"name":1,"class_name":1,"student_id":1,"photo":1}).to_list(None)
+    rows = await db.members.find({}, {"_id":0,"id":1,"name":1,"class_name":1,"student_id":1,"photo":1,"member_type":1,"subject":1}).to_list(None)
     rows.sort(key=lambda m: (m.get("class_name",""), m.get("name","")))
     return rows
 
 @api.post("/members")
 async def add_member(data: MemberInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah anggota")
-    doc=data.model_dump(); doc["student_id"] = (doc.get("student_id") or "").strip()
+    doc=normalize_member(data.model_dump())
     await ensure_unique_nis(doc["student_id"])
     doc.update({"id":"MB-"+str(uuid.uuid4())[:8].upper()}); await db.members.insert_one(doc); return public(doc)
 
@@ -919,7 +942,7 @@ async def import_members(file: UploadFile = File(...), user=Depends(current_user
         raise HTTPException(400, "Berkas kosong atau tidak memiliki data")
     if len(rows) > 2000:
         raise HTTPException(400, "Maksimal 2000 baris per impor")
-    all_members = await db.members.find({}, {"_id": 0, "id": 1, "name": 1, "student_id": 1, "class_name": 1}).to_list(None)
+    all_members = await db.members.find({"member_type": {"$ne": "guru"}}, {"_id": 0, "id": 1, "name": 1, "student_id": 1, "class_name": 1}).to_list(None)
     by_nis = {}
     for m in all_members:
         sid = (m.get("student_id") or "").strip()
@@ -990,7 +1013,10 @@ async def update_member(member_id: str, data: MemberInput, user=Depends(current_
     staff_only(user)
     member = await db.members.find_one({"id": member_id}, {"_id":0})
     if not member: raise HTTPException(404, "Anggota tidak ditemukan")
-    upd = data.model_dump(); upd["student_id"] = (upd.get("student_id") or "").strip()
+    upd = normalize_member(data.model_dump())
+    # Foto yang sudah ada hanya boleh diganti/dihapus oleh admin
+    if user["role"] != "admin" and member.get("photo") and (upd.get("photo") or "") != member.get("photo"):
+        raise HTTPException(403, "Foto anggota sudah ada. Hanya admin yang dapat mengganti foto")
     await ensure_unique_nis(upd["student_id"], member_id)
     if (member.get("class_name") or "") != upd["class_name"]:
         await freeze_old_class([member_id], member.get("class_name", ""))
@@ -1004,7 +1030,7 @@ async def set_member_photo(member_id: str, data: PhotoInput, user=Depends(curren
     await check_student_photo(user, data.photo, member_id)
     member = await db.members.find_one({"id": member_id}, {"_id":0})
     if not member: raise HTTPException(404, "Anggota tidak ditemukan")
-    if user["role"] == "siswa":
+    if user["role"] != "admin":
         await check_student_photo_allowed(member)
     await db.members.update_one({"id": member_id}, {"$set": {"photo": data.photo}})
     return await db.members.find_one({"id": member_id}, {"_id":0})
@@ -1018,6 +1044,8 @@ async def promote_members(data: PromoteInput, user=Depends(current_user)):
         raise HTTPException(400, "Kelas asal dan kelas tujuan wajib diisi")
     if from_c == to_c:
         raise HTTPException(400, "Kelas asal dan tujuan tidak boleh sama")
+    if GURU_CLASS.lower() in (from_c.lower(), to_c.lower()):
+        raise HTTPException(400, "Anggota guru tidak ikut naik kelas")
     count = await db.members.count_documents({"class_name": from_c})
     if count == 0:
         raise HTTPException(404, "Tidak ada anggota pada kelas asal tersebut")
@@ -1103,6 +1131,15 @@ async def backup_zip(user=Depends(current_user)):
         if lb["total_loans"] == 0 and month != now.strftime("%Y-%m"):
             continue
         jobs.append((f"laporan/06-Peringkat-Rajin-Meminjam/Peringkat-{month}", "peringkat-pinjam", lb["label"], lb, settings, len(lb["students"])))
+    # Peringkat khusus guru (hanya bulan yang ada aktivitas guru)
+    for month in lb_months:
+        lb, settings, _ = await export_rows("peringkat", month, "guru")
+        if lb["total_visits"]:
+            jobs.append((f"laporan/07-Peringkat-Guru-Berkunjung/Peringkat-Guru-{month}", "peringkat", lb["label"], lb, settings, len(lb["students"])))
+    for month in loan_months:
+        lb, settings, _ = await export_rows("peringkat-pinjam", month, "guru")
+        if lb["total_loans"]:
+            jobs.append((f"laporan/08-Peringkat-Guru-Meminjam/Peringkat-Guru-{month}", "peringkat-pinjam", lb["label"], lb, settings, len(lb["students"])))
 
     def build():
         buf = io.BytesIO()
@@ -1283,15 +1320,15 @@ async def attach_class(loans):
         if not l.get("class_name"): l["class_name"] = info.get(l.get("member_id"), "")
     return loans
 
-async def export_rows(type: str, period: str):
+async def export_rows(type: str, period: str, audience: str = "siswa"):
     if type not in ("transaksi","masuk","hilang","kunjungan","statistik","peringkat","peringkat-pinjam"): raise HTTPException(400, "Jenis laporan tidak valid")
     now = datetime.now(WIB)
     settings = await db.settings.find_one({"id":"main"}, {"_id":0}) or {}
     if type == "peringkat-pinjam":
-        return await loan_leaderboard(period if re.match(r"^\d{4}-\d{2}$", period or "") else None, limit=50), settings, now
+        return await loan_leaderboard(period if re.match(r"^\d{4}-\d{2}$", period or "") else None, limit=50, audience=audience), settings, now
     if type == "peringkat":
         await visits_auto_close()
-        return await visit_leaderboard(period if re.match(r"^\d{4}-\d{2}$", period or "") else None, limit=50), settings, now
+        return await visit_leaderboard(period if re.match(r"^\d{4}-\d{2}$", period or "") else None, limit=50, audience=audience), settings, now
     if type in ("kunjungan","statistik"):
         await visits_auto_close()
         if type == "statistik":
@@ -1308,21 +1345,24 @@ async def export_rows(type: str, period: str):
     return rows, settings, now
 
 @api.get("/reports/export.pdf")
-async def export_report(type: str = "transaksi", period: str = "semua", orientation: str = "landscape", user=Depends(current_user)):
+async def export_report(type: str = "transaksi", period: str = "semua", orientation: str = "landscape", audience: str = "siswa", user=Depends(current_user)):
     staff_only(user)
     orientation = "portrait" if orientation == "portrait" else "landscape"
-    rows, settings, now = await export_rows(type, period)
+    rows, settings, now = await export_rows(type, period, audience)
+    if type in ("peringkat", "peringkat-pinjam") and rows.get("audience") == "guru": type_label = f"{type}-guru"
+    else: type_label = type
     pdf = render_report_pdf(type, rows["label"] if type in ("peringkat", "peringkat-pinjam") else period, rows, settings, user["name"], orientation=orientation)
-    filename = f"laporan-{type}-{period}-{'potret' if orientation == 'portrait' else 'lanskap'}-{now.strftime('%Y%m%d')}.pdf"
+    filename = f"laporan-{type_label}-{period}-{'potret' if orientation == 'portrait' else 'lanskap'}-{now.strftime('%Y%m%d')}.pdf"
     return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 @api.get("/reports/export.xlsx")
-async def export_report_xlsx(type: str = "transaksi", period: str = "semua", orientation: str = "landscape", user=Depends(current_user)):
+async def export_report_xlsx(type: str = "transaksi", period: str = "semua", orientation: str = "landscape", audience: str = "siswa", user=Depends(current_user)):
     staff_only(user)
     orientation = "portrait" if orientation == "portrait" else "landscape"
-    rows, settings, now = await export_rows(type, period)
+    rows, settings, now = await export_rows(type, period, audience)
+    type_label = f"{type}-guru" if type in ("peringkat", "peringkat-pinjam") and rows.get("audience") == "guru" else type
     data = render_report_xlsx(type, rows["label"] if type in ("peringkat", "peringkat-pinjam") else period, rows, settings, user["name"], orientation=orientation)
-    filename = f"laporan-{type}-{period}-{'potret' if orientation == 'portrait' else 'lanskap'}-{now.strftime('%Y%m%d')}.xlsx"
+    filename = f"laporan-{type_label}-{period}-{'potret' if orientation == 'portrait' else 'lanskap'}-{now.strftime('%Y%m%d')}.xlsx"
     return Response(content=data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 from visits import build_router, visits_auto_close, visit_stats, in_visit_period, visit_leaderboard

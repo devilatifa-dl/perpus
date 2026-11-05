@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { MemberCard } from "./MemberCard";
 import { MemberCardBack } from "./MemberCardBack";
+import { CardHDButton, safeName } from "./CardHDButton";
 
 function Sheet({ cards, back, portrait, settings, page }) {
   return <div className={`print-sheet ${portrait ? "portrait" : ""} ${back ? "back-side" : ""} ${page ? "duplex-page" : ""}`} data-testid={page ? `duplex-sheet-${page}-${back ? "back" : "front"}` : "print-sheet"}>
@@ -11,7 +12,7 @@ function Sheet({ cards, back, portrait, settings, page }) {
   </div>;
 }
 
-export function BulkCardPrint({ members, settings, close, initialClass = "semua" }) {
+export function BulkCardPrint({ members, settings, close, initialClass = "semua", notify }) {
   const classes = useMemo(() => [...new Set(members.map((m) => m.class_name))].sort(), [members]);
   const [klass, setKlass] = useState(initialClass); const [side, setSide] = useState("depan");
   const list = members.filter((m) => klass === "semua" || (m.class_name || "") === klass);
@@ -27,6 +28,12 @@ export function BulkCardPrint({ members, settings, close, initialClass = "semua"
       <div className="bulk-actions">
         <label>Kelas<select data-testid="bulk-class-select" value={klass} onChange={(e) => setKlass(e.target.value)}><option value="semua">Semua kelas</option>{classes.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
         <label>Sisi<select data-testid="bulk-side-select" value={side} onChange={(e) => setSide(e.target.value)}><option value="depan">Depan (data anggota)</option><option value="belakang">Belakang (peraturan)</option><option value="dua">Dua sisi (bolak-balik)</option></select></label>
+        <CardHDButton testId="bulk-png-hd" label="PNG HD (ZIP)" notify={notify} disabled={!list.length} zipName={`kartu-anggota-${safeName(klass === "semua" ? "semua-kelas" : klass)}.zip`} getItems={() => {
+          const root = document.querySelector('[data-testid="bulk-print-view"]'); if (!root) return [];
+          const fronts = side === "belakang" ? [] : list.map((m, i) => ({ el: root.querySelector(`[data-testid="bulk-card-${m.id}"] .id-card`), name: `${String(i + 1).padStart(3, "0")}-${m.id}-${safeName(m.name)}.png` })).filter((x) => x.el);
+          const back = side === "depan" ? null : root.querySelector(".id-card-back");
+          return back ? [...fronts, { el: back, name: "000-belakang-kartu.png" }] : fronts;
+        }}/>
         <button className="primary" data-testid="bulk-print-button" onClick={() => window.print()} disabled={!list.length}><Printer size={16}/> {duplex ? `Cetak dua sisi (${pages * 2} halaman)` : `Cetak ${list.length} kartu`}</button>
         <button className="icon-button" data-testid="bulk-close-button" onClick={close}><X size={18}/></button>
       </div>

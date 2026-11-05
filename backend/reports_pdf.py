@@ -91,6 +91,16 @@ def table_rows(kind, rows):
         plain = [[c["class_name"], str(c["count"]), f"{c['pct']:.1f}%"] for c in st["per_class"]]
         kinds = " · ".join(f"{k['label']}: {k['count']} ({k['pct']:.1f}%)" for k in st["kinds"])
         summary = f"Total pengunjung: {st['total']} · Rata-rata {st['avg_per_day']}/hari · {kinds} · Durasi rata-rata {st['avg_duration_min']} menit"
+    elif kind == "peringkat" and rows.get("audience") == "guru":
+        lb = rows; header = ["Peringkat", "Nama Guru", "Pengunjung", "Hari datang", "Total waktu", "Persentase"]
+        widths = [22 * mm, 110 * mm, 30 * mm, 30 * mm, 34 * mm, 30 * mm]
+        plain = [[s_["name"], str(s_["visits"]), str(s_["days"]), f"{s_.get('minutes', 0) // 60} j {s_.get('minutes', 0) % 60} m", f"{s_['pct']:.1f}%"] for s_ in lb["students"]]
+        summary = f"{lb['label']} · Total kunjungan guru: {lb['total_visits']} · Guru aktif: {lb['active_students']}"
+    elif kind == "peringkat-pinjam" and rows.get("audience") == "guru":
+        lb = rows; header = ["Peringkat", "Nama Guru", "Peminjaman", "Judul berbeda", "Hari meminjam", "Persentase"]
+        widths = [22 * mm, 110 * mm, 30 * mm, 32 * mm, 32 * mm, 30 * mm]
+        plain = [[s_["name"], str(s_["loans"]), str(s_["books"]), str(s_["days"]), f"{s_['pct']:.1f}%"] for s_ in lb["students"]]
+        summary = f"{lb['label']} · Total peminjaman guru: {lb['total_loans']} · Guru meminjam: {lb['active_students']}"
     elif kind == "peringkat":
         lb = rows; header = ["Peringkat", "Nama Siswa", "Kelas", "Pengunjung", "Hari datang", "Total waktu", "Persentase"]
         widths = [22 * mm, 70 * mm, 40 * mm, 30 * mm, 30 * mm, 34 * mm, 30 * mm]
@@ -111,6 +121,14 @@ def table_rows(kind, rows):
     return header, widths, plain, summary
 
 
+def title_of(kind, rows):
+    """Judul laporan; peringkat khusus guru diberi akhiran "(Guru)"."""
+    t = TITLES[kind]
+    if kind in ("peringkat", "peringkat-pinjam") and isinstance(rows, dict) and rows.get("audience") == "guru":
+        t = t.replace("Peringkat", "Peringkat Guru", 1) if t.startswith("Peringkat") else f"{t} (Guru)"
+    return t
+
+
 def render_report_xlsx(kind, period, rows, settings, officer, orientation="landscape"):
     from openpyxl import Workbook
     from openpyxl.drawing.image import Image as XLImage
@@ -118,7 +136,7 @@ def render_report_xlsx(kind, period, rows, settings, officer, orientation="lands
     from openpyxl.utils import get_column_letter
     now = datetime.now(WIB)
     header, widths, plain, summary = table_rows(kind, rows)
-    wb = Workbook(); ws = wb.active; ws.title = TITLES[kind][:30]
+    wb = Workbook(); ws = wb.active; ws.title = title_of(kind, rows)[:30]
     ncol = len(header)
     for logo_val, fallback, col in ((settings.get("school_logo"), "logo-sekolah.jpg", "A"), (settings.get("library_logo"), "logo-perpustakaan.jpg", get_column_letter(ncol))):
         try:
@@ -128,7 +146,7 @@ def render_report_xlsx(kind, period, rows, settings, officer, orientation="lands
     ws.merge_cells(start_row=1, start_column=2, end_row=1, end_column=ncol - 1); ws.merge_cells(start_row=2, start_column=2, end_row=2, end_column=ncol - 1); ws.merge_cells(start_row=3, start_column=2, end_row=3, end_column=ncol - 1)
     ws["B1"] = "PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH"; ws["B1"].font = Font(bold=True, size=14, color="0F2745"); ws["B1"].alignment = Alignment(horizontal="center")
     ws["B2"] = "Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara"; ws["B2"].alignment = Alignment(horizontal="center"); ws["B2"].font = Font(size=9, color="475569")
-    ws["B3"] = f"{TITLES[kind]} — {PERIODS.get(period, period or 'Semua waktu')} · dicetak {fmt_long(now, True)} WIB oleh {officer}"; ws["B3"].alignment = Alignment(horizontal="center"); ws["B3"].font = Font(size=9, italic=True, color="475569")
+    ws["B3"] = f"{title_of(kind, rows)} — {PERIODS.get(period, period or 'Semua waktu')} · dicetak {fmt_long(now, True)} WIB oleh {officer}"; ws["B3"].alignment = Alignment(horizontal="center"); ws["B3"].font = Font(size=9, italic=True, color="475569")
     ws.row_dimensions[1].height = 24; ws.row_dimensions[2].height = 14; ws.row_dimensions[4].height = 6
     ws.cell(row=5, column=1, value=summary).font = Font(bold=True, color="0284C7")
     thin = Side(style="thin", color="CBD5E1"); border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -213,7 +231,7 @@ def render_report_pdf(kind, period, rows, settings, officer, orientation="landsc
     pagesize = A4 if portrait else landscape(A4)
     margin_x = 12 * mm if portrait else 14 * mm
     avail = pagesize[0] - 2 * margin_x
-    doc = SimpleDocTemplate(buf, pagesize=pagesize, leftMargin=margin_x, rightMargin=margin_x, topMargin=12 * mm, bottomMargin=14 * mm, title=TITLES[kind])
+    doc = SimpleDocTemplate(buf, pagesize=pagesize, leftMargin=margin_x, rightMargin=margin_x, topMargin=12 * mm, bottomMargin=14 * mm, title=title_of(kind, rows))
     # Ukuran huruf menyesuaikan lebar kertas: potret lebih sempit -> huruf tabel sedikit lebih kecil & teks dibungkus.
     fs = 7.6 if portrait else 8.5
     h1 = ParagraphStyle("h1", fontName="Helvetica-Bold", fontSize=13.5 if portrait else 15, textColor=NAVY, leading=17 if portrait else 18)
@@ -226,7 +244,7 @@ def render_report_pdf(kind, period, rows, settings, officer, orientation="landsc
     kop = Table([[_logo(settings.get("school_logo"), "logo-sekolah.jpg", logo), [Paragraph("PERPUSTAKAAN SMA NEGERI 1 ABUNG TENGAH", h1), Paragraph("Jln Raya Subik, Desa Pekurun Selatan, Lampung Utara", sub), Paragraph(f"NPSN: {SCHOOL_NPSN}", sub)], _logo(settings.get("library_logo"), "logo-perpustakaan.jpg", logo)]], colWidths=[logo + 4 * mm, avail - 2 * (logo + 4 * mm), logo + 4 * mm])
     kop.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LINEBELOW", (0, 0), (-1, 0), 1.5, NAVY), ("BOTTOMPADDING", (0, 0), (-1, 0), 6)]))
 
-    title = Paragraph(f"{TITLES[kind]} — {PERIODS.get(period, period or 'Semua waktu')}", ParagraphStyle("t", parent=h1, fontSize=12 if portrait else 13, spaceBefore=8))
+    title = Paragraph(f"{title_of(kind, rows)} — {PERIODS.get(period, period or 'Semua waktu')}", ParagraphStyle("t", parent=h1, fontSize=12 if portrait else 13, spaceBefore=8))
     meta = Paragraph(f"Dicetak {fmt_long(now, True)} WIB · {len(rows) if isinstance(rows, list) else rows.get('total', rows.get('total_visits', rows.get('total_loans', 0)))} data · oleh {officer}", sub)
 
     header, widths, plain, summary = table_rows(kind, rows)

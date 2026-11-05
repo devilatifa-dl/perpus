@@ -1,0 +1,32 @@
+/* ===== Kualitas cetak kartu anggota (tajam & jelas) ===== */
+/* QR selalu bersudut tegas (vektor, tanpa anti-alias) */
+.id-card .id-qr,.id-card .id-qr *{shape-rendering:crispEdges}
+/* Teks kartu dirender presisi */
+.id-card,.id-card-back{text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.id-card .photo img,.id-card .card-logo{image-rendering:auto}
+
+@media print{
+  /* Warna & gambar dicetak persis (tanpa dihemat browser) */
+  .id-card,.id-card *,.id-card-back,.id-card-back *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+  /* Efek yang memaksa browser merasterisasi kartu pada resolusi rendah dimatikan saat cetak */
+  .id-card,.id-card *,.id-card-back,.id-card-back *{text-shadow:none!important;filter:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;animation:none!important;transition:none!important}
+  .id-card,.id-card-back{box-shadow:none!important}
+  .id-card .photo,.id-card .photo img{box-shadow:none!important}
+  .id-card .photo img{image-rendering:auto}
+}
+
+/* Wadah render PNG HD (di luar layar) */
+.card-export-host{position:fixed;left:-20000px;top:0;pointer-events:none;z-index:-1;background:transparent}
+.card-export-host .card-export-slot{width:auto!important;height:auto!important;overflow:visible!important}
+.card-export-host .card-export-slot .id-card{zoom:1!important;margin:0!important;box-shadow:none!important;animation:none!important;transition:none!important}
+.card-export-host .card-export-slot .id-card-back{zoom:1!important;margin:0!important;box-shadow:none!important;aspect-ratio:auto!important}
+
+/* Kontrol unduh PNG HD */
+.hd-export{display:inline-flex;align-items:stretch;border-radius:12px;overflow:hidden;border:1px solid #cbd5e1;background:#ffffff}
+.hd-export select{height:auto;border:0;border-right:1px solid #cbd5e1;border-radius:0;padding:0 8px;font-size:12px;font-weight:700;background:#f8fafc;color:#334155;min-width:0}
+.hd-export button{border:0!important;border-radius:0!important;box-shadow:none!important}
+html[data-theme="dark"] .hd-export{background:#1a1530;border-color:#3b3360}
+html[data-theme="dark"] .hd-export select{background:#151126;color:#d4d0f0;border-color:#3b3360}
+.hd-note{font-size:11.5px;color:#64748b;margin:6px 0 0}
+html[data-theme="dark"] .hd-note{color:#94a3b8}
+@media print{.hd-export,.hd-note{display:none!important}}

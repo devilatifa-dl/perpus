@@ -10,7 +10,7 @@ logger = logging.getLogger("media")
 # Foto disimpan langsung di MongoDB (koleksi "files"), tanpa layanan penyimpanan luar.
 APP_NAME = "perpus-smansa"
 MAX_SIDE = 1080
-TARGET_BYTES = 500 * 1024
+TARGET_BYTES = 600 * 1024
 MAX_UPLOAD = 25 * 1024 * 1024
 
 
@@ -28,11 +28,20 @@ def compress_photo(raw: bytes, max_side: int = MAX_SIDE, target: int = TARGET_BY
         img = bg
     elif img.mode != "RGB":
         img = img.convert("RGB")
+    # Foto JPEG yang sudah kecil & tidak perlu diputar disimpan apa adanya (tanpa kompres ulang → tidak menurun kualitasnya)
+    try:
+        src_fmt = (Image.open(io.BytesIO(raw)).format or "").upper()
+        orient = Image.open(io.BytesIO(raw)).getexif().get(0x0112, 1)
+    except Exception:
+        src_fmt, orient = "", 1
+    if src_fmt == "JPEG" and orient in (0, 1) and len(raw) <= target and max(img.size) <= max_side:
+        return raw, img.size
     img.thumbnail((max_side, max_side), Image.LANCZOS)
     out = b""
-    for q in (90, 85, 80, 74, 68, 60):
+    for q in (94, 90, 86, 80, 74, 68, 60):
         buf = io.BytesIO()
-        img.save(buf, "JPEG", quality=q, optimize=True, progressive=True)
+        # kualitas tinggi tanpa chroma subsampling (4:4:4) agar tepi wajah/teks tetap tajam
+        img.save(buf, "JPEG", quality=q, optimize=True, progressive=True, subsampling=0 if q >= 86 else 2)
         out = buf.getvalue()
         if len(out) <= target:
             break
@@ -82,8 +91,6 @@ def build_router(db, current_user):
 
     @r.post("/uploads/photo")
     async def upload_photo(file: UploadFile = File(...), user=Depends(current_user)):
-        if user["role"] == "siswa" and not await photo_upload_allowed(db):
-            raise HTTPException(403, "Unggah foto sedang ditutup oleh petugas perpustakaan")
         raw = await file.read()
         if not raw:
             raise HTTPException(400, "Berkas kosong")

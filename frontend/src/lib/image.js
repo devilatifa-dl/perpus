@@ -96,8 +96,9 @@ export async function optimizeImage(file, kind = "photo") {
 }
 
 // ===== Potong foto anggota =====
-// Kotak foto kartu berukuran ±84×98 (rasio 6:7). Hasil potong 600×700px: tajam untuk layar & cetak.
-export const CARD_PHOTO = { width: 600, height: 700, targetKB: 300 };
+// Kotak foto kartu berukuran ±84×98 (rasio 6:7). Hasil potong 900×1050px (≈ 20×24 mm pada >1000 DPI):
+// tetap tajam saat dicetak 300/600 DPI maupun diekspor PNG HD.
+export const CARD_PHOTO = { width: 900, height: 1050, targetKB: 480 };
 
 const loadSrc = (src) => new Promise((resolve, reject) => {
   const img = new Image();
@@ -134,11 +135,11 @@ export async function cropToDataUrl(src, area, rotation = 0) {
   const cut = document.createElement("canvas"); cut.width = cw; cut.height = ch;
   const cx = cut.getContext("2d"); cx.fillStyle = "#ffffff"; cx.fillRect(0, 0, cw, ch);
   cx.drawImage(rot, Math.round(area.x), Math.round(area.y), cw, ch, 0, 0, cw, ch);
-  // Tidak memperbesar foto kecil (agar tidak buram); hanya diperkecil bila lebih besar dari 600×700
+  // Tidak memperbesar foto kecil (agar tidak buram); hanya diperkecil bila lebih besar dari 900×1050
   const s = Math.min(1, CARD_PHOTO.width / cw);
   const ow = Math.max(1, Math.round(cw * s)); const oh = Math.max(1, Math.round(ch * s));
   const out = drawScaled(cut, ow, oh, true);
   let url = "";
-  for (const q of QUALITY_STEPS) { url = out.toDataURL("image/jpeg", q); if (dataUrlBytes(url) <= CARD_PHOTO.targetKB * 1024) break; }
+  for (const q of [0.95, ...QUALITY_STEPS]) { url = out.toDataURL("image/jpeg", q); if (dataUrlBytes(url) <= CARD_PHOTO.targetKB * 1024) break; }
   return { dataUrl: url, info: { changed: true, cropped: true, after: dataUrlBytes(url), width: ow, height: oh } };
 }

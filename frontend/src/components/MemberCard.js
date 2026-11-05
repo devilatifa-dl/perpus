@@ -1,4 +1,5 @@
 import { QRCodeSVG } from "qrcode.react";
+import "../Circulation.css";
 import { DEFAULT_SETTINGS, LIBRARY_LOGO, SCHOOL_LOGO, cardFontClass, cardSizeVars } from "../lib";
 
 export function MemberCard({ member, settings }) {
@@ -21,8 +22,9 @@ export function MemberCard({ member, settings }) {
       <div className="card-identity">
         {s.card_owner_label && <span className={ff("owner").trim() || undefined} data-testid="card-owner-label">{s.card_owner_label}</span>}
         <h3 className={`${member.name.length > 20 ? "long-name" : ""}${ff("name")}`.trim() || undefined} data-testid="card-member-name">{member.name}</h3>
-        {s.card_show_class !== false && <p className={`card-field card-field-class${ff("class")}`} data-testid="card-class"><i>{s.card_class_label}</i><em>:</em>{member.class_name}</p>}
-        {s.card_show_nis !== false && <p className={`card-field card-field-nis${ff("nis")}`} data-testid="card-nis"><i>{s.card_nis_label}</i><em>:</em>{member.student_id}</p>}
+        {member.member_type === "guru" && <p className={`card-field card-field-class card-field-subject${ff("class")}`} data-testid="card-subject"><i>Mapel</i><em>:</em>{member.subject || "-"}</p>}
+        {member.member_type !== "guru" && s.card_show_class !== false && <p className={`card-field card-field-class${ff("class")}`} data-testid="card-class"><i>{s.card_class_label}</i><em>:</em>{member.class_name}</p>}
+        {member.member_type !== "guru" && s.card_show_nis !== false && <p className={`card-field card-field-nis${ff("nis")}`} data-testid="card-nis"><i>{s.card_nis_label}</i><em>:</em>{member.student_id}</p>}
       </div>
       {s.card_qr_pos === "bawah" && qr}
     </div>

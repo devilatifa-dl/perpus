@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from reports_pdf import WIB
 
+from rank_audience import norm_audience, guru_member_ids, is_guru_row
+
 MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 _db = None
 
@@ -31,7 +33,9 @@ def _wib_day(value) -> str:
         return str(value)[:10]
 
 
-async def loan_leaderboard(month: Optional[str] = None, limit: int = 10):
+async def loan_leaderboard(month: Optional[str] = None, limit: int = 10, audience: str = "siswa"):
+    """audience="siswa" (default, tanpa guru) atau "guru" (khusus anggota guru, tanpa peringkat kelas)."""
+    audience = norm_audience(audience)
     now = datetime.now(WIB)
     if month:
         try:
@@ -44,7 +48,8 @@ async def loan_leaderboard(month: Optional[str] = None, limit: int = 10):
         y, m = now.year, now.month
     key = f"{y:04d}-{m:02d}"
     all_loans = await _db.transactions.find({"action": "pinjam"}, {"_id": 0, "member_id": 1, "member_name": 1, "class_name": 1, "book_id": 1, "book_title": 1, "date": 1}).to_list(200000)
-    rows = [t for t in all_loans if _wib_month(t.get("date")) == key]
+    guru_ids = await guru_member_ids(_db)
+    rows = [t for t in all_loans if _wib_month(t.get("date")) == key and is_guru_row(t, guru_ids) == (audience == "guru")]
     ids = list({t["member_id"] for t in rows if t.get("member_id")})
     members = {x["id"]: x for x in await _db.members.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "name": 1, "class_name": 1, "photo": 1}).to_list(None)} if ids else {}
 
@@ -72,10 +77,10 @@ async def loan_leaderboard(month: Optional[str] = None, limit: int = 10):
             "loans": st["loans"], "books": len(st["books"]), "days": len(st["days"]),
             "pct": round(st["loans"] * 100 / total, 1) if total else 0.0,
         })
-    out_classes = [{"rank": i, "class_name": c["class_name"], "loans": c["loans"], "members": len(c["members"]), "pct": round(c["loans"] * 100 / total, 1) if total else 0.0}
+    out_classes = [] if audience == "guru" else [{"rank": i, "class_name": c["class_name"], "loans": c["loans"], "members": len(c["members"]), "pct": round(c["loans"] * 100 / total, 1) if total else 0.0}
                    for i, c in enumerate(sorted(classes.values(), key=lambda x: (-x["loans"], -len(x["members"]), x["class_name"])), 1)]
     months = sorted({k for k in (_wib_month(t.get("date")) for t in all_loans) if k} | {now.strftime("%Y-%m")}, reverse=True)
-    return {"month": key, "label": f"{MONTHS_ID[m - 1]} {y}", "total_loans": total, "active_students": len(students),
+    return {"month": key, "label": f"{MONTHS_ID[m - 1]} {y}", "audience": audience, "total_loans": total, "active_students": len(students),
             "students": out_students, "classes": out_classes, "months": months}
 
 
@@ -85,7 +90,7 @@ def build_router(db, current_user):
     r = APIRouter()
 
     @r.get("/loans/leaderboard")
-    async def leaderboard(month: Optional[str] = None, user=Depends(current_user)):
-        return await loan_leaderboard(month)
+    async def leaderboard(month: Optional[str] = None, audience: str = "siswa", user=Depends(current_user)):
+        return await loan_leaderboard(month, audience=audience)
 
     return r
