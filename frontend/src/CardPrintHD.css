@@ -30,3 +30,10 @@ html[data-theme="dark"] .hd-export select{background:#151126;color:#d4d0f0;borde
 .hd-note{font-size:11.5px;color:#64748b;margin:6px 0 0}
 html[data-theme="dark"] .hd-note{color:#94a3b8}
 @media print{.hd-export,.hd-note{display:none!important}}
+
+/* Cetak 1 kartu: memakai lembar & slot cetak massal (86 x 56 mm), tidak tampil di layar */
+@media screen{.single-card-print{display:none!important}}
+@media print{
+  body.single-card-mode .single-card-print{display:block!important}
+  body.single-card-mode .single-card-print .print-sheet{min-height:0}
+}

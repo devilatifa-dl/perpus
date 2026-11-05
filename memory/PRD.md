@@ -297,3 +297,9 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - CardPrintHD.css: QR crispEdges, teks geometricPrecision, print-color-adjust exact, efek (shadow/filter/backdrop) dimatikan saat cetak.
 - Foto: potong 900×1050 (sebelumnya 600×700), JPEG 0.95; server (media.py) tidak mengompres ulang JPEG kecil, kualitas 94 + 4:4:4.
 - Paket baru: html-to-image 1.11.11, jszip 3.10.1.
+- GitHub: PR #20 https://github.com/devilatifa-dl/perpus/pull/20 (branch fitur/guru-sirkulasi-peringkat-kartu-hd, 26 file). Token disimpan di /root/.config/perpus/github_token (chmod 600, di luar repo); clone kerja di /root/work/perpus.
+
+## 5 Nov 2026 — Cetak 1 kartu = ukuran cetak massal
+- components/SingleCardPrint.js: tombol "Cetak kartu" kini mencetak lewat lembar & slot yang sama dengan Cetak massal (A4, kartu 86 x 56 mm di posisi slot pertama, sisi depan/belakang sesuai pratinjau). Diverifikasi: kotak cetak 1 kartu = kotak slot pertama cetak massal (325,03 x 211,64 px CSS = 86 x 56 mm).
+- PNG HD sisi belakang memakai elemen .id-card-back (sebelumnya pembungkus).
+- Disimpan ke main melalui PR #20 (merge).
