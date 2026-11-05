@@ -1,0 +1,7 @@
+/* Font kartu anggota (disajikan dari /public/fonts, ikut tersimpan untuk offline) */
+@font-face{font-family:"Shrikhand";src:url("/fonts/Shrikhand-400.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Anton";src:url("/fonts/Anton-400.woff2") format("woff2");font-weight:400;font-display:swap}
+/* Adumu Regular oleh Kyle Hathcoat — gratis untuk penggunaan pribadi & komersial (lihat Adumu-LICENSE.txt) */
+@font-face{font-family:"Adumu";src:url("/fonts/Adumu.ttf") format("truetype");font-weight:400;font-display:swap}
+@font-face{font-family:"El Messiri";src:url("/fonts/ElMessiri-400.woff2") format("woff2");font-weight:400 700;font-display:swap}
+@font-face{font-family:"DM Sans";src:url("/fonts/DMSans-400.woff2") format("woff2");font-weight:100 1000;font-display:swap}

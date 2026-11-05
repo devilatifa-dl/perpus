@@ -1,15 +1,16 @@
-import { DEFAULT_SETTINGS, LIBRARY_LOGO, SCHOOL_LOGO, cardSizeVars } from "../lib";
+import { DEFAULT_SETTINGS, LIBRARY_LOGO, SCHOOL_LOGO, cardFontClass, cardSizeVars } from "../lib";
 
 export function MemberCardBack({ settings, testId = "member-card-back" }) {
   const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+  const ff = (key) => cardFontClass(s, key).trim() || undefined;
   const rules = (s.card_back_rules || "").split("\n").map((r) => r.trim()).filter(Boolean);
   return <div className={`id-card id-card-back fs-on theme-${s.card_theme} layout-${s.card_layout} font-${s.card_font} size-${s.card_font_size}`} data-testid={testId} style={cardSizeVars(s)}>
     <div className="back-head">
       <img src={s.school_logo || SCHOOL_LOGO} alt="Logo sekolah"/>
-      <b data-testid="card-back-title">{s.card_back_title}</b>
+      <b className={ff("back_title")} data-testid="card-back-title">{s.card_back_title}</b>
       <img src={s.library_logo || LIBRARY_LOGO} alt="Logo perpustakaan"/>
     </div>
-    <ol className="back-rules" data-testid="card-back-rules">{rules.map((r, i) => <li key={i}>{r}</li>)}</ol>
-    {s.card_back_web && <div className="back-web" data-testid="card-back-web">{s.card_back_web}</div>}
+    <ol className={`back-rules${cardFontClass(s, "back_rules")}`} data-testid="card-back-rules">{rules.map((r, i) => <li key={i}>{r}</li>)}</ol>
+    {s.card_back_web && <div className={`back-web${cardFontClass(s, "back_web")}`} data-testid="card-back-web">{s.card_back_web}</div>}
   </div>;
 }

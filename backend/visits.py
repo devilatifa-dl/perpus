@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from reports_pdf import WIB
+from offline_sync import client_dt
 
 DEFAULT_CHECKOUT = "14:00"
 STAT_PERIODS = ("harian", "7hari", "30hari", "bulanan", "semua")
@@ -17,6 +18,9 @@ _db = None
 class ScanInput(BaseModel):
     code: str = Field(..., min_length=1, max_length=80)
     purpose: str = Field("", max_length=120)
+    # Diisi bila scan dicatat saat offline lalu disinkronkan
+    client_id: str = Field("", max_length=64)
+    client_time: str = Field("", max_length=40)
 
 
 class PurposeInput(BaseModel):
@@ -27,6 +31,13 @@ class GuestInput(BaseModel):
     name: str = Field(..., min_length=1, max_length=80)
     purpose: str = Field("", max_length=120)
     origin: str = Field("", max_length=80)
+    client_id: str = Field("", max_length=64)
+    client_time: str = Field("", max_length=40)
+
+
+class CheckoutInput(BaseModel):
+    client_id: str = Field("", max_length=64)
+    client_time: str = Field("", max_length=40)
 
 
 class VisitConfigInput(BaseModel):
@@ -281,41 +292,91 @@ def build_router(db, current_user, staff_only, now_iso):
         member = await find_member(data.code)
         if not member:
             raise HTTPException(404, "Kode kartu anggota tidak dikenal")
-        now = datetime.now(timezone.utc)
+        if data.client_id:
+            dup = await db.visits.find_one({"$or": [{"client_id": data.client_id}, {"checkout_client_id": data.client_id}]}, {"_id": 0})
+            if dup:
+                return {"action": "duplikat", "visit": dup, "member": member}
+        offline_at = client_dt(data.client_time)
+        now = offline_at or datetime.now(timezone.utc)
         open_visit = await db.visits.find_one({"member_id": member["id"], "check_out": None}, {"_id": 0}, sort=[("check_in", -1)])
+        if offline_at:
+            # Scan offline yang disinkronkan belakangan: kunjungan bisa sudah ditutup otomatis (jam pulang)
+            # padahal anggota sebenarnya scan keluar lebih awal -> pakai waktu scan sebenarnya.
+            if open_visit and (_parse(open_visit["check_in"]) or now) > now:
+                open_visit = None
+            if not open_visit:
+                t = now.isoformat()
+                auto = await db.visits.find_one({"member_id": member["id"], "checkout_type": "otomatis", "check_in": {"$lte": t}, "check_out": {"$gte": t}}, {"_id": 0}, sort=[("check_in", -1)])
+                if auto:
+                    out = now.isoformat()
+                    await db.visits.update_one({"id": auto["id"]}, {"$set": {"check_out": out, "checkout_type": "scan", "duration_min": _duration(auto["check_in"], out), "checkout_by": user["name"], "checkout_client_id": data.client_id or None, "checkout_offline": True}})
+                    return {"action": "keluar", "visit": await db.visits.find_one({"id": auto["id"]}, {"_id": 0}), "member": member}
         if open_visit:
             cin = _parse(open_visit["check_in"])
             if cin and (now - cin).total_seconds() < 30:
                 return {"action": "sudah_masuk", "visit": open_visit, "member": member}
             out = now.isoformat()
-            await db.visits.update_one({"id": open_visit["id"]}, {"$set": {"check_out": out, "checkout_type": "scan", "duration_min": _duration(open_visit["check_in"], out), "checkout_by": user["name"]}})
+            extra = {"checkout_client_id": data.client_id, "checkout_offline": True} if offline_at else {}
+            await db.visits.update_one({"id": open_visit["id"]}, {"$set": {"check_out": out, "checkout_type": "scan", "duration_min": _duration(open_visit["check_in"], out), "checkout_by": user["name"], **extra}})
             return {"action": "keluar", "visit": await db.visits.find_one({"id": open_visit["id"]}, {"_id": 0}), "member": member}
         last = await db.visits.find_one({"member_id": member["id"]}, {"_id": 0}, sort=[("check_out", -1)])
         if last and last.get("checkout_type") == "scan" and last.get("check_out"):
             lo = _parse(last["check_out"])
             if lo and (now - lo).total_seconds() < 30:
                 return {"action": "sudah_keluar", "visit": last, "member": member}
-        doc = {"id": new_id(), "kind": "anggota", "member_id": member["id"], "student_id": member.get("student_id", ""), "name": member["name"], "class_name": member.get("class_name", ""), "purpose": (data.purpose or "").strip(), "origin": "", "photo": member.get("photo", ""), "check_in": now.isoformat(), "check_out": None, "checkout_type": None, "duration_min": None, "date": today_wib(), "recorded_by": user["name"]}
+        doc = {"id": new_id(), "kind": "anggota", "member_id": member["id"], "student_id": member.get("student_id", ""), "name": member["name"], "class_name": member.get("class_name", ""), "purpose": (data.purpose or "").strip(), "origin": "", "photo": member.get("photo", ""), "check_in": now.isoformat(), "check_out": None, "checkout_type": None, "duration_min": None, "date": now.astimezone(WIB).date().isoformat(), "recorded_by": user["name"]}
+        if data.client_id:
+            doc["client_id"] = data.client_id
+        if offline_at:
+            doc["offline"] = True
         await db.visits.insert_one(doc)
+        if offline_at:
+            await visits_auto_close()  # masuk offline kemarin/pagi -> langsung ditutup otomatis bila sudah lewat jam pulang
+            doc = await db.visits.find_one({"id": doc["id"]}, {"_id": 0}) or doc
         return {"action": "masuk", "visit": _clean(doc), "member": member}
 
     @r.post("/visits/guest")
     async def guest_visit(data: GuestInput, user=Depends(current_user)):
         staff_only(user)
-        doc = {"id": new_id(), "kind": "tamu", "member_id": None, "student_id": "", "name": data.name.strip(), "class_name": "Tamu", "purpose": data.purpose.strip(), "origin": data.origin.strip(), "photo": "", "check_in": now_iso(), "check_out": None, "checkout_type": None, "duration_min": None, "date": today_wib(), "recorded_by": user["name"]}
+        if data.client_id:
+            dup = await db.visits.find_one({"client_id": data.client_id}, {"_id": 0})
+            if dup:
+                return {**dup, "duplicate": True}
+        offline_at = client_dt(data.client_time)
+        now = offline_at or datetime.now(timezone.utc)
+        doc = {"id": new_id(), "kind": "tamu", "member_id": None, "student_id": "", "name": data.name.strip(), "class_name": "Tamu", "purpose": data.purpose.strip(), "origin": data.origin.strip(), "photo": "", "check_in": now.isoformat(), "check_out": None, "checkout_type": None, "duration_min": None, "date": now.astimezone(WIB).date().isoformat(), "recorded_by": user["name"]}
+        if data.client_id:
+            doc["client_id"] = data.client_id
+        if offline_at:
+            doc["offline"] = True
         await db.visits.insert_one(doc)
+        if offline_at:
+            await visits_auto_close()
+            doc = await db.visits.find_one({"id": doc["id"]}, {"_id": 0}) or doc
         return _clean(doc)
 
     @r.post("/visits/{visit_id}/checkout")
-    async def checkout_visit(visit_id: str, user=Depends(current_user)):
+    async def checkout_visit(visit_id: str, data: Optional[CheckoutInput] = None, user=Depends(current_user)):
         staff_only(user)
+        data = data or CheckoutInput()
         v = await db.visits.find_one({"id": visit_id}, {"_id": 0})
         if not v:
             raise HTTPException(404, "Data pengunjung tidak ditemukan")
+        if data.client_id and v.get("checkout_client_id") == data.client_id:
+            return v
+        offline_at = client_dt(data.client_time)
+        cin = _parse(v.get("check_in"))
+        if offline_at and cin and offline_at < cin:
+            offline_at = None
         if v.get("check_out"):
-            raise HTTPException(400, "Pengunjung sudah tercatat keluar")
-        out = now_iso()
-        await db.visits.update_one({"id": visit_id}, {"$set": {"check_out": out, "checkout_type": "manual", "duration_min": _duration(v["check_in"], out), "checkout_by": user["name"]}})
+            # Dicatat keluar saat offline, tapi sementara itu sudah ditutup otomatis: pakai jam keluar sebenarnya
+            if offline_at and v.get("checkout_type") == "otomatis" and offline_at.isoformat() <= v["check_out"]:
+                pass
+            else:
+                raise HTTPException(400, "Pengunjung sudah tercatat keluar")
+        out = offline_at.isoformat() if offline_at else now_iso()
+        extra = {"checkout_client_id": data.client_id or None, "checkout_offline": True} if offline_at else {}
+        await db.visits.update_one({"id": visit_id}, {"$set": {"check_out": out, "checkout_type": "manual", "duration_min": _duration(v["check_in"], out), "checkout_by": user["name"], **extra}})
         return await db.visits.find_one({"id": visit_id}, {"_id": 0})
 
     @r.patch("/visits/{visit_id}/purpose")

@@ -1,4 +1,5 @@
 // Pendaftaran service worker + utilitas PWA (cache, install, status offline)
+import { idbClear } from "./lib/idb";
 const API_CACHE_PREFIX = "perpus-api-";
 const TOKEN_KEY = "perpus_token";
 const WARM_API = /^\/api\/(auth\/me|books|shelves|settings(\/student-photo)?|dashboard|members(\/options)?|transactions|reports(\/summary)?|overdue|reservations(\/mine)?|stocktake|incoming|visits(\/(config|stats|leaderboard|history))?|loans\/leaderboard|account\/(member|history))$/;
@@ -6,6 +7,8 @@ const WARM_API = /^\/api\/(auth\/me|books|shelves|settings(\/student-photo)?|das
 export const emit = (name, detail) => { try { window.dispatchEvent(new CustomEvent(name, { detail })); } catch { /* */ } };
 
 export function clearApiCache() {
+  // Salinan data offline (IndexedDB) ikut dibersihkan; antrean data offline TIDAK dihapus agar tetap tersinkron
+  idbClear("cache").catch(() => {});
   try {
     navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_API_CACHE" });
     if (typeof caches !== "undefined") {

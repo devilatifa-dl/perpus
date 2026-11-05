@@ -14,3 +14,7 @@ import "@/Dark.css";
 import "@/Glass.css";
 import "@/Print.css";
 import "@/BookQr.css";
+// Font, foto & susunan kartu anggota + desainer kartu (dimuat terakhir agar tidak tertimpa)
+import "@/CardDesign.css";
+// Indikator online/offline & antrean data offline
+import "@/Offline.css";

@@ -4,9 +4,11 @@
  * - Aset statis lain (gambar, font, bundle dev): stale-while-revalidate / network-first.
  * - Data API GET (katalog buku, rak, pengaturan, dll): network-first, cadangan cache saat offline.
  * - Login, logout, unggah, unduh berkas, cadangan & pemulihan TIDAK pernah di-cache.
+ * - Halaman admin (/admin: Sirkulasi, Pengunjung, Laporan Pengunjung) & portal siswa disimpan saat install
+ *   sehingga tetap bisa dibuka tanpa internet. Data offline (antrean) disimpan aplikasi di IndexedDB.
  * Ubah VERSION untuk memaksa pembaruan cache.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `perpus-shell-${VERSION}`;
 const STATIC_CACHE = `perpus-static-${VERSION}`;
 const IMG_CACHE = `perpus-img-${VERSION}`;
@@ -16,6 +18,14 @@ const KNOWN = [SHELL_CACHE, STATIC_CACHE, IMG_CACHE, API_CACHE];
 const SHELL_KEY = "/";
 const PRECACHE = [
   "/",
+  "/admin",
+  "/siswa",
+  "/fonts/fonts.css",
+  "/fonts/Shrikhand-400.woff2",
+  "/fonts/Anton-400.woff2",
+  "/fonts/Adumu.ttf",
+  "/fonts/ElMessiri-400.woff2",
+  "/fonts/DMSans-400.woff2",
   "/offline.html",
   "/manifest.json",
   "/logo-sekolah.png",
@@ -45,8 +55,10 @@ self.addEventListener("install", (event) => {
     await Promise.all(PRECACHE.map(async (url) => {
       try {
         const res = await fetch(url, { cache: "reload" });
-        if (res.ok) await cache.put(url, res.clone());
-        if (url === "/" && res.ok) await precacheShellAssets(await res.text());
+        if (!res.ok) return;
+        const isPage = url === "/" || url === "/admin" || url === "/siswa";
+        await (isPage || url.startsWith("/fonts/") ? caches.open(isPage ? SHELL_CACHE : STATIC_CACHE) : Promise.resolve(cache)).then((c) => c.put(url, res.clone()));
+        if (url === "/") await precacheShellAssets(await res.text());
       } catch (e) { /* abaikan, akan dicoba lagi saat runtime */ }
     }));
     await precacheBuildChunks();
@@ -126,14 +138,15 @@ async function navigationHandler(event) {
     const preload = await event.preloadResponse;
     const res = preload || await fetch(event.request);
     if (res && res.ok && (res.headers.get("content-type") || "").includes("text/html")) {
-      event.waitUntil(cache.put(SHELL_KEY, res.clone()));
+      const path = new URL(event.request.url).pathname;
+      event.waitUntil(Promise.all([cache.put(SHELL_KEY, res.clone()), path !== "/" ? cache.put(path, res.clone()) : null]));
     }
     return res;
   })();
   try {
     return await Promise.race([network, timeout(NAV_TIMEOUT)]);
   } catch (e) {
-    const shell = await cache.match(SHELL_KEY);
+    const shell = (await cache.match(new URL(event.request.url).pathname)) || await cache.match(SHELL_KEY);
     if (shell) { event.waitUntil(network.catch(() => {})); return shell; }
     try { return await network; } catch (err) { return (await cache.match("/offline.html")) || Response.error(); }
   }

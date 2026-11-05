@@ -250,3 +250,25 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - 4 Nov 2026: Kartu anggota — baris "Kelas" disembunyikan hanya saat dicetak (CSS @media print di Card.css); tetap tampil di layar/pratinjau. Berlaku untuk cetak satu kartu, cetak massal, dan kartu di portal siswa.
 - 4 Nov 2026: Kartu anggota — nama sekolah & judul kartu (KARTU ANGGOTA PERPUSTAKAAN) rata tengah di layar, desain kartu, dan cetak (Card.css).
 - 4 Nov 2026: Desain kartu → grup "Teks & ukuran teks di kartu" (components/CardTextControls.js): edit nama sekolah, judul kartu, label di atas nama (card_owner_label), label Kelas/NIS (card_class_label, card_nis_label), alamat (card_address); ukuran per teks 50-200% (card_text_sizes: school,title,owner,name,fields,address,code,back_title,back_rules,back_web) via CSS var --k-* (Card.css, kelas fs-on). Backend SettingsInput menyimpan & membatasi nilai.
+
+## 5 Nov 2026 — Pemulihan dari ZIP "perpus-main (4)" ke workspace baru
+- Source asli disalin apa adanya (backend, frontend src/public/plugins/config, package.json, yarn.lock, .yarnrc, memory, plan, scripts, docs, vercel.json, render.yaml, middleware.js). .env bawaan workspace tidak ditimpa. Tidak ada fitur/desain yang diubah.
+- pip install -r requirements.txt, yarn install. backend/.env ditambah JWT_SECRET (baru, acak) + FRONTEND_URL (preview).
+- Tidak ada di ZIP: file .env (sengaja), isi database, GITHUB_TOKEN, OLD_SERVER_ADMIN_EMAIL/PASSWORD (hanya untuk skrip). DB baru di-seed otomatis (4 buku, 3 anggota, 3 rak, 3 akun).
+- Regresi iteration_1: backend 42/43 (1 = endpoint /api/admin/reset-code yang memang sudah dihapus), UI semua halaman tampil.
+
+## 5 Nov 2026 — Mode offline (Sirkulasi, Pengunjung, Laporan Pengunjung) + desain kartu
+- IndexedDB (`frontend/src/lib/idb.js`, `lib/offline.js`): store `cache` (salinan /auth/me, /books, /members, /reports, /visits?date, /visits/history, dll via `cachedGet`) & `queue` (antrean offline: tx, visit-scan, visit-guest, visit-checkout). Saat offline atau request gagal karena jaringan → disimpan di antrean; overlay `applyPendingStaff` / `applyPendingVisits` menampilkan stok, transaksi, pinjaman & pengunjung yang belum tersinkron (tag "Menunggu sinkron").
+- Sinkron otomatis: event `online` + interval 30 dtk + tombol "Sinkronkan". Urut FIFO; 4xx dari server → dibuang otomatis + toast & daftar "Dibuang saat sinkron" (keputusan user); jaringan/5xx/401/403/429 → dicoba lagi nanti.
+- Backend: `client_id` (anti dobel) + `client_time` (waktu kejadian asli, maks 14 hari lalu) di POST /api/transactions, /api/visits/scan, /api/visits/guest, /api/visits/{id}/checkout (`backend/offline_sync.py`). Scan keluar offline setelah auto-keluar → jam keluar asli dipakai.
+- Indikator `OfflineBar` (components/OfflineBar.js, Offline.css) di Sirkulasi, Pengunjung, Laporan → Pengunjung. Pencarian nama pengunjung offline memakai daftar anggota tersimpan.
+- Service worker v3: precache /admin, /siswa, font kartu; halaman terakhir (menu admin) diingat di localStorage `perpus-admin-view`.
+- Kartu anggota: font Shrikhand, Anton, Adumu Regular (Kyle Hathcoat, gratis pribadi & komersial), El Messiri (pengganti Montaser Arabic — tidak ada sumber gratis resmi; keputusan user), DM Sans — file di public/fonts (+ fonts.css). Font per teks (`card_text_fonts`), ukuran Kelas & NIS terpisah (`class`,`nis`; `fields` lama tetap dihormati), tampil/sembunyi Kelas/NIS/Kode/Alamat, foto: posisi kiri/kanan/atas, bentuk kotak/membulat/bulat, ukuran 60–160% (`card_photo_size`, `card_photo_shape`).
+- Desain kartu dirapikan: 4 tab (Tampilan · Teks & font · Foto & logo · Belakang), baris ringkas (teks + font + ukuran), tombol Bawaan.
+- Cetak massal: baris Kelas disembunyikan juga di pratinjau (CardDesign.css).
+- Catatan: file sisa tidak terpakai /app/fonts_dl, public/fonts/Adumu-400.woff2, DMSans-700.woff2, ElMessiri-700.woff2 (tidak bisa dihapus dari sesi ini).
+
+## Update: Kelola Antrean Offline
+- Data offline yang ditolak server tidak hilang: tersimpan di perangkat (IndexedDB "rejected") dan tampil di panel status Online/Offline (Sirkulasi, Pengunjung, Laporan Kunjungan) dengan alasan penolakan.
+- Aksi: Coba lagi, Hapus, Hapus semua; data menunggu sinkron bisa Dibatalkan. Hapus/batalkan pakai konfirmasi 2 klik.
+- Sesi login disimpan di perangkat saat login agar aplikasi tetap bisa dibuka ulang saat offline; dihapus saat logout.
