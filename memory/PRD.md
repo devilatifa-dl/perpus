@@ -303,3 +303,6 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - components/SingleCardPrint.js: tombol "Cetak kartu" kini mencetak lewat lembar & slot yang sama dengan Cetak massal (A4, kartu 86 x 56 mm di posisi slot pertama, sisi depan/belakang sesuai pratinjau). Diverifikasi: kotak cetak 1 kartu = kotak slot pertama cetak massal (325,03 x 211,64 px CSS = 86 x 56 mm).
 - PNG HD sisi belakang memakai elemen .id-card-back (sebelumnya pembungkus).
 - Disimpan ke main melalui PR #20 (merge).
+
+## 5 Nov 2026 — Teks "Guru" di kartu cetak
+- MemberCard: baris data-testid card-role "Guru" di bawah nama untuk anggota guru; hanya tampil saat cetak (cetak 1 kartu, cetak massal, PNG HD), di layar tetap Mapel.

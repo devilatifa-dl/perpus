@@ -37,3 +37,9 @@ html[data-theme="dark"] .hd-note{color:#94a3b8}
   body.single-card-mode .single-card-print{display:block!important}
   body.single-card-mode .single-card-print .print-sheet{min-height:0}
 }
+
+/* Kartu guru: teks "Guru" di bawah nama HANYA saat dicetak (cetak 1 kartu, cetak massal & PNG HD) */
+.id-card .card-field-role{display:none;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.id-card.fs-on .id-card-body .card-identity p.card-field-role{font-size:calc(var(--fbase) * var(--k-class,1))}
+.bulk-print .id-card .card-field-role,.card-export-host .id-card .card-field-role{display:block!important}
+@media print{.id-card .card-field-role{display:block!important}}
