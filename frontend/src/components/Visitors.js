@@ -5,7 +5,8 @@ import { applyPendingVisitDay, cachedGet, enqueue, isNetErr, useOffline } from "
 import { OfflineBar, PendingTag } from "./OfflineBar";
 import { ShowMore } from "../lib/showMore";
 import { Modal } from "./Shared";
-import { beep, cameraError, createCamera, unlockAudio } from "../lib/camera";
+import { cameraError, createCamera, scanSound, unlockAudio } from "../lib/camera";
+import { SoundControl } from "./SoundControl";
 
 const COOLDOWN_MS = 1000;
 
@@ -152,16 +153,16 @@ export function Visitors({ notify, members = [] }) {
     const c = (raw || "").trim(); if (!c || busyRef.current) return null;
     busyRef.current = true; setBusy(true);
     let out = null;
-    const offlineScan = async () => { let r; try { r = await scanOffline(c); } catch (err) { r = { action: "error", message: "Gagal menyimpan data offline di perangkat" }; } beep(r.action === "masuk" || r.action === "keluar"); flash(r); return r; };
+    const offlineScan = async () => { let r; try { r = await scanOffline(c); } catch (err) { r = { action: "error", message: "Gagal menyimpan data offline di perangkat" }; } scanSound(r.action); flash(r); return r; };
     try {
       if (isOffline()) out = await offlineScan();
       else {
         const { data: r } = await api.post("/visits/scan", { code: c, purpose: resolvePurpose(purposeRef.current, otherRef.current) });
-        beep(r.action === "masuk" || r.action === "keluar"); flash(r); load(); out = r;
+        scanSound(r.action); flash(r); load(); out = r;
       }
     } catch (e) {
       if (isNetErr(e)) out = await offlineScan();
-      else { beep(false); out = { action: "error", message: e.response?.data?.detail || "Gagal memproses kode" }; flash(out); }
+      else { scanSound("error"); out = { action: "error", message: e.response?.data?.detail || "Gagal memproses kode" }; flash(out); }
     }
     finally {
       busyRef.current = false; setBusy(false); setCode(""); setSugs([]); setSugActive(-1);
@@ -219,7 +220,7 @@ export function Visitors({ notify, members = [] }) {
     <OfflineBar testId="offline-bar-visitors" kinds={["visit-"]}/>
     <div className="visit-top">
       <section className="panel visit-kiosk" ref={kioskRef} data-testid="visit-kiosk">
-        <div className="panel-title"><div><p className="eyebrow">BUKU TAMU DIGITAL</p><h3>Scan kartu saat masuk &amp; keluar</h3></div><button className="icon-button" title="Layar penuh" data-testid="visit-fullscreen-button" onClick={fullscreen}><Maximize2 size={17}/></button></div>
+        <div className="panel-title"><div><p className="eyebrow">BUKU TAMU DIGITAL</p><h3>Scan kartu saat masuk &amp; keluar</h3></div><div className="visit-kiosk-tools"><SoundControl/><button className="icon-button" title="Layar penuh" data-testid="visit-fullscreen-button" onClick={fullscreen}><Maximize2 size={17}/></button></div></div>
         <div className="visit-kiosk-body">
           <div className="visit-scan-area">
             {camOn ? <LiveScanner onCode={submitCode}/> : <div className="visit-scan-idle"><ScanLine size={44}/><b>Siap memindai</b><span>Arahkan alat pemindai QR ke kartu anggota, atau nyalakan kamera.</span></div>}
