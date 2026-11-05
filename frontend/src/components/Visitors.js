@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Camera, CameraOff, CheckCircle2, Clock, DoorClosed, DoorOpen, Keyboard, LogIn, LogOut, Maximize2, Pencil, ScanLine, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Camera, CameraOff, CheckCircle2, Clock, DoorClosed, DoorOpen, LogIn, LogOut, Maximize2, Pencil, ScanLine, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import { api, isOffline } from "../lib";
 import { applyPendingVisitDay, cachedGet, enqueue, isNetErr, useOffline } from "../lib/offline";
 import { OfflineBar, PendingTag } from "./OfflineBar";
@@ -108,11 +108,6 @@ export function Visitors({ notify, members = [] }) {
   const setOther = (v) => { setOtherState(v); try { localStorage.setItem(OTHER_KEY, v); } catch { /* abaikan */ } };
   const [guestOther, setGuestOther] = useState("");
   const [purposeEdit, setPurposeEdit] = useState(null);
-  // Keyboard layar HP tidak langsung muncul: kolom tetap fokus untuk alat pemindai (inputMode "none"),
-  // keyboard baru tampil setelah petugas menekan tombol keyboard.
-  const [kbOn, setKbOn] = useState(false);
-  const kbOpening = useRef(false);
-  const openKeyboard = () => { setKbOn(true); const el = inputRef.current; if (!el) return; kbOpening.current = true; el.blur(); setTimeout(() => { el.focus(); kbOpening.current = false; }, 60); };
   const inputRef = useRef(null); const kioskRef = useRef(null); const resultTimer = useRef(null); const camOnRef = useRef(false); const busyRef = useRef(false);
   camOnRef.current = camOn;
   const isToday = date === todayStr();
@@ -169,7 +164,7 @@ export function Visitors({ notify, members = [] }) {
       else { beep(false); out = { action: "error", message: e.response?.data?.detail || "Gagal memproses kode" }; flash(out); }
     }
     finally {
-      busyRef.current = false; setBusy(false); setCode(""); setSugs([]); setSugActive(-1); setKbOn(false);
+      busyRef.current = false; setBusy(false); setCode(""); setSugs([]); setSugActive(-1);
       // Di HP jangan fokus ke kolom ketik saat kamera aktif (keyboard akan menutupi kamera)
       if (!camOnRef.current) inputRef.current?.focus();
     }
@@ -238,7 +233,7 @@ export function Visitors({ notify, members = [] }) {
             </div>
             <form className="visit-code-form" onSubmit={onSearchSubmit} autoComplete="off">
               <div className="visit-search-wrap">
-                <label>Nama siswa / kode kartu / NIS<div className="visit-search-input"><Search size={16}/><input ref={inputRef} data-testid="visit-code-input" data-keyboard={kbOn ? "on" : "off"} inputMode={kbOn ? "text" : "none"} placeholder={kbOn ? "Ketik nama, kode kartu, atau NIS" : "Scan kartu / ketuk ikon keyboard"} value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={onSearchKey} onBlur={() => { setTimeout(() => setSugs([]), 150); if (!code && !kbOpening.current) setKbOn(false); }} disabled={!isToday} autoComplete="off"/>{code && <button type="button" className="visit-search-clear" aria-label="Hapus" data-testid="visit-code-clear" onClick={() => { setCode(""); inputRef.current?.focus(); }}><X size={14}/></button>}<button type="button" className={`visit-kb-toggle${kbOn ? " on" : ""}`} aria-label={kbOn ? "Tutup keyboard" : "Buka keyboard untuk mengetik"} aria-pressed={kbOn} title={kbOn ? "Tutup keyboard" : "Ketik manual"} data-testid="visit-keyboard-toggle" disabled={!isToday} onMouseDown={(e) => e.preventDefault()} onClick={() => { if (kbOn) { setKbOn(false); inputRef.current?.blur(); } else openKeyboard(); }}><Keyboard size={16}/></button></div></label>
+                <label>Nama siswa / kode kartu / NIS<div className="visit-search-input"><Search size={16}/><input ref={inputRef} data-testid="visit-code-input" placeholder="Ketik nama, atau scan kartu lalu Enter" value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={onSearchKey} onBlur={() => setTimeout(() => setSugs([]), 150)} disabled={!isToday} autoComplete="off"/>{code && <button type="button" className="visit-search-clear" aria-label="Hapus" data-testid="visit-code-clear" onClick={() => { setCode(""); inputRef.current?.focus(); }}><X size={14}/></button>}</div></label>
                 <MemberSuggest items={sugs} active={sugActive} onPick={pickMember}/>
               </div>
               <button className="primary" data-testid="visit-code-submit" disabled={busy || !isToday}><LogIn size={16}/> {busy ? "Memproses..." : "Catat"}</button>

@@ -237,15 +237,3 @@ html[data-theme="dark"] .class-photo-badge.done{background:rgba(34,197,94,.14);c
 html[data-theme="dark"] .no-photo-text{color:#fcd34d}
 html[data-theme="dark"] .photo-done-text{color:#86efac}
 @media(max-width:640px){.class-photo-badge{font-size:0;padding:5px}.class-photo-badge svg{margin:0}}
-
-/* Halaman Pengunjung: tombol keyboard (keyboard layar HP hanya muncul bila ditekan) */
-.visit-search-input input{padding-right:88px!important}
-.visit-kb-toggle{position:absolute;right:6px;width:38px;height:34px;border-radius:9px;border:1px solid #ddd6fe;background:#f5f3ff;color:#6d28d9;display:grid;place-items:center;cursor:pointer;transition:transform .15s ease,opacity .15s ease}
-.visit-kb-toggle:hover:not(:disabled){transform:translateY(-1px)}
-.visit-kb-toggle:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
-.visit-kb-toggle.on{background:#7c3aed;border-color:#7c3aed;color:#fff}
-.visit-kb-toggle:disabled{opacity:.5;cursor:default}
-html[data-theme="dark"] .visit-kb-toggle{background:#251d4a;border-color:#4c1d95;color:#ddd6fe}
-html[data-theme="dark"] .visit-kb-toggle.on{background:#7c3aed;color:#fff}
-@media(max-width:640px){.visit-kb-toggle{width:44px;height:40px}.visit-search-input input{padding-right:100px!important}.visit-search-clear{right:56px!important}}
-
