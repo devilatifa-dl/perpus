@@ -272,3 +272,34 @@ Backend FastAPI + MongoDB (motor). Frontend React + react-router-dom + Tailwind 
 - Data offline yang ditolak server tidak hilang: tersimpan di perangkat (IndexedDB "rejected") dan tampil di panel status Online/Offline (Sirkulasi, Pengunjung, Laporan Kunjungan) dengan alasan penolakan.
 - Aksi: Coba lagi, Hapus, Hapus semua; data menunggu sinkron bisa Dibatalkan. Hapus/batalkan pakai konfirmasi 2 klik.
 - Sesi login disimpan di perangkat saat login agar aplikasi tetap bisa dibuka ulang saat offline; dihapus saat logout.
+
+## 5 Nov 2026 — Pemulihan dari ZIP "perpus-main" (sesi baru)
+- Source asli disalin apa adanya (backend, frontend src/public/plugins/config, package.json, yarn.lock, .yarnrc, memory, plan, scripts, docs, vercel.json, render.yaml, middleware.js). .env bawaan workspace tidak ditimpa. Tidak ada fitur/desain yang diubah.
+- pip install -r requirements.txt, yarn install --frozen-lockfile. backend/.env ditambah JWT_SECRET (baru, acak) + FRONTEND_URL (preview).
+- Tidak ada di ZIP: .env (sengaja), isi database. DB di-seed otomatis (keputusan user: data contoh dulu, data asli dipulihkan sendiri lewat Akun & sandi → Pulihkan data).
+- Folder root tests/ & test_reports/ lama tidak disalin (dikunci sistem uji workspace).
+- Regresi iteration_1: backend 25/25, frontend semua halaman lulus; uji tulis manual (buku, anggota, pinjam/kembali, scan pengunjung, Excel) OK, data uji dihapus.
+
+## 5 Nov 2026 — Anggota Guru, layar sukses sirkulasi, aturan foto baru
+- Anggota tipe Guru: `member_type` ("siswa"|"guru") + `subject` (mapel). Guru: tanpa NIS, `class_name` otomatis "Guru" (normalize_member di server.py) → daftar per kelas (grup "Guru" paling atas), cetak massal per kelas, laporan (kolom Kelas = "Guru", mapel tidak pernah ada di laporan/PDF/Excel). Naik kelas menolak kelas "Guru"; impor Excel tidak menyentuh guru.
+- Form tambah/edit anggota (components/MemberForm.js): pilihan Siswa/Guru; Guru → kolom Mata Pelajaran saja. Daftar: tag "Guru" + "Mapel: X". Kartu: baris "Mapel" (data-testid card-subject) hanya di layar — disembunyikan saat cetak satu kartu & cetak massal (Circulation.css).
+- Sirkulasi (components/CirculationResult.js): layar hasil hijau (nama anggota, judul, status Dipinjam/Dikembalikan) ±2,6 dtk lalu hilang; gagal → layar merah. Bunyi Web Audio (lib/camera.js scanSound): pinjam "masuk" 2 nada naik, kembali "keluar" 3 nada turun, gagal "error" dengung rendah.
+- Foto: tombol on/off "Foto siswa" dihapus (StudentPhotoSwitch dihapus; /settings/student-photo selalu open). Portal siswa: pilihan tipe Siswa/Guru saat unggah. Siswa/guru & petugas hanya bisa unggah bila belum ada foto; mengganti/menghapus foto yang sudah ada hanya admin (POST /members/{id}/photo & PUT /members/{id}).
+- Diuji: iteration_2 (backend 30/30) + uji manual layar sukses, bunyi, sembunyi mapel saat cetak.
+
+## 5 Nov 2026 — Peringkat dipisah Siswa / Guru
+- Backend: `audience` ("siswa" default | "guru") di GET /visits/leaderboard, /loans/leaderboard, dan /reports/export.pdf|xlsx (type peringkat / peringkat-pinjam). Helper rank_audience.py (guru = member_type guru atau kelas tercatat "Guru"). Peringkat guru tanpa peringkat kelas; PDF/Excel guru: judul "Peringkat Guru Rajin …", kolom tanpa Kelas, nama file berakhiran -guru. Cadangan ZIP menambah laporan/07-Peringkat-Guru-Berkunjung & 08-Peringkat-Guru-Meminjam (bila ada aktivitas guru).
+- Frontend: AudienceSwitch (Siswa/Guru, teal) di atas peringkat (admin Laporan & portal siswa); pilihan admin tetap saat pindah tab berkunjung/meminjam; disembunyikan saat cetak.
+- Diuji: iteration_3 (backend 11/11, frontend lulus). Data asli user (guru Devi Latifa) tidak diubah.
+
+## 5 Nov 2026 — Kualitas cetak kartu (HD)
+- lib/cardExport.js + components/CardHDButton.js: "Unduh PNG HD" (300/600 DPI) di panel kartu & "PNG HD (ZIP)" di Cetak massal. Kartu dirender ulang (html-to-image) pada ukuran fisik 86×56 mm: 300 DPI = 1016×661 px, 600 DPI = 2031×1322 px; PNG diberi chunk pHYs (DPI). Font kartu (lokal /fonts + Google Fonts) disematkan. Baris Kelas & Mapel tidak ikut (sama seperti cetak). ZIP: kartu depan + belakang (sesuai pilihan Sisi) + BACA-SAYA.txt.
+- CardPrintHD.css: QR crispEdges, teks geometricPrecision, print-color-adjust exact, efek (shadow/filter/backdrop) dimatikan saat cetak.
+- Foto: potong 900×1050 (sebelumnya 600×700), JPEG 0.95; server (media.py) tidak mengompres ulang JPEG kecil, kualitas 94 + 4:4:4.
+- Paket baru: html-to-image 1.11.11, jszip 3.10.1.
+- GitHub: PR #20 https://github.com/devilatifa-dl/perpus/pull/20 (branch fitur/guru-sirkulasi-peringkat-kartu-hd, 26 file). Token disimpan di /root/.config/perpus/github_token (chmod 600, di luar repo); clone kerja di /root/work/perpus.
+
+## 5 Nov 2026 — Cetak 1 kartu = ukuran cetak massal
+- components/SingleCardPrint.js: tombol "Cetak kartu" kini mencetak lewat lembar & slot yang sama dengan Cetak massal (A4, kartu 86 x 56 mm di posisi slot pertama, sisi depan/belakang sesuai pratinjau). Diverifikasi: kotak cetak 1 kartu = kotak slot pertama cetak massal (325,03 x 211,64 px CSS = 86 x 56 mm).
+- PNG HD sisi belakang memakai elemen .id-card-back (sebelumnya pembungkus).
+- Disimpan ke main melalui PR #20 (merge).

@@ -192,8 +192,11 @@ async def visit_stats(period: str = "7hari"):
 MONTHS_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
 
-async def visit_leaderboard(month: Optional[str] = None, limit: int = 10):
-    """Peringkat siswa & kelas dengan kunjungan terbanyak dalam satu bulan (WIB)."""
+async def visit_leaderboard(month: Optional[str] = None, limit: int = 10, audience: str = "siswa"):
+    """Peringkat kunjungan terbanyak dalam satu bulan (WIB).
+    audience="siswa" (default, guru tidak ikut) atau "guru" (khusus guru, tanpa peringkat kelas)."""
+    from rank_audience import norm_audience, guru_member_ids, is_guru_row
+    audience = norm_audience(audience)
     now = datetime.now(WIB)
     if month:
         try:
@@ -204,7 +207,9 @@ async def visit_leaderboard(month: Optional[str] = None, limit: int = 10):
     else:
         y, m = now.year, now.month
     key = f"{y:04d}-{m:02d}"
-    rows = [r for r in await _db.visits.find({"kind": "anggota", "date": {"$regex": f"^{key}"}}, {"_id": 0, "photo": 0}).limit(50000).to_list(50000)]
+    guru_ids = await guru_member_ids(_db)
+    rows = [r for r in await _db.visits.find({"kind": "anggota", "date": {"$regex": f"^{key}"}}, {"_id": 0, "photo": 0}).limit(50000).to_list(50000)
+            if is_guru_row(r, guru_ids) == (audience == "guru")]
     students, classes = {}, {}
     for r in rows:
         mid = r.get("member_id") or r.get("name")
@@ -220,10 +225,10 @@ async def visit_leaderboard(month: Optional[str] = None, limit: int = 10):
     for i, st in enumerate(ranked[:limit], 1):
         mem = members.get(st["member_id"]) or {}
         out_students.append({"rank": i, "member_id": st["member_id"], "name": mem.get("name") or st["name"], "class_name": mem.get("class_name") or st["class_name"], "photo": mem.get("photo", ""), "visits": st["visits"], "days": len(st["days"]), "minutes": st["minutes"], "pct": round(st["visits"] * 100 / total, 1) if total else 0.0})
-    out_classes = [{"rank": i, "class_name": c["class_name"], "visits": c["visits"], "members": len(c["members"]), "pct": round(c["visits"] * 100 / total, 1) if total else 0.0}
+    out_classes = [] if audience == "guru" else [{"rank": i, "class_name": c["class_name"], "visits": c["visits"], "members": len(c["members"]), "pct": round(c["visits"] * 100 / total, 1) if total else 0.0}
                    for i, c in enumerate(sorted(classes.values(), key=lambda x: (-x["visits"], -len(x["members"]), x["class_name"])), 1)]
     months = sorted({(v.get("date") or "")[:7] for v in await _db.visits.find({"kind": "anggota"}, {"_id": 0, "date": 1}).to_list(50000) if v.get("date")} | {now.strftime("%Y-%m")}, reverse=True)
-    return {"month": key, "label": f"{MONTHS_ID[m - 1]} {y}", "total_visits": total, "active_students": len(students), "students": out_students, "classes": out_classes, "months": months}
+    return {"month": key, "label": f"{MONTHS_ID[m - 1]} {y}", "audience": audience, "total_visits": total, "active_students": len(students), "students": out_students, "classes": out_classes, "months": months}
 
 
 def build_router(db, current_user, staff_only, now_iso):
@@ -419,9 +424,9 @@ def build_router(db, current_user, staff_only, now_iso):
         return [v for v in rows if in_visit_period(v.get("check_in"), period, now)]
 
     @r.get("/visits/leaderboard")
-    async def leaderboard(month: Optional[str] = None, user=Depends(current_user)):
+    async def leaderboard(month: Optional[str] = None, audience: str = "siswa", user=Depends(current_user)):
         await visits_auto_close()
-        data = await visit_leaderboard(month)
+        data = await visit_leaderboard(month, audience=audience)
         if user.get("role") == "siswa":
             for st in data["students"]:
                 st.pop("minutes", None)
