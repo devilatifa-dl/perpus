@@ -25,7 +25,7 @@ services:
     autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11.9"
+        value: "3.13.17"
       - key: MONGO_URL          # dari MongoDB Atlas (mongodb+srv://...)
         sync: false
       - key: DB_NAME

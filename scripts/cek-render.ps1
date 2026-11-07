@@ -10,7 +10,7 @@
 param(
   [string]$Url = "",
   [string]$VercelToken = "",
-  [string]$VercelProject = "perpusmansa",
+  [string]$VercelProject = "perpus",
   [int]$TimeoutSec = 90
 )
 
