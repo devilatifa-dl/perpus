@@ -65,6 +65,16 @@ if ($be.Count -eq 0) {
 Write-Host "Backend: OK (port $BackendPort)" -ForegroundColor Green
 
 # 3. Jalankan tunnel, tangkap URL-nya
+$running = @(Get-Process cloudflared -ErrorAction SilentlyContinue)
+if ($running.Count -gt 0) {
+  Write-Host ""
+  Write-Host "Sudah ada cloudflared berjalan (PID $($running.Id -join ', '))." -ForegroundColor Yellow
+  Write-Host "Kalau tunnel lama masih dipakai produksi, JANGAN jalankan skrip ini lagi" -ForegroundColor Yellow
+  Write-Host "(URL baru akan berbeda dan situs jadi putus sampai BACKEND_URL diperbarui)." -ForegroundColor Yellow
+  Write-Host "Hentikan dulu: Stop-Process -Id $($running.Id -join ',')" -ForegroundColor DarkGray
+  exit 1
+}
+
 Write-Host ""
 Write-Host "Membuka tunnel Cloudflare..." -ForegroundColor Cyan
 $logFile = Join-Path $env:TEMP "perpus-tunnel.log"
@@ -73,7 +83,7 @@ if (Test-Path $logFile) { Remove-Item $logFile -Force }
 $proc = Start-Process -FilePath $cloudflared -ArgumentList "tunnel","--url","http://127.0.0.1:$BackendPort","--no-autoupdate" -RedirectStandardError $logFile -RedirectStandardOutput "$logFile.out" -PassThru -WindowStyle Hidden
 
 $url = $null
-for ($i = 0; $i -lt 40; $i++) {
+for ($i = 0; $i -lt 20; $i++) {
   Start-Sleep -Seconds 2
   if (Test-Path $logFile) {
     $txt = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
@@ -94,18 +104,18 @@ Write-Host "URL publik backend:" -ForegroundColor Cyan
 Write-Host "  $url" -ForegroundColor Green
 Write-Host ""
 
-# 4. Uji tunnel
+# 4. Uji tunnel (maks ~40 detik; DNS trycloudflare kadang butuh waktu)
 Write-Host "Menguji tunnel..." -ForegroundColor Cyan
 $ok = $false
-for ($i = 0; $i -lt 15; $i++) {
+for ($i = 0; $i -lt 8; $i++) {
   try {
-    $r = Invoke-WebRequest -Uri "$url/api/" -TimeoutSec 30 -UseBasicParsing -ErrorAction Stop
+    $r = Invoke-WebRequest -Uri "$url/api/" -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
     if ($r.Content -match "aktif") { $ok = $true; break }
   } catch { }
   Start-Sleep -Seconds 3
 }
 if ($ok) { Write-Host "  Tunnel OK - backend dapat diakses dari internet" -ForegroundColor Green }
-else { Write-Host "  Tunnel belum merespons. Tunggu 30 detik lalu coba buka $url/api/ di browser." -ForegroundColor Yellow }
+else { Write-Host "  Tunnel belum merespons. Tunggu 30 detik lalu buka $url/api/ di browser." -ForegroundColor Yellow }
 
 # 5. Perbarui BACKEND_URL di Vercel (opsional)
 if (-not $VercelToken) {
