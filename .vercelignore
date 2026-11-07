@@ -1,0 +1,13 @@
+# Jangan unggah artefak besar ke Vercel
+backend/.venv
+backend/__pycache__
+backend/tests
+backend/.pytest_cache
+backend/backend_test*.py
+backend/test_*.py
+frontend/node_modules
+frontend/build
+frontend/.cache
+.git
+*.zip
+*.log
