@@ -105,6 +105,56 @@ situs akan error karena `/api/` tidak punya tujuan.
 > **Kalau nama `perpus-backend` sudah dipakai** (misalnya dari percobaan sebelumnya), Render akan
 > memberi nama lain seperti `perpus-backend-abc1`. Pakai URL yang Anda dapat di langkah 3.
 
+### Cara tahu Render sudah Live
+
+Ada 3 cara, pilih yang paling mudah:
+
+**Cara 1 - lihat dashboard Render (paling jelas)**
+
+Buka https://dashboard.render.com -> klik layanan `perpus-backend`.
+Status di bagian atas:
+
+| Status | Artinya |
+|---|---|
+| `Deploying` / `Building` | masih proses, tunggu |
+| `Live` (hijau) | **sudah siap dipakai** |
+| `Failed` | build gagal, buka tab **Logs** |
+| `Suspended` | layanan dihentikan |
+
+**Cara 2 - buka URL di browser**
+
+```
+https://<nama-layanan>.onrender.com/api
+```
+
+Kalau muncul `{"message":"Perpustakaan SMA Negeri 1 Abung Tengah aktif"}` berarti **Live**.
+Kalau muncul halaman Render "Service Not Found" atau error 502, belum siap.
+
+**Cara 3 - jalankan skrip otomatis**
+
+```powershell
+cd "c:\Stiawan Dev\Project Perpus\perpus-main"
+powershell -ExecutionPolicy Bypass -File scripts\cek-render.ps1
+```
+
+Skrip menguji beberapa kandidat nama dan melapor mana yang Live.
+Kalau nama layanan Anda berbeda, sebutkan URL-nya:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\cek-render.ps1 -Url https://nama-anda.onrender.com
+```
+
+**Isi BACKEND_URL otomatis (opsional)**
+
+Kalau Anda punya token Vercel (buat di https://vercel.com/account/tokens), skrip bisa
+mengisi env dan redeploy sekaligus:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\cek-render.ps1 -Url https://nama-anda.onrender.com -VercelToken "token-vercel-anda"
+```
+
+Tanpa `-VercelToken`, skrip hanya melapor dan tidak mengubah apa pun.
+
 ### Uji backend
 
 Buka di browser:
