@@ -21,7 +21,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from pydantic import BaseModel
 
 logger = logging.getLogger("restore")
-CHUNK_SIZE = 8 * 1024 * 1024  # 8 MB per potongan (jauh di bawah batas hosting & batas dokumen MongoDB 16 MB)
+# Vercel menolak body request > 4,5 MB (FUNCTION_PAYLOAD_TOO_LARGE) sebelum sampai ke backend.
+# Potongan dibuat 3 MB agar aman di semua hosting; jumlah potongan menyesuaikan ukuran berkas,
+# sehingga cadangan berukuran berapa pun (100 MB, 1 GB, ...) tetap bisa dipulihkan.
+CHUNK_SIZE = 3 * 1024 * 1024
+MAX_RESTORE = 2 * 1024 * 1024 * 1024  # batas wajar ukuran berkas cadangan (2 GB)
 BATCH = 500
 JSON_MEMBER = "data-cadangan.json"
 
@@ -30,7 +34,7 @@ class StartInput(BaseModel):
     code: str = ""
     filename: str = ""
     size: int = 0
-    chunks: int
+    chunks: int = 0  # opsional: server menghitung sendiri dari `size`
 
 
 class FinishInput(BaseModel):
@@ -300,7 +304,12 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
     @r.post("/admin/restore/start")
     async def start(data: StartInput, user=Depends(current_user)):
         admin_only(user)
-        if data.chunks < 1:
+        size = max(0, data.size)
+        if size > MAX_RESTORE:
+            raise HTTPException(400, f"Ukuran cadangan melebihi batas {MAX_RESTORE // (1024 * 1024)} MB")
+        # Jumlah potongan dihitung server dari ukuran berkas, jadi klien versi lama pun tetap cocok.
+        chunks = max(1, -(-size // CHUNK_SIZE)) if size else max(1, data.chunks)
+        if chunks < 1:
             raise HTTPException(400, "Berkas cadangan kosong")
         if await db.restore_uploads.find_one({"status": "processing"}, {"_id": 0, "id": 1}):
             raise HTTPException(409, "Pemulihan lain sedang berjalan. Tunggu sampai selesai.")
@@ -311,10 +320,10 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
             await db.restore_chunks.delete_many({"upload_id": j["id"]})
         await db.restore_uploads.delete_many({"created_at": {"$lt": old}})
         upload_id = "RS-" + uuid.uuid4().hex[:12].upper()
-        await db.restore_uploads.insert_one({"id": upload_id, "user_id": user["id"], "filename": data.filename[:200], "size": max(0, data.size),
-                                             "chunks": data.chunks, "status": "uploading", "created_at": _now(), "updated_at": _now()})
+        await db.restore_uploads.insert_one({"id": upload_id, "user_id": user["id"], "filename": data.filename[:200], "size": size,
+                                             "chunks": chunks, "status": "uploading", "created_at": _now(), "updated_at": _now()})
         await db.restore_chunks.create_index([("upload_id", 1), ("idx", 1)])
-        return {"upload_id": upload_id, "chunk_size": CHUNK_SIZE}
+        return {"upload_id": upload_id, "chunk_size": CHUNK_SIZE, "chunks": chunks}
 
     @r.put("/admin/restore/chunk")
     async def chunk(request: Request, upload_id: str, index: int, user=Depends(current_user)):

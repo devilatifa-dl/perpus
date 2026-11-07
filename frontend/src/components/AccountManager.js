@@ -84,17 +84,20 @@ export function AccountManager({ user, close, notify }) {
 
   const [restoreProg, setRestoreProg] = useState(null);
   // Berkas dikirim dalam potongan kecil sehingga cadangan berukuran berapa pun bisa dipulihkan.
+  // Ukuran potongan ditentukan server (3 MB) agar tidak melewati batas body request hosting (Vercel 4,5 MB).
   const restore = async (restoreFile) => {
     setBusyData("restore");
     const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
     try {
-      const guessChunk = 8 * 1024 * 1024;
-      const chunks = Math.max(1, Math.ceil(restoreFile.size / guessChunk));
       setRestoreProg({ pct: 0, text: `Menyiapkan ${restoreFile.name}...` });
-      const { data: st } = await api.post("/admin/restore/start", { filename: restoreFile.name, size: restoreFile.size, chunks });
-      const size = st.chunk_size || guessChunk;
-      if (size !== guessChunk) throw new Error("Ukuran potongan tidak cocok, muat ulang halaman lalu coba lagi");
+      // Vercel menolak body request > 4,5 MB (FUNCTION_PAYLOAD_TOO_LARGE) sebelum sampai ke backend,
+      // jadi ukuran potongan selalu dibatasi 3 MB di sisi browser — berapa pun nilai dari server.
+      const SAFE_CHUNK = 3 * 1024 * 1024;
+      const guessChunks = Math.max(1, Math.ceil(restoreFile.size / SAFE_CHUNK));
+      const { data: st } = await api.post("/admin/restore/start", { filename: restoreFile.name, size: restoreFile.size, chunks: guessChunks });
+      const size = Math.min(st.chunk_size || SAFE_CHUNK, SAFE_CHUNK);
+      const chunks = Math.max(1, Math.ceil(restoreFile.size / size));
       for (let i = 0; i < chunks; i++) {
         const part = restoreFile.slice(i * size, Math.min(restoreFile.size, (i + 1) * size));
         let ok = false, lastErr = null;
@@ -134,7 +137,10 @@ export function AccountManager({ user, close, notify }) {
         setRestoreProg({ pct: 100, processing: true, text: `${STAGE[pr.stage] || "Memproses"}${pr.collection ? ` · ${pr.collection}` : ""}${pr.inserted ? ` · ${pr.inserted} entri` : ""}...` });
       }
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || "Gagal memulihkan data";
+      const status = err.response?.status;
+      const msg = status === 413
+        ? "Berkas terlalu besar untuk sekali kirim. Pemulihan memakai potongan 3 MB — muat ulang halaman (Ctrl+F5) lalu coba lagi."
+        : (err.response?.data?.detail || err.message || "Gagal memulihkan data");
       setRestoreProg({ pct: 0, text: msg, error: true });
       notify(msg);
     } finally {
