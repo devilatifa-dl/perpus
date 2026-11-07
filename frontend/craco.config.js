@@ -223,7 +223,16 @@ if (emergentOverlay) {
 }
 
 const configureDevServer = webpackConfig.devServer;
-webpackConfig.devServer = (devServerConfig) =>
-  makeDevServerV5Compatible(configureDevServer(devServerConfig));
+webpackConfig.devServer = (devServerConfig) => {
+  const cfg = makeDevServerV5Compatible(configureDevServer(devServerConfig));
+  // Proxy /api ke backend lokal saat dev, agar URL media relatif (/api/files/..., /api/books/.../cover)
+  // dan unggahan foto bekerja tanpa mengisi REACT_APP_BACKEND_URL (sama seperti proxy di produksi).
+  const backend = (process.env.BACKEND_URL || process.env.REACT_APP_BACKEND_URL || "http://localhost:8000").trim().replace(/\/+$/, "");
+  cfg.proxy = [
+    ...(Array.isArray(cfg.proxy) ? cfg.proxy : cfg.proxy ? [cfg.proxy] : []),
+    { context: ["/api"], target: backend, changeOrigin: true, secure: false },
+  ];
+  return cfg;
+};
 
 module.exports = webpackConfig;
