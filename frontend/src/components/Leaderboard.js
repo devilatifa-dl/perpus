@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PrintButton } from "./ReportPrint";
 import { Award, BookOpen, Crown, Download, DoorOpen, FileSpreadsheet, GraduationCap, Medal, Trophy, UserRound, Users } from "lucide-react";
 import { api } from "../lib";
+import { loanLeaderboard, visitLeaderboard } from "../lib/rankAudience";
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const monthLabel = (k) => { const [y, m] = k.split("-"); return `${MONTHS[Number(m) - 1]} ${y}`; };
@@ -81,11 +82,37 @@ export function Leaderboard({ mode = "admin", kind = "kunjungan", meId = "", dow
   useEffect(() => { setLb(null); }, [audience]);
   useEffect(() => {
     let alive = true; setErr("");
+    // Backend produksi bisa jadi belum mendukung `audience` (tab Guru menampilkan siswa).
+    // Bila respons tidak memuat penanda `audience`, peringkat dihitung di browser dari data mentah.
+    const local = async (aud) => {
+      const [members, raw] = await Promise.all([
+        api.get("/members").then((r) => r.data),
+        kind === "pinjam"
+          ? api.get("/transactions").then((r) => r.data)
+          : api.get("/visits/history", { params: { period: "semua" } }).then((r) => r.data),
+      ]);
+      const fn = kind === "pinjam" ? loanLeaderboard : visitLeaderboard;
+      return fn({ [kind === "pinjam" ? "transactions" : "visits"]: raw, members, month, audience: aud });
+    };
     api.get(K.url, { params: month ? { month, audience } : { audience } })
-      .then((r) => { if (!alive) return; setLb(r.data); if (!month) setMonth(r.data.month); })
-      .catch(() => alive && setErr("Peringkat belum dapat dimuat"));
+      .then(async (r) => {
+        if (!alive) return;
+        const d = r.data;
+        if (d && d.audience === audience) { setLb(d); if (!month) setMonth(d.month); return; }
+        const computed = await local(audience);
+        if (!alive) return;
+        setLb(computed); if (!month) setMonth(computed.month);
+      })
+      .catch(async () => {
+        if (!alive) return;
+        try {
+          const computed = await local(audience);
+          if (!alive) return;
+          setLb(computed); if (!month) setMonth(computed.month);
+        } catch { if (alive) setErr("Peringkat belum dapat dimuat"); }
+      });
     return () => { alive = false; };
-  }, [month, K.url, audience]);
+  }, [month, K.url, audience, kind]);
   const bar = <div className="lb-audience-bar" data-testid="leaderboard-audience-bar"><AudienceSwitch value={audience} onChange={setAudience}/><span>{guru ? "Peringkat khusus anggota guru" : "Peringkat siswa · guru tidak ikut dihitung"}</span></div>;
   if (err) return <>{bar}<div className="error" data-testid="leaderboard-error">{err}</div></>;
   if (!lb) return <>{bar}<div className="panel muted">Menghitung peringkat...</div></>;
