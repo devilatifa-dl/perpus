@@ -1,7 +1,8 @@
 // Vercel Routing Middleware: meneruskan /api/* ke backend.
 // - Jika env BACKEND_URL diisi di Vercel → /api/* diteruskan ke BACKEND_URL (mis. backend Render).
 // - Jika kosong → diteruskan ke langkah berikutnya, yaitu rewrite /api/* di vercel.json
-//   (backend produksi Emergent). Dengan begitu situs tidak pernah mati hanya karena env belum diisi.
+//   (backend Render: https://perpus-backend.onrender.com). Dengan begitu situs tidak pernah
+//   mati hanya karena env belum diisi.
 export const config = { matcher: "/api/:path*" };
 
 export default function middleware(request) {

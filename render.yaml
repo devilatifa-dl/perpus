@@ -1,52 +1,40 @@
-# Blueprint Render: backend (FastAPI) + frontend (static site). Dipakai lewat New + > Blueprint.
-# Semua nilai rahasia diisi di dashboard (sync: false). Lihat README.md bagian "Deploy di Render".
+# Blueprint Render — HANYA backend (FastAPI). Frontend tetap di Vercel.
+#
+# Cara pakai (gratis, tanpa langganan):
+#   1. Daftar MongoDB Atlas -> cluster M0 Free (region Singapore) -> salin connection string.
+#   2. Render -> New + -> Blueprint -> pilih repo ini -> Apply.
+#   3. Isi env yang bertanda sync:false di dashboard Render:
+#        MONGO_URL     = mongodb+srv://... (dari Atlas)
+#        FRONTEND_URL  = https://perpusmansa.vercel.app
+#   4. Vercel -> Settings -> Environment Variables -> BACKEND_URL = https://perpus-backend.onrender.com
+#   5. Agar backend tidak tidur: daftar cron-job.org -> URL
+#        https://perpus-backend.onrender.com/api/   setiap 10 menit.
+#
+# Catatan paket gratis Render: layanan tidur setelah +-15 menit tanpa akses;
+# permintaan pertama setelah tidur +-50 detik. Cron-job.org mencegahnya.
 services:
   - type: web
     name: perpus-backend
     runtime: python
     plan: free
+    region: singapore
     rootDir: backend
     buildCommand: pip install -r requirements.prod.txt
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/
+    autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
-      - key: MONGO_URL          # dari MongoDB Atlas
+      - key: MONGO_URL          # dari MongoDB Atlas (mongodb+srv://...)
         sync: false
       - key: DB_NAME
         value: perpus
       - key: JWT_SECRET
         generateValue: true
-      - key: FRONTEND_URL       # alamat frontend, mis. https://perpus-frontend.onrender.com
+      - key: FRONTEND_URL       # alamat frontend di Vercel
+        value: https://perpusmansa.vercel.app
+      - key: CORS_ORIGINS       # opsional, dipisah koma (mis. domain kustom)
         sync: false
-      - key: CORS_ORIGINS       # opsional, dipisah koma
+      - key: CORS_ORIGIN_REGEX  # opsional, mis. ^https://perpus[a-z0-9-]*\.vercel\.app$
         sync: false
-
-  - type: web
-    name: perpus-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: yarn install --network-timeout 600000 && CI=false yarn build
-    staticPublishPath: build
-    envVars:
-      - key: NODE_VERSION
-        value: "22"
-      - key: REACT_APP_BACKEND_URL   # kosongkan: frontend memakai rewrite /api di bawah
-        value: ""
-    headers:
-      - path: /service-worker.js
-        name: Cache-Control
-        value: no-cache, no-store, must-revalidate
-      - path: /static/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
-    routes:
-      # GANTI alamat ini dengan URL layanan perpus-backend Anda bila berbeda
-      # (bisa juga diubah di Dashboard > perpus-frontend > Redirects/Rewrites).
-      - type: rewrite
-        source: /api/*
-        destination: https://perpus-backend.onrender.com/api/*
-      - type: rewrite
-        source: /*
-        destination: /index.html
