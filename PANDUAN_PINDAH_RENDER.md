@@ -322,3 +322,60 @@ Harus **tidak ada hasil**.
 
 Untuk perpustakaan sekolah dengan pemakaian jam belajar, **Render free + cron-job.org**
 sudah lebih dari cukup.
+
+---
+
+## Opsi sementara: pakai laptop sendiri (tunnel Cloudflare)
+
+Kalau ingin situs langsung memakai backend versi terbaru **sekarang** tanpa menunggu Render,
+backend di laptop bisa dibuka ke internet lewat Cloudflare Tunnel. Ini yang dipakai saat
+memverifikasi perbaikan 413 dan pemisahan peringkat guru.
+
+```
+Browser --> Vercel (frontend)  --/api/*-->  trycloudflare.com  -->  laptop:8000  -->  MongoDB lokal
+```
+
+### Cara pakai
+
+1. Install cloudflared sekali saja:
+
+```
+winget install --id Cloudflare.cloudflared
+```
+
+2. Jalankan skrip (sudah disiapkan):
+
+```
+cd "c:\Stiawan Dev\Project Perpus\perpus-main\scripts"
+.\jalankan-backend-publik.ps1
+```
+
+Skrip akan menyalakan MongoDB, backend, dan tunnel, lalu menampilkan URL publik.
+
+3. Isi URL itu ke `BACKEND_URL` di Vercel, lalu **Redeploy**.
+
+   Atau biarkan skrip mengerjakannya otomatis:
+
+```
+.\jalankan-backend-publik.ps1 -VercelToken "token-vercel-anda"
+```
+
+### Batasan yang harus dipahami
+
+| Hal | Kenyataan |
+|---|---|
+| URL berubah | Setiap tunnel dijalankan ulang, URL baru. `BACKEND_URL` harus diperbarui. |
+| Laptop harus nyala | Kalau laptop mati atau sleep, situs ikut mati. |
+| Tidak untuk 24 jam | Cloudflare quick tunnel tidak menjamin uptime. |
+| Kecepatan | Tergantung internet sekolah/rumah. |
+
+Karena itu tunnel cocok untuk **uji coba dan verifikasi**, bukan untuk pemakaian harian
+siswa. Untuk pemakaian harian, tetap pindah ke Render + Atlas seperti panduan di atas.
+
+### Kalau tunnel mati
+
+Situs akan menampilkan error koneksi. Perbaiki dengan salah satu cara:
+
+- Jalankan ulang `jalankan-backend-publik.ps1`, lalu perbarui `BACKEND_URL` di Vercel.
+- Atau hapus `BACKEND_URL` di Vercel lalu **Redeploy** - situs kembali memakai backend
+  cadangan di `vercel.json` (data akan kembali ke versi backend cadangan).
