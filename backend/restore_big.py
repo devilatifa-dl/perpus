@@ -13,7 +13,7 @@ jadi cadangan yang rusak tidak menghapus data yang ada.
 
 Alur lama (start/chunk/finish/status) tetap tersedia untuk kompatibilitas dan pemakaian di server biasa.
 """
-import asyncio, io, json, logging, mmap, os, struct, tempfile, uuid, zipfile, zlib
+import asyncio, io, logging, mmap, os, struct, tempfile, uuid, zipfile, zlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -21,7 +21,6 @@ import ijson
 from bson.binary import Binary
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
-from pymongo import ReturnDocument
 
 logger = logging.getLogger("restore")
 # Vercel menolak body request > 4,5 MB (FUNCTION_PAYLOAD_TOO_LARGE) sebelum sampai ke backend.
