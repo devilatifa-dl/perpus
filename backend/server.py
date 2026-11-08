@@ -427,6 +427,11 @@ async def startup():
 @api.get("/")
 async def root(): return {"message":"Perpustakaan SMA Negeri 1 Abung Tengah aktif"}
 
+@api.get("/health")
+async def health():
+    """Ping ringan untuk memastikan server sudah merespons normal (dipakai auto-reload saat server lambat)."""
+    return {"ok": True, "ts": now_iso()}
+
 @api.post("/auth/login")
 async def login(data: LoginInput, response: Response):
     identifier = data.email.lower()

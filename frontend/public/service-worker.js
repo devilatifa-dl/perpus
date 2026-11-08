@@ -105,6 +105,8 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) {
     if (API_BYPASS.test(url.pathname + url.search)) return;
     if (req.headers.get("range")) return;
+    // Permintaan "fresh" (mis. cek server sudah normal) -> selalu ke jaringan, jangan pakai cache
+    if (req.headers.get("x-perpus-fresh") || url.searchParams.has("fresh")) return;
     if (url.pathname.startsWith("/api/files/")) { event.respondWith(staleWhileRevalidate(req, IMG_CACHE, event)); return; }
     // Sampul buku ber-versi (?v=) -> tidak berubah, simpan permanen di HP
     if (/^\/api\/books\/[^/]+\/cover$/.test(url.pathname)) { event.respondWith(url.searchParams.get("v") ? cacheFirst(req, IMG_CACHE) : staleWhileRevalidate(req, IMG_CACHE, event)); return; }

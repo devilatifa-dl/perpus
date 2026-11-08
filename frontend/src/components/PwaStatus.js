@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CloudOff, Download, RefreshCw, Share, Smartphone, Wifi, X } from "lucide-react";
 import { applyUpdate, canPromptInstall, isIOS, isStandalone, promptInstall } from "../pwa";
+import { API } from "../lib";
 import "../Pwa.css";
 
 const DISMISS_KEY = "perpus-pwa-install-dismissed";
 const DISMISS_DAYS = 14;
+// Percobaan otomatis saat server lambat: 2s, 3s, 5s, 8s, 13s, 20s (maks 6 kali)
+const AUTO_RETRY_BASE_MS = 2000;
+const AUTO_RETRY_MAX_MS = 20000;
+const AUTO_RETRY_MAX = 6;
 const dismissedRecently = () => { try { const t = Number(localStorage.getItem(DISMISS_KEY) || 0); return t && Date.now() - t < DISMISS_DAYS * 864e5; } catch { return false; } };
 const fmtTime = (iso) => { if (!iso) return ""; const d = new Date(iso); if (Number.isNaN(d.getTime())) return ""; return d.toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); };
 
@@ -62,9 +67,50 @@ export default function PwaStatus() {
   useEffect(() => {
     if (online && !cachedAt) return undefined;
     setNoticeVisible(true);
+    // Saat server lambat, banner dibiarkan tampil selama percobaan otomatis berjalan
+    if (cachedAt && online) return undefined;
     const t = setTimeout(() => setNoticeVisible(false), 3000);
     return () => clearTimeout(t);
   }, [online, cachedAt]);
+
+  // Server lambat: coba lagi otomatis sampai data terbaru berhasil dimuat.
+  // Begitu server merespons normal (bukan dari cache), halaman dimuat ulang sekali
+  // agar semua data tampil segar tanpa perlu menekan tombol.
+  const [autoTries, setAutoTries] = useState(0);
+  const reloadedRef = useRef(false);
+
+  useEffect(() => {
+    if (!cachedAt || !online) { setAutoTries(0); return undefined; }
+    if (autoTries >= AUTO_RETRY_MAX) return undefined;
+
+    let cancelled = false;
+    const delay = Math.min(AUTO_RETRY_BASE_MS * Math.pow(1.6, autoTries), AUTO_RETRY_MAX_MS);
+
+    const t = setTimeout(async () => {
+      if (cancelled) return;
+      try {
+        // Ping ringan dengan penanda agar service worker tidak menyajikan salinan cache.
+        const res = await fetch(`${API}/health?fresh=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "x-perpus-fresh": "1" },
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          // Server sudah normal -> muat ulang sekali agar data segar tampil.
+          if (!reloadedRef.current) {
+            reloadedRef.current = true;
+            window.location.reload();
+            return;
+          }
+        }
+      } catch {
+        /* masih lambat / offline, coba lagi di putaran berikutnya */
+      }
+      if (!cancelled) setAutoTries((n) => n + 1);
+    }, delay);
+
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [cachedAt, online, autoTries]);
 
   const dismissInstall = () => { try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* */ } setShowInstall(false); };
   const doInstall = async () => { const r = await install(); if (r !== "unavailable") setShowInstall(false); };
@@ -76,7 +122,17 @@ export default function PwaStatus() {
   } else if (backOnline) {
     status = <div className="pwa-pill online" role="status" data-testid="pwa-back-online-banner"><Wifi size={15}/><span><b>Kembali online</b></span><button type="button" data-testid="pwa-refresh-button" onClick={refresh}><RefreshCw size={13}/> Muat data terbaru</button><button type="button" className="pwa-x" aria-label="Tutup" data-testid="pwa-back-online-close" onClick={() => { setBackOnline(false); setCachedAt(""); }}><X size={14}/></button></div>;
   } else if (cachedAt) {
-    status = noticeVisible && <div className="pwa-pill cached" role="status" data-testid="pwa-cached-banner"><CloudOff size={15}/><span>Server lambat · menampilkan data tersimpan ({fmtTime(cachedAt)})</span><button type="button" data-testid="pwa-cached-refresh-button" onClick={refresh}><RefreshCw size={13}/> Coba lagi</button><button type="button" className="pwa-x" aria-label="Tutup" onClick={() => setCachedAt("")}><X size={14}/></button></div>;
+    const exhausted = autoTries >= AUTO_RETRY_MAX;
+    status = noticeVisible && <div className="pwa-pill cached" role="status" data-testid="pwa-cached-banner">
+      <CloudOff size={15}/>
+      <span>
+        {exhausted
+          ? <>Server lambat · menampilkan data tersimpan ({fmtTime(cachedAt)})</>
+          : <>Server lambat · memuat ulang otomatis{autoTries > 0 ? ` (${autoTries}/${AUTO_RETRY_MAX})` : ""}…</>}
+      </span>
+      <button type="button" data-testid="pwa-cached-refresh-button" onClick={refresh}><RefreshCw size={13}/> Muat sekarang</button>
+      <button type="button" className="pwa-x" aria-label="Tutup" onClick={() => setCachedAt("")}><X size={14}/></button>
+    </div>;
   }
 
   return <div className="pwa-layer" data-testid="pwa-status-layer">
