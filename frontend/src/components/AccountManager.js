@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import JSZip from "jszip";
 import { KeyRound, ShieldCheck, Save, Database, Download, Upload, Trash2, AlertTriangle } from "lucide-react";
 import { api } from "../lib";
 import { Modal } from "./Shared";
@@ -83,63 +84,83 @@ export function AccountManager({ user, close, notify }) {
   };
 
   const [restoreProg, setRestoreProg] = useState(null);
-  // Berkas dikirim dalam potongan kecil sehingga cadangan berukuran berapa pun bisa dipulihkan.
-  // Ukuran potongan ditentukan server (3 MB) agar tidak melewati batas body request hosting (Vercel 4,5 MB).
+
+  // Baca isi cadangan (.zip dari "Unduh cadangan" atau .json lama) langsung di browser.
+  const readBackup = async (file) => {
+    const isZip = /\.zip$/i.test(file.name) || (await file.slice(0, 2).text()) === "PK";
+    let text;
+    if (isZip) {
+      const zip = await JSZip.loadAsync(file);
+      const member = Object.keys(zip.files).find((n) => n === "data-cadangan.json" || n.endsWith("/data-cadangan.json"));
+      if (!member) throw new Error("ZIP cadangan tidak berisi data-cadangan.json");
+      text = await zip.files[member].async("string");
+    } else {
+      text = await file.text();
+    }
+    let parsed;
+    try { parsed = JSON.parse(text); } catch (e) { throw new Error("Isi berkas cadangan tidak lengkap (terpotong) atau bukan JSON. Unduh ulang cadangan lalu coba lagi."); }
+    const cols = parsed && parsed.collections;
+    if (!cols || typeof cols !== "object") throw new Error("Struktur berkas cadangan tidak dikenali");
+    const names = Object.keys(cols).filter((n) => Array.isArray(cols[n]));
+    if (!names.length) throw new Error("Berkas cadangan tidak berisi data perpustakaan");
+    return { cols, names };
+  };
+
+  // Data dikirim per potongan kecil (di bawah 2 MB) sehingga setiap permintaan cepat selesai dan
+  // tidak terkena batas waktu hosting serverless. Data lama baru diganti pada langkah "commit".
   const restore = async (restoreFile) => {
     setBusyData("restore");
     const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
+    let uploadId = null;
     try {
-      setRestoreProg({ pct: 0, text: `Menyiapkan ${restoreFile.name}...` });
-      // Vercel menolak body request > 4,5 MB (FUNCTION_PAYLOAD_TOO_LARGE) sebelum sampai ke backend,
-      // jadi ukuran potongan selalu dibatasi 3 MB di sisi browser — berapa pun nilai dari server.
-      const SAFE_CHUNK = 3 * 1024 * 1024;
-      const guessChunks = Math.max(1, Math.ceil(restoreFile.size / SAFE_CHUNK));
-      const { data: st } = await api.post("/admin/restore/start", { filename: restoreFile.name, size: restoreFile.size, chunks: guessChunks });
-      const size = Math.min(st.chunk_size || SAFE_CHUNK, SAFE_CHUNK);
-      const chunks = Math.max(1, Math.ceil(restoreFile.size / size));
-      for (let i = 0; i < chunks; i++) {
-        const part = restoreFile.slice(i * size, Math.min(restoreFile.size, (i + 1) * size));
-        let ok = false, lastErr = null;
-        for (let attempt = 0; attempt < 4 && !ok; attempt++) {
-          try {
-            await api.put("/admin/restore/chunk", part, { params: { upload_id: st.upload_id, index: i }, headers: { "Content-Type": "application/octet-stream" } });
-            ok = true;
-          } catch (err) {
-            lastErr = err;
-            if (err.response && err.response.status < 500) break;
-            await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      setRestoreProg({ pct: 0, text: `Membaca ${restoreFile.name}...` });
+      const { cols, names } = await readBackup(restoreFile);
+      const total = names.reduce((a, n) => a + cols[n].length, 0);
+      const { data: st } = await api.post("/admin/restore/begin", { filename: restoreFile.name, size: restoreFile.size, collections: names });
+      uploadId = st.upload_id;
+      const MAX_BYTES = Math.min(st.max_bytes || 2 * 1024 * 1024, 2 * 1024 * 1024);
+      let sent = 0;
+      for (const name of names) {
+        const items = cols[name];
+        let batch = [], bytes = 0;
+        const flush = async () => {
+          if (!batch.length) return;
+          let ok = false, lastErr = null;
+          for (let attempt = 0; attempt < 4 && !ok; attempt++) {
+            try {
+              await api.post("/admin/restore/batch", { upload_id: uploadId, collection: name, items: batch });
+              ok = true;
+            } catch (err) {
+              lastErr = err;
+              if (err.response && err.response.status < 500) break;
+              await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+            }
           }
+          if (!ok) throw lastErr;
+          sent += batch.length; batch = []; bytes = 0;
+          setRestoreProg({ pct: Math.round((sent / Math.max(1, total)) * 100), text: `Mengirim data ${name} · ${sent} dari ${total} entri` });
+        };
+        for (const item of items) {
+          const size = JSON.stringify(item).length;
+          if (batch.length && bytes + size > MAX_BYTES) await flush();
+          batch.push(item); bytes += size;
         }
-        if (!ok) throw lastErr;
-        const pct = Math.round(((i + 1) / chunks) * 100);
-        setRestoreProg({ pct, text: `Mengunggah ${fmtSize(Math.min(restoreFile.size, (i + 1) * size))} dari ${fmtSize(restoreFile.size)}` });
+        await flush();
       }
-      await api.post("/admin/restore/finish", { upload_id: st.upload_id });
-      const STAGE = { menyiapkan: "Menyiapkan berkas", memeriksa: "Memeriksa isi cadangan", memuat: "Memuat data", mengganti: "Mengganti data lama" };
-      let fails = 0;
-      for (;;) {
-        await new Promise((r) => setTimeout(r, 2000));
-        let job;
-        try { job = (await api.get(`/admin/restore/status/${st.upload_id}`)).data; fails = 0; }
-        catch (err) { if (++fails > 30) throw err; continue; }
-        if (job.status === "done") {
-          const total = Object.values(job.restored || {}).reduce((a, b) => a + b, 0);
-          const note = job.salvaged ? " (ZIP tidak utuh, tetapi data berhasil diselamatkan)" : "";
-          setRestoreProg({ pct: 100, text: `Selesai: ${total} entri dipulihkan${note}`, done: true });
-          notify(`Data berhasil dipulihkan (${total} entri)${note}. Memuat ulang...`);
-          window.removeEventListener("beforeunload", warn);
-          setTimeout(() => window.location.reload(), job.salvaged ? 3500 : 1500);
-          return;
-        }
-        if (job.status === "error") throw new Error(job.error || "Gagal memulihkan data");
-        const pr = job.progress || {};
-        setRestoreProg({ pct: 100, processing: true, text: `${STAGE[pr.stage] || "Memproses"}${pr.collection ? ` · ${pr.collection}` : ""}${pr.inserted ? ` · ${pr.inserted} entri` : ""}...` });
-      }
+      setRestoreProg({ pct: 100, processing: true, text: "Mengganti data lama..." });
+      const { data: done } = await api.post("/admin/restore/commit", { upload_id: uploadId });
+      const count = Object.values(done.restored || {}).reduce((a, b) => a + b, 0);
+      setRestoreProg({ pct: 100, text: `Selesai: ${count} entri dipulihkan`, done: true });
+      notify(`Data berhasil dipulihkan (${count} entri). Memuat ulang...`);
+      window.removeEventListener("beforeunload", warn);
+      setTimeout(() => window.location.reload(), 1500);
+      return;
     } catch (err) {
+      if (uploadId) { try { await api.post("/admin/restore/abort", { upload_id: uploadId }); } catch (e) { /* sesi sudah tidak aktif */ } }
       const status = err.response?.status;
       const msg = status === 413
-        ? "Berkas terlalu besar untuk sekali kirim. Pemulihan memakai potongan 3 MB — muat ulang halaman (Ctrl+F5) lalu coba lagi."
+        ? "Potongan data terlalu besar untuk dikirim. Muat ulang halaman (Ctrl+F5) lalu coba lagi."
         : (err.response?.data?.detail || err.message || "Gagal memulihkan data");
       setRestoreProg({ pct: 0, text: msg, error: true });
       notify(msg);

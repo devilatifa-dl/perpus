@@ -1,17 +1,19 @@
 """Pulihkan data dari cadangan berukuran berapa pun.
 
-Alur (dipakai menu Akun -> Pulihkan data):
-  1. POST /admin/restore/start   {filename, size, chunks}  -> buat sesi unggah (admin, tanpa kode email)
-  2. PUT  /admin/restore/chunk?upload_id=..&index=..  (body = potongan berkas, maks CHUNK_SIZE)
-  3. POST /admin/restore/finish  {upload_id}  -> proses di latar belakang
-  4. GET  /admin/restore/status/{upload_id}  -> pantau kemajuan / hasil
+Alur utama (dipakai menu Akun -> Pulihkan data):
+  1. POST /admin/restore/begin   {filename, size, collections}  -> buat sesi (admin, tanpa kode email)
+  2. POST /admin/restore/batch?upload_id=..&collection=..  (body = potongan JSON berisi daftar entri)
+  3. POST /admin/restore/commit  {upload_id}  -> tukar koleksi sementara menjadi data aktif
+  4. POST /admin/restore/abort   {upload_id}  -> batalkan & bersihkan
 
-Berkas dipotong kecil-kecil di browser sehingga tidak terkena batas ukuran unggahan server hosting.
-Potongan disimpan di MongoDB (aman bila server punya lebih dari satu instance), lalu dibaca secara streaming
-(ijson) dan dimasukkan ke koleksi sementara. Data lama baru diganti setelah SELURUH isi cadangan berhasil dibaca,
-sehingga cadangan yang rusak tidak menghapus data yang ada.
+Browser membaca isi cadangan lalu mengirimnya per potongan kecil (di bawah batas body request hosting),
+sehingga setiap permintaan selesai jauh di bawah batas waktu hosting serverless (Vercel 60 detik) dan
+tidak ada berkas besar yang perlu dibaca ulang dari database. Data lama baru diganti pada langkah commit,
+jadi cadangan yang rusak tidak menghapus data yang ada.
+
+Alur lama (start/chunk/finish/status) tetap tersedia untuk kompatibilitas dan pemakaian di server biasa.
 """
-import asyncio, io, logging, mmap, os, struct, tempfile, uuid, zipfile, zlib
+import asyncio, io, json, logging, mmap, os, struct, tempfile, uuid, zipfile, zlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -19,6 +21,7 @@ import ijson
 from bson.binary import Binary
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
+from pymongo import ReturnDocument
 
 logger = logging.getLogger("restore")
 # Vercel menolak body request > 4,5 MB (FUNCTION_PAYLOAD_TOO_LARGE) sebelum sampai ke backend.
@@ -27,6 +30,9 @@ logger = logging.getLogger("restore")
 CHUNK_SIZE = 3 * 1024 * 1024
 MAX_RESTORE = 2 * 1024 * 1024 * 1024  # batas wajar ukuran berkas cadangan (2 GB)
 BATCH = 500
+# Batas ukuran satu potongan data pada alur bertahap (begin/batch/commit). Dijaga di bawah 4,5 MB
+# (batas body request Vercel) dan cukup kecil agar satu permintaan selesai dalam hitungan detik.
+STEP_BYTES = 2 * 1024 * 1024
 JSON_MEMBER = "data-cadangan.json"
 
 
@@ -38,6 +44,23 @@ class StartInput(BaseModel):
 
 
 class FinishInput(BaseModel):
+    upload_id: str
+
+
+class BeginInput(BaseModel):
+    filename: str = ""
+    size: int = 0
+    collections: list[str] = []
+
+
+class BatchInput(BaseModel):
+    upload_id: str
+    collection: str
+    items: list[dict] = []
+    last: bool = False
+
+
+class UploadIdInput(BaseModel):
     upload_id: str
 
 
@@ -300,6 +323,100 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
         if status and job.get("status") != status:
             raise HTTPException(400, "Sesi pemulihan sudah tidak aktif. Ulangi dari awal.")
         return job
+
+    # ------------------------------------------------------------------
+    # Alur bertahap: browser mengirim isi cadangan per potongan kecil.
+    # Setiap permintaan selesai dalam hitungan detik sehingga aman untuk
+    # hosting serverless yang memutus proses setelah 60 detik.
+    # ------------------------------------------------------------------
+    def _tmp(name):
+        return f"_restore_tmp_{name}"
+
+    async def _drop_tmp(names):
+        for name in names:
+            try:
+                await db[_tmp(name)].drop()
+            except Exception:
+                pass
+
+    @r.post("/admin/restore/begin")
+    async def begin(data: BeginInput, user=Depends(current_user)):
+        admin_only(user)
+        size = max(0, data.size)
+        if size > MAX_RESTORE:
+            raise HTTPException(400, f"Ukuran cadangan melebihi batas {MAX_RESTORE // (1024 * 1024)} MB")
+        names = [n for n in data.collections if n in collections]
+        if not names:
+            raise HTTPException(400, "Berkas cadangan tidak berisi data perpustakaan")
+        # Sesi lama yang menggantung tidak boleh menghalangi pemulihan baru.
+        for j in await db.restore_uploads.find({"status": {"$in": ["uploading", "processing"]}}, {"_id": 0, "id": 1}).to_list(100):
+            await _drop_tmp(collections)
+            await db.restore_uploads.update_one({"id": j["id"]}, {"$set": {"status": "error", "error": "Dibatalkan karena ada pemulihan baru", "updated_at": _now()}})
+        old = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+        await db.restore_uploads.delete_many({"created_at": {"$lt": old}})
+        await _drop_tmp(collections)
+        upload_id = "RS-" + uuid.uuid4().hex[:12].upper()
+        await db.restore_uploads.insert_one({
+            "id": upload_id, "user_id": user["id"], "filename": (data.filename or "")[:200], "size": size,
+            "mode": "step", "status": "uploading", "collections": names, "counts": {},
+            "created_at": _now(), "updated_at": _now(),
+        })
+        return {"upload_id": upload_id, "max_bytes": STEP_BYTES, "collections": names}
+
+    @r.post("/admin/restore/batch")
+    async def batch(data: BatchInput, user=Depends(current_user)):
+        admin_only(user)
+        job = await own_upload(data.upload_id, user, "uploading")
+        name = data.collection
+        if name not in job.get("collections", []):
+            raise HTTPException(400, f"Koleksi '{name}' tidak ada pada berkas cadangan ini")
+        docs = []
+        for item in data.items:
+            if isinstance(item, dict):
+                item.pop("_id", None)
+                docs.append(item)
+        if docs:
+            await db[_tmp(name)].insert_many(docs, ordered=False)
+        counts = dict(job.get("counts") or {})
+        counts[name] = counts.get(name, 0) + len(docs)
+        await set_job(data.upload_id, counts=counts, progress={"stage": "memuat", "collection": name, "inserted": counts[name]})
+        return {"ok": True, "collection": name, "inserted": counts[name]}
+
+    @r.post("/admin/restore/commit")
+    async def commit(data: UploadIdInput, user=Depends(current_user)):
+        admin_only(user)
+        job = await own_upload(data.upload_id, user, "uploading")
+        names = job.get("collections", [])
+        counts = job.get("counts") or {}
+        await set_job(data.upload_id, status="processing", progress={"stage": "mengganti", "collection": "", "inserted": sum(counts.values())})
+        restored = {}
+        try:
+            for name in names:
+                count = counts.get(name, 0)
+                if count:
+                    await db[_tmp(name)].aggregate([{"$match": {}}, {"$out": name}]).to_list(None)
+                else:
+                    await db[name].delete_many({})
+                restored[name] = count
+            if await db.books.count_documents({"stock": {"$exists": False}}) > 0:
+                await normalize_books()
+            await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
+        except Exception as e:
+            logger.exception("restore commit failed")
+            await set_job(data.upload_id, status="error", error=f"Pemulihan gagal: {e}")
+            raise HTTPException(500, f"Pemulihan gagal: {e}")
+        finally:
+            await _drop_tmp(names)
+        await set_job(data.upload_id, status="done", restored=restored, finished_at=_now())
+        return {"ok": True, "restored": restored}
+
+    @r.post("/admin/restore/abort")
+    async def abort(data: UploadIdInput, user=Depends(current_user)):
+        admin_only(user)
+        job = await own_upload(data.upload_id, user)
+        await _drop_tmp(job.get("collections") or collections)
+        await db.restore_uploads.update_one({"id": data.upload_id}, {"$set": {"status": "error", "error": "Dibatalkan oleh admin", "updated_at": _now()}})
+        return {"ok": True}
 
     @r.post("/admin/restore/start")
     async def start(data: StartInput, user=Depends(current_user)):
