@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { Fingerprint, KeyRound, Loader2, ShieldCheck, X } from "lucide-react";
+import { api } from "../lib";
 import { biometricAvailable, biometricRegistered, registerBiometric, verifyBiometric } from "../lib/biometric";
 import { Modal } from "./Shared";
 
 /**
  * Gerbang aksi sensitif: coba fingerprint dulu, kata sandi sebagai cadangan.
- * Memanggil onVerified({ biometricToken }) bila berhasil.
+ * Kata sandi selalu diverifikasi ke server (bukan sekadar gerbang tampilan).
+ * Memanggil onVerified({ biometricToken }) bila lolos lewat fingerprint,
+ * atau onVerified({ password }) setelah server memastikan kata sandi benar.
  */
 export function BiometricGate({ open, title, message, user, onVerified, onClose, requirePassword = false }) {
   const [supported, setSupported] = useState(null);
@@ -54,10 +57,18 @@ export function BiometricGate({ open, title, message, user, onVerified, onClose,
     }
   };
 
-  const submitPassword = (e) => {
+  const submitPassword = async (e) => {
     e.preventDefault();
     if (!password) { setErr("Masukkan kata sandi admin"); return; }
-    onVerified({ password, viaFingerprint: false });
+    setBusy("pw"); setErr("");
+    try {
+      await api.post("/auth/verify-password", { password });
+      onVerified({ password, viaFingerprint: false });
+    } catch (e2) {
+      setErr(e2?.response?.data?.detail || "Kata sandi salah");
+    } finally {
+      setBusy("");
+    }
   };
 
   return <Modal title={title || "Verifikasi admin"} close={onClose}>
@@ -95,7 +106,7 @@ export function BiometricGate({ open, title, message, user, onVerified, onClose,
             <input type="password" autoFocus data-testid="bio-password-input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Masukkan kata sandi"/>
           </label>
           <button className="primary full" data-testid="bio-password-submit" disabled={!!busy}>
-            <ShieldCheck size={17}/> Lanjutkan
+            {busy === "pw" ? <Loader2 size={17} className="spin"/> : <ShieldCheck size={17}/>} {busy === "pw" ? "Memeriksa..." : "Lanjutkan"}
           </button>
           {supported && registered && (
             <button type="button" className="text-button" data-testid="bio-back-fingerprint" onClick={() => { setShowPassword(false); setErr(""); }}>

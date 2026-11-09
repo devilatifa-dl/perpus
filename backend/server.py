@@ -108,6 +108,9 @@ class PasswordChangeInput(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=6)
 
+class VerifyPasswordInput(BaseModel):
+    password: str
+
 class PasswordSetInput(BaseModel):
     new_password: str = Field(..., min_length=6)
 
@@ -457,6 +460,13 @@ async def login(data: LoginInput, response: Response):
 
 @api.get("/auth/me")
 async def me(user=Depends(current_user)): return public(user)
+
+@api.post("/auth/verify-password")
+async def verify_password(data: VerifyPasswordInput, user=Depends(current_user)):
+    """Cek kata sandi akun yang sedang login — dipakai gerbang 'Akun & sandi'."""
+    if not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()):
+        raise HTTPException(401, "Kata sandi salah")
+    return {"ok": True}
 
 @api.post("/auth/logout")
 async def logout(response: Response): response.delete_cookie("access_token", path="/", secure=True, samesite="none"); return {"ok":True}
