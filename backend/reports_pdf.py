@@ -58,12 +58,14 @@ def build_loans(transactions):
             loan = {"id": t["id"], "member_id": t["member_id"], "member_name": t["member_name"], "class_name": t.get("class_name", ""), "book_id": t["book_id"], "book_title": t["book_title"], "borrowed_at": t["date"], "returned_at": None, "status": "Dipinjam", "date": t["date"]}
             loans.append(loan); open_by_book.setdefault(t["book_id"], []).append(loan)
         else:
+            # "kembali" menutup pinjaman sebagai Dikembalikan; "hilang" menutupnya sebagai Hilang.
+            closed = "Hilang" if t["action"] == "hilang" else "Dikembalikan"
             stack = open_by_book.get(t["book_id"]) or []
             if stack:
                 idx = next((i for i, l in enumerate(stack) if l["member_id"] == t["member_id"]), 0)
-                loan = stack.pop(idx); loan.update(returned_at=t["date"], status="Dikembalikan", return_id=t["id"])
+                loan = stack.pop(idx); loan.update(returned_at=t["date"], status=closed, return_id=t["id"])
             else:
-                loans.append({"id": t["id"], "member_id": t["member_id"], "member_name": t["member_name"], "class_name": t.get("class_name", ""), "book_id": t["book_id"], "book_title": t["book_title"], "borrowed_at": None, "returned_at": t["date"], "status": "Dikembalikan", "date": t["date"]})
+                loans.append({"id": t["id"], "member_id": t["member_id"], "member_name": t["member_name"], "class_name": t.get("class_name", ""), "book_id": t["book_id"], "book_title": t["book_title"], "borrowed_at": None, "returned_at": t["date"], "status": closed, "date": t["date"]})
     loans.sort(key=lambda l: l["returned_at"] or l["borrowed_at"] or "", reverse=True)
     return loans
 
@@ -119,10 +121,12 @@ def table_rows(kind, rows):
         plain = [[r["member_name"], r.get("class_name") or "-", r["book_title"], fmt_date(r["borrowed_at"]), f"{r['days_out']} hari"] for r in rows["items"]]
         summary = f"Dipinjam lebih dari {rows['days']} hari: {rows['total']} buku · Rata-rata {rows['avg_days']} hari · Terlama {rows['max_days']} hari"
     else:
-        header = ["No", "Judul Buku", "Catatan", "Tgl Lapor", "Status", "Ditemukan", "Pelapor"]
-        widths = [10 * mm, 86 * mm, 56 * mm, 30 * mm, 22 * mm, 30 * mm, 30 * mm]
-        plain = [[r["title"], r.get("detail") if r.get("detail") != r.get("code") else "-", fmt_date(r["date"]), r["status"], fmt_date(r.get("found_at")), r.get("reported_by", "-")] for r in rows]
-        lost = sum(1 for r in rows if r["status"] == "Hilang"); summary = f"Total laporan: {len(rows)} · Masih hilang: {lost} · Ditemukan: {len(rows) - lost}"
+        header = ["No", "Judul Buku", "Peminjam", "Kelas", "Catatan", "Tgl Lapor", "Status", "Ganti rugi"]
+        widths = [10 * mm, 62 * mm, 40 * mm, 26 * mm, 40 * mm, 26 * mm, 20 * mm, 24 * mm]
+        plain = [[r["title"], r.get("member_name") or "-", r.get("class_name") or "-", r.get("detail") if r.get("detail") != r.get("code") else "-", fmt_date(r["date"]), r["status"], "Sudah" if r.get("compensated") else "Belum"] for r in rows]
+        lost = sum(1 for r in rows if r["status"] == "Hilang")
+        belum = sum(1 for r in rows if r["status"] == "Hilang" and not r.get("compensated"))
+        summary = f"Total laporan: {len(rows)} · Masih hilang: {lost} · Ditemukan: {len(rows) - lost} · Belum ganti rugi: {belum}"
     return header, widths, plain, summary
 
 

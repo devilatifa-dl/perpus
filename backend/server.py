@@ -137,6 +137,12 @@ class StatusInput(BaseModel):
     status: str
     note: str = ""
     reporter: str = ""
+    member_id: str = ""      # untuk "hilang saat dipinjam": siapa peminjamnya
+    transaction_id: str = "" # transaksi pinjam yang ditutup
+
+class CompensationInput(BaseModel):
+    compensated: bool = True
+    note: str = ""
 
 CARD_TEXT_KEYS = {"school", "title", "owner", "name", "fields", "class", "nis", "address", "code", "back_title", "back_rules", "back_web"}
 CARD_FONT_IDS = {"modern", "klasik", "elegan", "mono", "shrikhand", "anton", "adumu", "elmessiri", "dmsans"}
@@ -326,7 +332,8 @@ async def normalize_books():
 
 async def open_loan_count(member_id, book_id):
     p = await db.transactions.count_documents({"member_id": member_id, "book_id": book_id, "action": "pinjam"})
-    k = await db.transactions.count_documents({"member_id": member_id, "book_id": book_id, "action": "kembali"})
+    # "kembali" dan "hilang" sama-sama menutup pinjaman
+    k = await db.transactions.count_documents({"member_id": member_id, "book_id": book_id, "action": {"$in": ["kembali", "hilang"]}})
     return p - k
 
 async def take_copy(book_id):
@@ -798,10 +805,13 @@ async def book_status(book_id: str, data: StatusInput, user=Depends(current_user
     book = await db.books.find_one({"id":book_id}, {"_id":0})
     if not book: raise HTTPException(404, "Buku tidak ditemukan")
     if data.status == "Hilang":
+        # Dua jalur: eksemplar di rak (opname) atau eksemplar yang sedang dipinjam lalu dinyatakan hilang.
+        if data.member_id:
+            return await mark_lost_while_borrowed(book, data, user)
         res = await db.books.find_one_and_update({"id": book_id, "$expr": {"$gt": ["$stock", "$borrowed"]}}, {"$inc": {"stock": -1, "lost": 1}})
         if not res: raise HTTPException(400, "Tidak ada eksemplar di rak yang bisa ditandai hilang")
         await refresh_book(book_id)
-        report = {"id":"LS-"+str(uuid.uuid4())[:8].upper(),"book_id":book_id,"title":book["title"],"code":book_id,"detail":data.note or "1 eksemplar","date":now_iso(),"status":"Hilang","reported_by":data.reporter.strip() or user["name"]}
+        report = {"id":"LS-"+str(uuid.uuid4())[:8].upper(),"book_id":book_id,"title":book["title"],"code":book_id,"detail":data.note or "1 eksemplar","date":now_iso(),"status":"Hilang","reported_by":data.reporter.strip() or user["name"],"source":"rak","compensated":False}
         await db.missing.insert_one(report); return public(report)
     res = await db.books.find_one_and_update({"id": book_id, "lost": {"$gt": 0}}, {"$inc": {"stock": 1, "lost": -1}})
     if not res: raise HTTPException(400, "Tidak ada eksemplar buku ini yang tercatat hilang")
@@ -809,6 +819,48 @@ async def book_status(book_id: str, data: StatusInput, user=Depends(current_user
     first = await db.missing.find_one({"book_id": book_id, "status": "Hilang"}, {"_id": 0}, sort=[("date", 1)])
     if first: await db.missing.update_one({"id": first["id"]}, {"$set": {"status": "Ditemukan", "found_at": now_iso()}})
     return {"ok":True, "status":"Tersedia"}
+
+async def mark_lost_while_borrowed(book, data: StatusInput, user):
+    """Eksemplar yang sedang dipinjam dinyatakan hilang: tutup pinjaman, pindahkan stok ke hilang, catat laporan."""
+    member = await db.members.find_one({"id": data.member_id}, {"_id":0})
+    if not member: raise HTTPException(404, "Anggota tidak ditemukan")
+    if await open_loan_count(member["id"], book["id"]) <= 0:
+        raise HTTPException(400, "Anggota ini tidak sedang meminjam buku tersebut")
+    # Tutup pinjaman: borrowed -1, lalu pindahkan eksemplar ke hilang (stock -1, lost +1)
+    res = await db.books.find_one_and_update({"id": book["id"], "borrowed": {"$gt": 0}}, {"$inc": {"borrowed": -1, "stock": -1, "lost": 1}})
+    if not res: raise HTTPException(400, "Tidak ada eksemplar buku ini yang sedang dipinjam")
+    await refresh_book(book["id"])
+    when = now_iso()
+    trx = {"id":"TRX-"+str(uuid.uuid4())[:8].upper(),"member_id":member["id"],"member_name":member["name"],"class_name":member.get("class_name",""),"book_id":book["id"],"book_title":book["title"],"action":"hilang","date":when,"note":data.note or "Dinyatakan hilang saat dipinjam"}
+    if data.transaction_id: trx["loan_id"] = data.transaction_id
+    await db.transactions.insert_one(trx)
+    report = {"id":"LS-"+str(uuid.uuid4())[:8].upper(),"book_id":book["id"],"title":book["title"],"code":book["id"],"detail":data.note or "Hilang saat dipinjam","date":when,"status":"Hilang","reported_by":data.reporter.strip() or user["name"],"source":"pinjam","member_id":member["id"],"member_name":member["name"],"class_name":member.get("class_name",""),"transaction_id":trx["id"],"compensated":False}
+    await db.missing.insert_one(report)
+    return public(report)
+
+@api.patch("/missing/{report_id}/compensation")
+async def set_compensation(report_id: str, data: CompensationInput, user=Depends(current_user)):
+    """Tandai ganti rugi buku hilang: sudah diganti atau belum."""
+    staff_only(user)
+    rep = await db.missing.find_one({"id": report_id}, {"_id":0})
+    if not rep: raise HTTPException(404, "Laporan tidak ditemukan")
+    upd = {"compensated": bool(data.compensated), "compensated_at": now_iso() if data.compensated else None, "compensated_by": user["name"] if data.compensated else None}
+    if data.note: upd["compensation_note"] = data.note.strip()[:300]
+    await db.missing.update_one({"id": report_id}, {"$set": upd})
+    return {"ok": True, **upd}
+
+@api.patch("/missing/{report_id}/found")
+async def mark_missing_found(report_id: str, user=Depends(current_user)):
+    """Buku hilang ditemukan kembali: kembalikan eksemplar ke rak dan tutup laporan."""
+    staff_only(user)
+    rep = await db.missing.find_one({"id": report_id}, {"_id":0})
+    if not rep: raise HTTPException(404, "Laporan tidak ditemukan")
+    if rep.get("status") == "Ditemukan": raise HTTPException(400, "Laporan ini sudah ditandai ditemukan")
+    res = await db.books.find_one_and_update({"id": rep["book_id"], "lost": {"$gt": 0}}, {"$inc": {"stock": 1, "lost": -1}})
+    if not res: raise HTTPException(400, "Tidak ada eksemplar buku ini yang tercatat hilang")
+    await refresh_book(rep["book_id"])
+    await db.missing.update_one({"id": report_id}, {"$set": {"status": "Ditemukan", "found_at": now_iso(), "found_by": user["name"]}})
+    return {"ok": True, "status": "Ditemukan"}
 
 @api.get("/incoming")
 async def incoming_list(user=Depends(current_user)):
