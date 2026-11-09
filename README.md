@@ -1,11 +1,11 @@
-# Ruang Baca SMANSA Ã¢â‚¬â€ Perpustakaan SMA Negeri 1 Abung Tengah
+# Ruang Baca SMANSA — Perpustakaan SMA Negeri 1 Abung Tengah
 
 Aplikasi web perpustakaan sekolah: koleksi buku, anggota & kartu anggota (cetak massal, depan/belakang),
 sirkulasi dengan scan QR, reservasi buku, pengunjung, laporan (cetak A4, PDF, Excel), cadangan/pulihkan data, PWA.
 
-- **Backend:** Python 3.11 Ã‚Â· FastAPI Ã‚Â· MongoDB (motor) Ã‚Â· reportlab Ã‚Â· openpyxl Ã‚Â· Pillow
-- **Frontend:** React (CRA + craco) Ã‚Â· Tailwind Ã‚Â· html5-qrcode Ã‚Â· recharts Ã‚Â· paket **yarn**
-- Portal: `/` pemilih portal Ã‚Â· `/admin` admin & petugas Ã‚Â· `/siswa` siswa
+- **Backend:** Python 3.11 Ã‚· FastAPI Ã‚· MongoDB (motor) Ã‚· reportlab Ã‚· openpyxl Ã‚· Pillow
+- **Frontend:** React (CRA + craco) Ã‚· Tailwind Ã‚· html5-qrcode Ã‚· recharts Ã‚· paket **yarn**
+- Portal: `/` pemilih portal Ã‚· `/admin` admin & petugas Ã‚· `/siswa` siswa
 
 Aplikasi ini **tidak bergantung pada layanan Emergent**:
 - Semua data **termasuk foto anggota, sampul buku, dan logo** disimpan di MongoDB
@@ -74,7 +74,7 @@ Jika salah satu berisi `*`, semua asal diizinkan. Dengan mode proxy, CORS sebena
 2. **Create cluster Ã¢â€ â€™ M0 Free**, provider AWS, region **Singapore (ap-southeast-1)**.
 3. **Database Access Ã¢â€ â€™ Add New Database User**: username mis. `perpus`, password *Autogenerate* Ã¢â€ â€™ simpan.
    Hindari karakter `@ : / ? #` di password (atau URL-encode).
-4. **Network Access Ã¢â€ â€™ Add IP Address Ã¢â€ â€™ Allow access from anywhere** (`0.0.0.0/0`) Ã¢â‚¬â€ IP Render/Vercel berubah-ubah.
+4. **Network Access Ã¢â€ â€™ Add IP Address Ã¢â€ â€™ Allow access from anywhere** (`0.0.0.0/0`) — IP Render/Vercel berubah-ubah.
 5. **Database Ã¢â€ â€™ Connect Ã¢â€ â€™ Drivers Ã¢â€ â€™ Python** Ã¢â€ â€™ salin:
    `mongodb+srv://perpus:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
    Ganti `<password>`. Ini nilai **`MONGO_URL`**. `DB_NAME` bebas (mis. `perpus`); database dibuat otomatis.
@@ -135,7 +135,7 @@ Catatan paket gratis Render: layanan tidur setelah Ã‚Â±15 menit tanpa akses
 - [ ] `/<frontend>/api/` menampilkan pesan backend aktif.
 - [ ] Login `/admin` dan `/siswa` berhasil.
 - [ ] Tambah anggota + unggah foto Ã¢â€ â€™ foto tampil di kartu; tambah buku + sampul Ã¢â€ â€™ sampul tampil.
-- [ ] **Scan QR** (Sirkulasi / Pengunjung) Ã¢â‚¬â€ butuh HTTPS + izin kamera (Vercel/Render sudah HTTPS).
+- [ ] **Scan QR** (Sirkulasi / Pengunjung) — butuh HTTPS + izin kamera (Vercel/Render sudah HTTPS).
 - [ ] **Cetak kartu** (satu & massal, depan/belakang) dan **Cetak QR massal** buku.
 - [ ] **Ekspor PDF/Excel** di Laporan, **Unduh cadangan**.
 - [ ] **Reservasi buku** dari portal siswa Ã¢â€ â€™ muncul di antrean petugas.
@@ -151,7 +151,6 @@ Catatan: foto anggota (koleksi `files`) belum ikut dalam file cadangan.
 
 ## 9. Menjalankan lokal
 ```bash
-# MongoDB lokal di mongodb://localhost:27017
 cd backend && cp .env.example .env && pip install -r requirements.prod.txt
 uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
@@ -160,6 +159,28 @@ yarn install && yarn start
 ```
 Catatan lokal: cookie login memakai `Secure`, jadi di `http://localhost` login berjalan lewat token Bearer
 (sudah otomatis disimpan aplikasi).
+
+### Database development terpisah (`perpus_dev`)
+
+Supaya pengujian lokal tidak menyentuh data nyata, gunakan database terpisah di Atlas:
+
+| Lingkungan | Database | Dipakai oleh |
+|---|---|---|
+| Production | `perpus` | Vercel (`perpusmansa.vercel.app`) |
+| Development | `perpus_dev` | Backend lokal |
+
+`backend/.env` untuk lokal:
+```env
+MONGO_URL=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/perpus_dev?retryWrites=true&w=majority
+DB_NAME=perpus_dev
+```
+
+Menyegarkan `perpus_dev` dengan data production terbaru:
+```bash
+cd backend
+.venv\Scripts\python.exe sync_dev.py
+```
+Skrip ini menyalin seluruh koleksi dari `perpus` ke `perpus_dev` (data production tidak diubah).
 
 ## 10. Struktur
 ```
