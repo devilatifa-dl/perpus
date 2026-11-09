@@ -136,7 +136,12 @@ export function Visitors({ notify, members = [] }) {
   useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, [load]);
   // Setelah data offline tersinkron, muat ulang daftar dari server
   useEffect(() => { const h = () => load(); window.addEventListener("perpus:sync-done", h); return () => window.removeEventListener("perpus:sync-done", h); }, [load]);
-  useEffect(() => { if (isToday && !camOnRef.current) inputRef.current?.focus(); }, [isToday]);
+  // Fokus otomatis ke kolom ketik hanya di perangkat berpenunjuk (desktop/laptop).
+  // Di HP/tablet, fokus otomatis memunculkan keyboard dan menutupi layar — jadi dilewati.
+  const wantsAutoFocus = () => {
+    try { return window.matchMedia("(hover: hover) and (pointer: fine)").matches; } catch { return false; }
+  };
+  useEffect(() => { if (isToday && !camOnRef.current && wantsAutoFocus()) inputRef.current?.focus(); }, [isToday]);
   // Saran nama anggota saat mengetik di kolom pencarian
   useEffect(() => {
     const term = code.trim();
@@ -167,7 +172,7 @@ export function Visitors({ notify, members = [] }) {
     finally {
       busyRef.current = false; setBusy(false); setCode(""); setSugs([]); setSugActive(-1);
       // Di HP jangan fokus ke kolom ketik saat kamera aktif (keyboard akan menutupi kamera)
-      if (!camOnRef.current) inputRef.current?.focus();
+      if (!camOnRef.current && wantsAutoFocus()) inputRef.current?.focus();
     }
     return out;
   };
