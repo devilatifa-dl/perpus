@@ -4,18 +4,15 @@ import JSZip from "jszip";
 import { Fingerprint, KeyRound, ShieldCheck, Save, Database, Download, Upload, Trash2, AlertTriangle } from "lucide-react";
 import { api } from "../lib";
 import { Modal } from "./Shared";
-import { BiometricGate } from "./BiometricGate";
 import { biometricAvailable, biometricRegistered, registerBiometric, removeBiometric } from "../lib/biometric";
 
-export function AccountManager({ user, close, notify }) {
+export function AccountManager({ user, close, notify, verifiedPassword = "", verifiedToken = "" }) {
   const isAdmin = user.role === "admin";
   const [cur, setCur] = useState(""); const [nw, setNw] = useState(""); const [conf, setConf] = useState("");
   const [savingOwn, setSavingOwn] = useState(false);
   const [users, setUsers] = useState([]); const [pwById, setPwById] = useState({}); const [savingId, setSavingId] = useState("");
   const [busyData, setBusyData] = useState(""); const [resetBooks, setResetBooks] = useState(false);
   const restoreRef = useRef(null);
-  // Gerbang fingerprint: aksi sensitif minta verifikasi dulu (fingerprint, cadangan kata sandi).
-  const [gate, setGate] = useState(null); // { action: "reset" | "unlock" }
   const [fpSupported, setFpSupported] = useState(false);
   const [fpRegistered, setFpRegistered] = useState(false);
   const [fpBusy, setFpBusy] = useState("");
@@ -208,14 +205,12 @@ export function AccountManager({ user, close, notify }) {
     }
   };
 
-  const [resetOpen, setResetOpen] = useState(false); const [resetPw, setResetPw] = useState(""); const [resetErr, setResetErr] = useState("");
-  const openReset = () => { setResetPw(""); setResetErr(""); setResetOpen(true); };
+  const [resetOpen, setResetOpen] = useState(false); const [resetErr, setResetErr] = useState("");
   const reset = async (e) => {
     e.preventDefault();
-    if (!resetPw) { setResetErr("Masukkan sandi admin"); return; }
     setBusyData("reset"); setResetErr("");
     try {
-      await api.post("/admin/reset-data", { include_books: resetBooks, password: resetPw });
+      await api.post("/admin/reset-data", { include_books: resetBooks, password: verifiedPassword, biometric_token: verifiedToken });
       setResetOpen(false);
       notify("Data berhasil direset. Memuat ulang...");
       setTimeout(() => window.location.reload(), 1200);
@@ -224,23 +219,9 @@ export function AccountManager({ user, close, notify }) {
     } finally { setBusyData(""); }
   };
 
-  // Reset data: minta fingerprint dulu; kata sandi hanya bila fingerprint tidak tersedia.
-  const startReset = () => {
-    setResetPw(""); setResetErr("");
-    if (fpSupported && fpRegistered) { setGate({ action: "reset" }); return; }
-    setResetOpen(true);
-  };
-  const resetWithBiometric = async (token) => {
-    setGate(null);
-    setBusyData("reset");
-    try {
-      await api.post("/admin/reset-data", { include_books: resetBooks, biometric_token: token });
-      notify("Data berhasil direset. Memuat ulang...");
-      setTimeout(() => window.location.reload(), 1200);
-    } catch (err) {
-      notify(err.response?.data?.detail || "Gagal mereset data");
-    } finally { setBusyData(""); }
-  };
+  // Reset data: verifikasi sudah dilakukan di pintu masuk "Akun & sandi",
+  // jadi di sini cukup konfirmasi sekali (tanpa gate fingerprint/sandi lagi).
+  const startReset = () => { setResetErr(""); setResetOpen(true); };
 
   const changeOwn = async (e) => {
     e.preventDefault();
@@ -330,27 +311,11 @@ export function AccountManager({ user, close, notify }) {
     {resetOpen && createPortal(<Modal title="Konfirmasi reset data" close={() => busyData !== "reset" && setResetOpen(false)}>
       <form className="modal-form" onSubmit={reset} data-testid="reset-confirm-form">
         <div className="error" data-testid="reset-confirm-warning"><AlertTriangle size={14}/> {resetBooks ? "SEMUA data termasuk koleksi buku" : "Anggota, transaksi, pesanan, pengunjung, dll (kecuali koleksi buku)"} akan dihapus permanen dan tidak dapat dibatalkan.</div>
-        <label>Sandi admin<input type="password" autoFocus autoComplete="current-password" data-testid="reset-admin-password-input" value={resetPw} onChange={e => setResetPw(e.target.value)} placeholder="Masukkan sandi akun admin Anda"/></label>
         {resetErr && <div className="error" data-testid="reset-confirm-error">{resetErr}</div>}
         <button type="submit" className="danger-btn full" data-testid="reset-confirm-submit" disabled={busyData === "reset"}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Ya, reset data"}</button>
         <button type="button" className="secondary full" data-testid="reset-confirm-cancel" disabled={busyData === "reset"} onClick={() => setResetOpen(false)}>Batal</button>
       </form>
     </Modal>, document.body)}
-    <BiometricGate
-      open={!!gate}
-      title="Verifikasi fingerprint"
-      message={gate?.action === "reset"
-        ? `Reset data${resetBooks ? " termasuk koleksi buku" : ""} akan menghapus data permanen. Verifikasi dengan sidik jari untuk melanjutkan.`
-        : "Verifikasi dengan sidik jari untuk melanjutkan."}
-      user={user}
-      onClose={() => setGate(null)}
-      onVerified={({ biometricToken, password }) => {
-        if (gate?.action === "reset") {
-          if (biometricToken) resetWithBiometric(biometricToken);
-          else { setGate(null); setResetPw(password || ""); setResetOpen(true); }
-        } else setGate(null);
-      }}
-    />
   </Modal>;
 }
 
