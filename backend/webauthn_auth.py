@@ -22,6 +22,7 @@ from webauthn.helpers import options_to_json
 from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria,
     AuthenticatorAttachment,
+    PublicKeyCredentialDescriptor,
     ResidentKeyRequirement,
     UserVerificationRequirement,
 )
@@ -109,7 +110,10 @@ def build_router(db, current_user):
             user_id=user["id"].encode(),
             user_name=user.get("email") or user["id"],
             user_display_name=user.get("name") or "Admin",
-            exclude_credentials=[{"id": _unb64url(c["credential_id"]), "type": "public-key"} for c in existing],
+            exclude_credentials=[
+                PublicKeyCredentialDescriptor(id=_unb64url(c["credential_id"]))
+                for c in existing
+            ],
             authenticator_selection=AuthenticatorSelectionCriteria(
                 authenticator_attachment=AuthenticatorAttachment.PLATFORM,
                 user_verification=UserVerificationRequirement.REQUIRED,
@@ -161,7 +165,10 @@ def build_router(db, current_user):
         creds = await db.webauthn_credentials.find({"user_id": user["id"]}, {"_id": 0, "credential_id": 1}).to_list(50)
         options = generate_authentication_options(
             rp_id=rp_id(request),
-            allow_credentials=[{"id": _unb64url(c["credential_id"]), "type": "public-key"} for c in creds],
+            allow_credentials=[
+                PublicKeyCredentialDescriptor(id=_unb64url(c["credential_id"]))
+                for c in creds
+            ],
             user_verification=UserVerificationRequirement.REQUIRED,
         )
         await save_challenge(user["id"], options.challenge, "login")
