@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import JSZip from "jszip";
-import { KeyRound, ShieldCheck, Save, Database, Download, Upload, Trash2, AlertTriangle } from "lucide-react";
+import { Fingerprint, KeyRound, ShieldCheck, Save, Database, Download, Upload, Trash2, AlertTriangle } from "lucide-react";
 import { api } from "../lib";
 import { Modal } from "./Shared";
+import { BiometricGate } from "./BiometricGate";
+import { biometricAvailable, biometricRegistered, registerBiometric, removeBiometric } from "../lib/biometric";
 
 export function AccountManager({ user, close, notify }) {
   const isAdmin = user.role === "admin";
@@ -12,10 +14,46 @@ export function AccountManager({ user, close, notify }) {
   const [users, setUsers] = useState([]); const [pwById, setPwById] = useState({}); const [savingId, setSavingId] = useState("");
   const [busyData, setBusyData] = useState(""); const [resetBooks, setResetBooks] = useState(false);
   const restoreRef = useRef(null);
+  // Gerbang fingerprint: aksi sensitif minta verifikasi dulu (fingerprint, cadangan kata sandi).
+  const [gate, setGate] = useState(null); // { action: "reset" | "unlock" }
+  const [fpSupported, setFpSupported] = useState(false);
+  const [fpRegistered, setFpRegistered] = useState(false);
+  const [fpBusy, setFpBusy] = useState("");
 
   useEffect(() => {
     if (isAdmin) api.get("/users").then(r => setUsers(r.data)).catch(() => {});
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    (async () => {
+      const ok = await biometricAvailable();
+      setFpSupported(ok);
+      if (ok) setFpRegistered(await biometricRegistered());
+    })();
+  }, [isAdmin]);
+
+  const enableFingerprint = async () => {
+    setFpBusy("on");
+    try {
+      await registerBiometric({ userId: user.id, userName: user.email, displayName: user.name });
+      setFpRegistered(true);
+      notify?.("Fingerprint aktif di perangkat ini");
+    } catch (e) {
+      notify?.(e?.message || "Gagal mengaktifkan fingerprint");
+    } finally { setFpBusy(""); }
+  };
+
+  const disableFingerprint = async () => {
+    setFpBusy("off");
+    try {
+      await removeBiometric();
+      setFpRegistered(false);
+      notify?.("Fingerprint dimatikan");
+    } catch {
+      notify?.("Gagal mematikan fingerprint");
+    } finally { setFpBusy(""); }
+  };
 
   const saveBlob = (blob, name) => {
     const url = URL.createObjectURL(blob);
@@ -186,6 +224,24 @@ export function AccountManager({ user, close, notify }) {
     } finally { setBusyData(""); }
   };
 
+  // Reset data: minta fingerprint dulu; kata sandi hanya bila fingerprint tidak tersedia.
+  const startReset = () => {
+    setResetPw(""); setResetErr("");
+    if (fpSupported && fpRegistered) { setGate({ action: "reset" }); return; }
+    setResetOpen(true);
+  };
+  const resetWithBiometric = async (token) => {
+    setGate(null);
+    setBusyData("reset");
+    try {
+      await api.post("/admin/reset-data", { include_books: resetBooks, biometric_token: token });
+      notify("Data berhasil direset. Memuat ulang...");
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      notify(err.response?.data?.detail || "Gagal mereset data");
+    } finally { setBusyData(""); }
+  };
+
   const changeOwn = async (e) => {
     e.preventDefault();
     if (nw !== conf) return notify("Konfirmasi kata sandi tidak cocok");
@@ -215,6 +271,20 @@ export function AccountManager({ user, close, notify }) {
 
   return <Modal title="Akun & kata sandi" close={close}>
     <div className="account-manager" data-testid="account-manager">
+      {isAdmin && fpSupported && <div className="account-users" data-testid="fingerprint-section">
+        <div className="account-section-head"><Fingerprint size={16}/> <span>Fingerprint admin</span></div>
+        <p className="account-hint">
+          {fpRegistered
+            ? "Fingerprint aktif di perangkat ini. Aksi sensitif (reset data, hapus laporan) cukup dengan sidik jari."
+            : "Aktifkan sidik jari agar aksi sensitif bisa diverifikasi tanpa mengetik kata sandi."}
+        </p>
+        <div className="data-actions">
+          {fpRegistered
+            ? <button type="button" className="secondary" data-testid="fingerprint-disable" disabled={!!fpBusy} onClick={disableFingerprint}><Fingerprint size={15}/> {fpBusy === "off" ? "Mematikan..." : "Matikan fingerprint"}</button>
+            : <button type="button" className="primary" data-testid="fingerprint-enable" disabled={!!fpBusy} onClick={enableFingerprint}><Fingerprint size={15}/> {fpBusy === "on" ? "Mendaftarkan..." : "Aktifkan fingerprint"}</button>}
+        </div>
+      </div>}
+
       <form onSubmit={changeOwn} className="modal-form">
         <div className="account-section-head"><KeyRound size={16}/> <span>Ubah kata sandi saya ({user.role})</span></div>
         <label>Kata sandi lama<input type="password" data-testid="own-current-password" required value={cur} onChange={e => setCur(e.target.value)}/></label>
@@ -252,7 +322,7 @@ export function AccountManager({ user, close, notify }) {
         <p className="account-hint" data-testid="restore-size-hint">Cadangan berukuran berapa pun bisa dipulihkan. Berkas besar dikirim bertahap — jangan tutup halaman sampai selesai.</p>
         <div className="data-reset-zone">
           <label className="reset-books-check"><input type="checkbox" data-testid="reset-include-books" checked={resetBooks} onChange={e => setResetBooks(e.target.checked)}/> Ikut hapus koleksi buku</label>
-          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={openReset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Reset data"}</button>
+          <button type="button" className="danger-btn" data-testid="reset-data-button" disabled={busyData !== ""} onClick={startReset}><Trash2 size={15}/> {busyData === "reset" ? "Mereset..." : "Reset data"}</button>
           <p className="account-hint reset-warn"><AlertTriangle size={13}/> Reset &amp; pulihkan akan mengganti data saat ini dan tidak dapat dibatalkan.</p>
         </div>
       </div>}
@@ -266,6 +336,21 @@ export function AccountManager({ user, close, notify }) {
         <button type="button" className="secondary full" data-testid="reset-confirm-cancel" disabled={busyData === "reset"} onClick={() => setResetOpen(false)}>Batal</button>
       </form>
     </Modal>, document.body)}
+    <BiometricGate
+      open={!!gate}
+      title="Verifikasi fingerprint"
+      message={gate?.action === "reset"
+        ? `Reset data${resetBooks ? " termasuk koleksi buku" : ""} akan menghapus data permanen. Verifikasi dengan sidik jari untuk melanjutkan.`
+        : "Verifikasi dengan sidik jari untuk melanjutkan."}
+      user={user}
+      onClose={() => setGate(null)}
+      onVerified={({ biometricToken, password }) => {
+        if (gate?.action === "reset") {
+          if (biometricToken) resetWithBiometric(biometricToken);
+          else { setGate(null); setResetPw(password || ""); setResetOpen(true); }
+        } else setGate(null);
+      }}
+    />
   </Modal>;
 }
 

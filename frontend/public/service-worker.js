@@ -8,7 +8,7 @@
  *   sehingga tetap bisa dibuka tanpa internet. Data offline (antrean) disimpan aplikasi di IndexedDB.
  * Ubah VERSION untuk memaksa pembaruan cache.
  */
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL_CACHE = `perpus-shell-${VERSION}`;
 const STATIC_CACHE = `perpus-static-${VERSION}`;
 const IMG_CACHE = `perpus-img-${VERSION}`;
@@ -38,7 +38,7 @@ const PRECACHE = [
 
 const NAV_TIMEOUT = 4000;
 const API_TIMEOUT = 8000;
-const LIMITS = { [STATIC_CACHE]: 120, [IMG_CACHE]: 400, [API_CACHE]: 150 };
+const LIMITS = { [STATIC_CACHE]: 120, [IMG_CACHE]: 400, [API_CACHE]: 220 };
 
 // API yang tidak boleh disimpan (sensitif, berkas unduhan, atau aksi admin)
 const API_BYPASS = /\/api\/(auth\/(login|logout)|admin\/|uploads\/|reports\/purge|restore)|\.(pdf|xlsx|xls|zip|csv)(\?|$)|import-template/i;

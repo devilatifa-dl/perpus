@@ -14,7 +14,7 @@ BLUE = colors.HexColor("#0284c7")
 LIGHT = colors.HexColor("#f1f5f9")
 SCHOOL_NPSN = "69948538"  # ditampilkan di kop PDF
 
-TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung", "peringkat-pinjam": "Peringkat Rajin Meminjam"}
+TITLES = {"transaksi": "Laporan Transaksi Peminjaman", "masuk": "Laporan Buku Masuk", "hilang": "Laporan Buku Hilang", "kunjungan": "Laporan Pengunjung Perpustakaan", "statistik": "Laporan Statistik Pengunjung", "peringkat": "Peringkat Rajin Berkunjung", "peringkat-pinjam": "Peringkat Rajin Meminjam", "terlambat": "Laporan Peminjaman Terlambat"}
 PERIODS = {"semua": "Semua waktu", "harian": "Harian", "bulanan": "Bulanan", "7hari": "7 hari terakhir", "30hari": "30 hari terakhir"}
 CHECKOUT_LABEL = {"scan": "Scan", "manual": "Petugas", "otomatis": "Otomatis"}
 
@@ -113,6 +113,11 @@ def table_rows(kind, rows):
         plain = [[s_["name"], s_["class_name"], str(s_["loans"]), str(s_["books"]), str(s_["days"]), f"{s_['pct']:.1f}%"] for s_ in lb["students"]]
         top_cls = lb["classes"][0]["class_name"] if lb["classes"] else "-"
         summary = f"{lb['label']} · Total peminjaman: {lb['total_loans']} · Siswa meminjam: {lb['active_students']} · Kelas terajin: {top_cls}"
+    elif kind == "terlambat":
+        header = ["No", "Anggota", "Kelas", "Buku", "Tgl Pinjam", "Hari"]
+        widths = [10 * mm, 66 * mm, 38 * mm, 84 * mm, 34 * mm, 20 * mm]
+        plain = [[r["member_name"], r.get("class_name") or "-", r["book_title"], fmt_date(r["borrowed_at"]), f"{r['days_out']} hari"] for r in rows["items"]]
+        summary = f"Dipinjam lebih dari {rows['days']} hari: {rows['total']} buku · Rata-rata {rows['avg_days']} hari · Terlama {rows['max_days']} hari"
     else:
         header = ["No", "Judul Buku", "Catatan", "Tgl Lapor", "Status", "Ditemukan", "Pelapor"]
         widths = [10 * mm, 86 * mm, 56 * mm, 30 * mm, 22 * mm, 30 * mm, 30 * mm]
@@ -165,6 +170,14 @@ def render_report_xlsx(kind, period, rows, settings, officer, orientation="lands
             c = ws.cell(row=start, column=j, value=h); c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745"); c.border = border
         for i, cl in enumerate(rows["classes"], 1):
             for j, v in enumerate([cl["rank"], cl["class_name"], cl[ck], cl["members"], f"{cl['pct']:.1f}%"], 1):
+                c = ws.cell(row=start + i, column=j, value=v); c.border = border
+    if kind == "terlambat" and rows.get("per_class"):
+        start = 7 + max(len(plain), 1) + 3
+        ws.cell(row=start - 1, column=1, value="Sebaran per kelas").font = Font(bold=True, color="0F2745")
+        for j, h in enumerate(["Kelas", "Jumlah buku terlambat"], 1):
+            c = ws.cell(row=start, column=j, value=h); c.font = Font(bold=True, color="FFFFFF"); c.fill = PatternFill("solid", fgColor="0F2745"); c.border = border
+        for i, cl in enumerate(rows["per_class"], 1):
+            for j, v in enumerate([cl["class_name"], cl["count"]], 1):
                 c = ws.cell(row=start + i, column=j, value=v); c.border = border
     if kind == "statistik":
         start = 7 + max(len(plain), 1) + 3
@@ -259,6 +272,9 @@ def render_report_pdf(kind, period, rows, settings, officer, orientation="landsc
         t.setStyle(_table_style()); return t
 
     extra = []
+    if kind == "terlambat" and rows.get("per_class"):
+        ct = side_table(["Kelas", "Jumlah buku terlambat"], [[c["class_name"], c["count"]] for c in rows["per_class"]], [110, 90])
+        extra = [Spacer(1, 12), Paragraph("Sebaran per kelas", ParagraphStyle("t4", parent=h1, fontSize=11)), Spacer(1, 4), ct]
     if kind == "statistik":
         days = [d for d in rows["per_day"]][-31:]
         tot = rows["total"] or 1

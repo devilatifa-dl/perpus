@@ -102,6 +102,7 @@ class ResetInput(BaseModel):
     include_books: bool = False
     code: str = ""
     password: str = ""
+    biometric_token: str = ""
 
 class PasswordChangeInput(BaseModel):
     current_password: str
@@ -1083,8 +1084,10 @@ async def delete_member(member_id: str, user=Depends(current_user)):
 @api.post("/admin/reset-data")
 async def reset_data(data: ResetInput, user=Depends(current_user)):
     if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mereset data")
-    if not data.password or not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()):
-        raise HTTPException(400, "Sandi admin salah. Data tidak direset.")
+    # Fingerprint (WebAuthn) lebih dulu; kata sandi jadi cadangan bila tidak tersedia.
+    if not await consume_biometric_token(db, user["id"], data.biometric_token):
+        if not data.password or not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()):
+            raise HTTPException(400, "Sandi admin salah. Data tidak direset.")
     members = (await db.members.delete_many({})).deleted_count
     await db.users.delete_many({"role": "siswa", "member_id": {"$exists": True}})
     transactions = (await db.transactions.delete_many({})).deleted_count
@@ -1325,10 +1328,53 @@ async def attach_class(loans):
         if not l.get("class_name"): l["class_name"] = info.get(l.get("member_id"), "")
     return loans
 
+OVERDUE_DAYS = 3
+
+async def overdue_report(period: str = "semua", now=None):
+    """Daftar peminjaman yang sudah dipinjam lebih dari OVERDUE_DAYS hari dan belum dikembalikan."""
+    now = now or datetime.now(WIB)
+    loans = await attach_class(build_loans(await db.transactions.find({}, {"_id":0}).to_list(100000)))
+    rows = []
+    for l in loans:
+        if l.get("status") != "Dipinjam" or not l.get("borrowed_at"): continue
+        try:
+            dt = datetime.fromisoformat(l["borrowed_at"].replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        dt = dt.astimezone(WIB) if dt.tzinfo else dt
+        days = (now.date() - dt.date()).days
+        if days <= OVERDUE_DAYS: continue
+        rows.append({**l, "days_out": days, "borrowed_date": dt.date().isoformat()})
+    rows.sort(key=lambda r: r["days_out"], reverse=True)
+    if period in ("harian", "bulanan"):
+        rows = [r for r in rows if in_period(r["borrowed_at"], period, now)]
+    total_days = sum(r["days_out"] for r in rows)
+    per_class = {}
+    for r in rows:
+        key = r.get("class_name") or "-"
+        per_class[key] = per_class.get(key, 0) + 1
+    n = len(rows) or 1
+    classes = [{"class_name": k, "count": v, "pct": v * 100 / n} for k, v in sorted(per_class.items(), key=lambda x: -x[1])]
+    return {
+        "days": OVERDUE_DAYS,
+        "total": len(rows),
+        "avg_days": round(total_days / n, 1) if rows else 0,
+        "max_days": max((r["days_out"] for r in rows), default=0),
+        "items": rows,
+        "per_class": classes,
+    }
+
+@api.get("/reports/overdue")
+async def reports_overdue(period: str = "semua", user=Depends(current_user)):
+    staff_only(user)
+    return await overdue_report(period)
+
 async def export_rows(type: str, period: str, audience: str = "siswa"):
-    if type not in ("transaksi","masuk","hilang","kunjungan","statistik","peringkat","peringkat-pinjam"): raise HTTPException(400, "Jenis laporan tidak valid")
+    if type not in ("transaksi","masuk","hilang","kunjungan","statistik","peringkat","peringkat-pinjam","terlambat"): raise HTTPException(400, "Jenis laporan tidak valid")
     now = datetime.now(WIB)
     settings = await db.settings.find_one({"id":"main"}, {"_id":0}) or {}
+    if type == "terlambat":
+        return await overdue_report(period, now), settings, now
     if type == "peringkat-pinjam":
         return await loan_leaderboard(period if re.match(r"^\d{4}-\d{2}$", period or "") else None, limit=50, audience=audience), settings, now
     if type == "peringkat":
@@ -1379,6 +1425,8 @@ api.include_router(restore_router(db, current_user, None, normalize_books, BACKU
 api.include_router(loan_rank_router(db, current_user))
 from purge import build_router as purge_router
 api.include_router(purge_router(db, current_user, None, visits_auto_close))  # tanpa kode email
+from webauthn_auth import build_router as webauthn_router, consume_biometric_token
+api.include_router(webauthn_router(db, current_user))
 api.include_router(media_router(db, current_user))
 api.include_router(summary_router(db, current_user, staff_only, overdue_loans, visits_auto_close))
 app.include_router(api)

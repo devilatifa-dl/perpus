@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, date
 from typing import List, Optional
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
@@ -22,6 +23,8 @@ class PurgeSelect(BaseModel):
 
 class PurgeInput(PurgeSelect):
     code: str = ""
+    password: str = ""
+    biometric_token: str = ""
 
 
 def _day(value):
@@ -131,6 +134,11 @@ def build_router(db, current_user, verify_reset_code, visits_auto_close):
     @r.post("/reports/purge")
     async def purge(data: PurgeInput, user=Depends(current_user)):
         admin_only(user)
+        # Fingerprint lebih dulu; kata sandi jadi cadangan.
+        from webauthn_auth import consume_biometric_token
+        if not await consume_biometric_token(db, user["id"], data.biometric_token):
+            if not data.password or not bcrypt.checkpw(data.password.encode(), user["password_hash"].encode()):
+                raise HTTPException(400, "Sandi admin salah. Laporan tidak dihapus.")
         rows, del_ids, protected, label = await collect(data)
         if not rows:
             raise HTTPException(400, "Tidak ada data yang bisa dihapus pada pilihan ini")

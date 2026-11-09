@@ -14,3 +14,4 @@ reportlab==5.0.1
 pillow==12.3.0
 pillow_heif==1.8.1
 ijson==3.6.0
+webauthn==3.0.1

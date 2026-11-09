@@ -2,7 +2,7 @@
 import { idbClear } from "./lib/idb";
 const API_CACHE_PREFIX = "perpus-api-";
 const TOKEN_KEY = "perpus_token";
-const WARM_API = /^\/api\/(auth\/me|books|shelves|settings(\/student-photo)?|dashboard|members(\/options)?|transactions|reports(\/summary)?|overdue|reservations(\/mine)?|stocktake|incoming|visits(\/(config|stats|leaderboard|history))?|loans\/leaderboard|account\/(member|history))$/;
+const WARM_API = /^\/api\/(auth\/me|books|shelves|settings(\/student-photo)?|dashboard|members(\/options)?|transactions|reports(\/(summary|overdue))?|overdue|reservations(\/mine)?|stocktake|incoming|visits(\/(config|stats|leaderboard|history))?|loans\/leaderboard|account\/(member|history))$/;
 
 export const emit = (name, detail) => { try { window.dispatchEvent(new CustomEvent(name, { detail })); } catch { /* */ } };
 

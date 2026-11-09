@@ -78,3 +78,65 @@
 .photo-chip.on{border-color:#bbf7d0;background:#f0fdf4}.photo-chip.on .chip-dot{background:#22c55e;box-shadow:0 0 0 3px #22c55e33}.photo-chip.on b{color:#15803d}
 .photo-chip.off{border-color:#fecaca;background:#fef2f2}.photo-chip.off .chip-dot{background:#ef4444;box-shadow:0 0 0 3px #ef444433}.photo-chip.off b{color:#b91c1c}
 @media(max-width:640px){.toolbar{flex-wrap:wrap;align-items:flex-start}.toolbar>div:first-child{flex:1 1 100%}.toolbar-buttons{flex-wrap:wrap}}
+
+/* ===== Laporan: Dipinjam lebih dari 3 hari ===== */
+.overdue-report{display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+.overdue-report>*{min-width:0}
+.stat-grid.three{grid-template-columns:repeat(3,1fr)}
+.pct-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.pct-list li{display:grid;grid-template-columns:minmax(70px,1fr) minmax(60px,2fr) auto;align-items:center;gap:10px;font-size:12px}
+.pct-name{font-weight:600;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pct-bar{height:8px;border-radius:99px;background:#f1f5f9;overflow:hidden}
+.pct-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#f97316,#dc2626)}
+.pct-value{font-variant-numeric:tabular-nums;color:#64748b;white-space:nowrap;font-size:11px}
+.days-pill{display:inline-block;padding:2px 8px;border-radius:99px;background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:700;white-space:nowrap}
+
+/* ===== Rapikan laporan ringkasan & grafik di HP ===== */
+@media(max-width:640px){
+  .ro-filters{gap:8px;align-items:stretch}
+  .ro-filters .period-select{flex:1 1 100%;overflow-x:auto;scrollbar-width:none}
+  .ro-filters .period-select::-webkit-scrollbar{display:none}
+  .ro-filters .period-select button{flex:1 0 auto;white-space:nowrap;padding:8px 10px;font-size:12px}
+  .ro-date{flex:1 1 calc(50% - 4px);min-width:0}
+  .ro-date input{width:100%;height:40px;font-size:13px}
+  .app-frame .ro-filters .ro-actions{flex:1 1 100%;margin-left:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .app-frame .ro-filters .ro-actions button{width:100%;min-width:0;justify-content:center;padding:10px 6px;font-size:12px}
+  .app-frame .overdue-report .ro-filters .download-row{flex:1 1 100%;justify-content:stretch;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .app-frame .overdue-report .ro-filters .download-row>button{width:100%;min-width:0;padding:0 8px;font-size:12px}
+  .ro-range{font-size:11px;line-height:1.5;margin:2px 0 12px}
+  .stat-grid,.stat-grid.five,.stat-grid.three{grid-template-columns:repeat(2,1fr);gap:9px}
+  .stat-grid.three .stat-card:last-child{grid-column:1/-1}
+  .stat-card{padding:13px}
+  .stat-card>span{font-size:11px}
+  .stat-card strong{font-size:20px}
+  .stat-card small{font-size:10px;line-height:1.35}
+  .report-summary{grid-template-columns:1fr;gap:8px}
+  .report-summary>div{padding:12px}
+  .ro-charts{grid-template-columns:1fr;gap:12px}
+  .ro-charts .panel{padding:12px}
+  .ro-charts .panel-title h3{font-size:14px}
+  .top-list li{gap:9px;padding:9px 2px}
+  .top-main b{font-size:12px}
+  .top-list em{font-size:10px}
+  .pct-list li{grid-template-columns:minmax(56px,1fr) minmax(40px,1.4fr) auto;gap:7px;font-size:11px}
+  .report-tabs{gap:6px}
+  .report-tabs button{padding:7px 10px;font-size:12px}
+}
+@media(max-width:380px){
+  .stat-grid,.stat-grid.five,.stat-grid.three{grid-template-columns:1fr}
+  .stat-grid.three .stat-card:last-child{grid-column:auto}
+}
+/* ===== Gerbang fingerprint admin ===== */
+.bio-gate{display:grid;gap:14px}
+.bio-head{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:6px 0 2px}
+.bio-icon{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:#f1f5f9;color:#94a3b8;transition:background-color .25s,color .25s,box-shadow .25s}
+.bio-icon.on{background:#ede9fe;color:#7c3aed;box-shadow:0 0 0 6px rgba(124,58,237,.10)}
+.bio-gate .text-button{justify-self:center;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#6d28d9;background:none;border:0;cursor:pointer;padding:6px}
+.bio-password{display:grid;gap:10px}
+.bio-password label{display:grid;gap:6px;font-size:12px;font-weight:600;color:#475569}
+.bio-password input{height:44px;border-radius:8px;border:1px solid #e2e8f0;padding:0 12px;font-size:14px}
+.bio-password input:focus{outline:2px solid #c4b5fd;border-color:#a78bfa}
+@media(max-width:520px){
+  .bio-icon{width:56px;height:56px}
+  .bio-gate{gap:12px}
+}
