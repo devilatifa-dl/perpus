@@ -29,7 +29,7 @@ export const cardSizeVars = (s) => {
 export const cardFontClass = (s, key) => { const f = s && s.card_text_fonts && s.card_text_fonts[key]; return f ? ` ff-${f}` : ""; };
 export const CARD_THEMES = [["navy", "Biru Navy"], ["emerald", "Hijau Zamrud"], ["maroon", "Merah Maroon"], ["sunset", "Jingga Senja"], ["midnight", "Hitam Emas"], ["light", "Putih Bersih"], ["book", "Tema Buku"]];
 export const CARD_LAYOUTS = [["classic", "Klasik", "Foto kiri, QR di atas"], ["modern", "Modern", "QR kiri, foto kanan"], ["portrait", "Potret", "Vertikal, QR di bawah"]];
-export const CARD_FONTS = [["modern", "Modern"], ["klasik", "Klasik"], ["elegan", "Elegan"], ["mono", "Monospace"], ["shrikhand", "Shrikhand"], ["anton", "Anton"], ["adumu", "Adumu Regular"], ["elmessiri", "El Messiri (gaya Arab)"], ["dmsans", "DM Sans"]];
+export const CARD_FONTS = [["modern", "Modern"], ["klasik", "Klasik"], ["elegan", "Elegan"], ["mono", "Monospace"], ["shrikhand", "Shrikhand"], ["orbitron", "Orbitron (futuristik)"], ["chakrapetch", "Chakra Petch (teknologi)"], ["rajdhani", "Rajdhani (tegas)"], ["exo2", "Exo 2 (modern)"], ["audiowide", "Audiowide (lebar)"]];
 export const CARD_PHOTO_SHAPES = [["kotak", "Kotak"], ["membulat", "Sudut membulat"], ["bulat", "Bulat"]];
 export const CARD_FONT_SIZES = [["kecil", "Kecil"], ["sedang", "Sedang"], ["besar", "Besar"]];
 export const CARD_POS = { logo: [["kiri", "Kiri"], ["kanan", "Kanan"]], photo: [["kiri", "Kiri"], ["kanan", "Kanan"], ["atas", "Atas"]], qr: [["atas", "Atas"], ["bawah", "Bawah"]] };

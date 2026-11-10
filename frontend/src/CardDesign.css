@@ -1,10 +1,11 @@
 /* ===== Kartu anggota: font (@font-face ada di public/fonts/fonts.css), foto & susunan ===== */
 /* Font utama kartu */
 .id-card.font-shrikhand{font-family:"Shrikhand",Georgia,serif}
-.id-card.font-anton{font-family:"Anton",Impact,"Arial Narrow",sans-serif;letter-spacing:.02em}
-.id-card.font-adumu{font-family:"Adumu",Impact,sans-serif;letter-spacing:.02em}
-.id-card.font-elmessiri{font-family:"El Messiri",Georgia,serif}
-.id-card.font-dmsans{font-family:"DM Sans",Inter,system-ui,sans-serif}
+.id-card.font-orbitron{font-family:"Orbitron",Impact,sans-serif;letter-spacing:.01em}
+.id-card.font-chakrapetch{font-family:"Chakra Petch",Impact,sans-serif;letter-spacing:.01em}
+.id-card.font-rajdhani{font-family:"Rajdhani",Impact,sans-serif;letter-spacing:.01em}
+.id-card.font-exo2{font-family:"Exo 2",Impact,sans-serif;letter-spacing:.01em}
+.id-card.font-audiowide{font-family:"Audiowide",Impact,sans-serif;letter-spacing:.01em}
 
 /* Font per teks (Desain kartu -> Teks & font) */
 .id-card .ff-modern{font-family:Outfit,Inter,system-ui,sans-serif!important}
@@ -12,10 +13,11 @@
 .id-card .ff-elegan{font-family:"Palatino Linotype","Book Antiqua",Palatino,Georgia,serif!important}
 .id-card .ff-mono{font-family:"Courier New",ui-monospace,monospace!important}
 .id-card .ff-shrikhand{font-family:"Shrikhand",Georgia,serif!important}
-.id-card .ff-anton{font-family:"Anton",Impact,sans-serif!important;letter-spacing:.02em}
-.id-card .ff-adumu{font-family:"Adumu",Impact,sans-serif!important;letter-spacing:.02em}
-.id-card .ff-elmessiri{font-family:"El Messiri",Georgia,serif!important}
-.id-card .ff-dmsans{font-family:"DM Sans",Inter,sans-serif!important}
+.id-card .ff-orbitron{font-family:"Orbitron",Impact,sans-serif!important;letter-spacing:.01em}
+.id-card .ff-chakrapetch{font-family:"Chakra Petch",Impact,sans-serif!important;letter-spacing:.01em}
+.id-card .ff-rajdhani{font-family:"Rajdhani",Impact,sans-serif!important;letter-spacing:.01em}
+.id-card .ff-exo2{font-family:"Exo 2",Impact,sans-serif!important;letter-spacing:.01em}
+.id-card .ff-audiowide{font-family:"Audiowide",Impact,sans-serif!important;letter-spacing:.01em}
 .id-card .card-field i,.id-card .card-field em{font-family:inherit}
 
 /* Pratinjau font di tombol pilihan */
@@ -24,10 +26,11 @@
 .font-prev-elegan span{font-family:"Palatino Linotype",Palatino,Georgia,serif}
 .font-prev-mono span{font-family:"Courier New",monospace}
 .font-prev-shrikhand span{font-family:"Shrikhand",serif}
-.font-prev-anton span{font-family:"Anton",Impact,sans-serif}
-.font-prev-adumu span{font-family:"Adumu",Impact,sans-serif}
-.font-prev-elmessiri span{font-family:"El Messiri",serif}
-.font-prev-dmsans span{font-family:"DM Sans",sans-serif}
+.font-prev-orbitron span{font-family:"Orbitron",sans-serif}
+.font-prev-chakrapetch span{font-family:"Chakra Petch",sans-serif}
+.font-prev-rajdhani span{font-family:"Rajdhani",sans-serif}
+.font-prev-exo2 span{font-family:"Exo 2",sans-serif}
+.font-prev-audiowide span{font-family:"Audiowide",sans-serif}
 
 /* Ukuran Kelas & NIS terpisah */
 .id-card.fs-on{--fbase:11px}

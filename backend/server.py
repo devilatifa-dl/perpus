@@ -145,7 +145,7 @@ class CompensationInput(BaseModel):
     note: str = ""
 
 CARD_TEXT_KEYS = {"school", "title", "owner", "name", "fields", "class", "nis", "address", "code", "back_title", "back_rules", "back_web"}
-CARD_FONT_IDS = {"modern", "klasik", "elegan", "mono", "shrikhand", "anton", "adumu", "elmessiri", "dmsans"}
+CARD_FONT_IDS = {"modern", "klasik", "elegan", "mono", "shrikhand", "orbitron", "chakrapetch", "rajdhani", "exo2", "audiowide"}
 
 class SettingsInput(BaseModel):
     school_logo: str = ""
