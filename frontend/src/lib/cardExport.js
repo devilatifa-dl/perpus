@@ -93,10 +93,11 @@ let fontCssCache = null;
 /**
  * Render satu elemen kartu (depan .id-card atau belakang .id-card-back) menjadi PNG ber-DPI.
  * @param {HTMLElement} cardEl elemen kartu yang sedang tampil di halaman
- * @param {{dpi?:number, hideFields?:boolean}} opts
+ * @param {{dpi?:number, hideFields?:boolean}} opts hideFields hanya untuk cetak massal;
+ *   unduhan PNG menyertakan semua detail (kelas untuk siswa, mapel untuk guru).
  * @returns {Promise<{blob:Blob, width:number, height:number, dpi:number}>}
  */
-export async function renderCardPng(cardEl, { dpi = DEFAULT_DPI, hideFields = true } = {}) {
+export async function renderCardPng(cardEl, { dpi = DEFAULT_DPI, hideFields = false } = {}) {
   if (!cardEl) throw new Error("Kartu tidak ditemukan");
   const portrait = cardEl.classList.contains("layout-portrait");
   const d = portrait ? DESIGN.portrait : DESIGN.landscape;
@@ -106,8 +107,9 @@ export async function renderCardPng(cardEl, { dpi = DEFAULT_DPI, hideFields = tr
   const slot = document.createElement("div"); slot.className = `print-slot card-export-slot${portrait ? " portrait" : ""}`;
   const clone = cardEl.cloneNode(true);
   clone.removeAttribute("id"); clone.style.width = `${d.w}px`; clone.style.height = `${d.h}px`;
-  // Sama dengan hasil cetak: baris Kelas & Mapel tidak ikut
-  if (hideFields) clone.querySelectorAll('[data-testid="card-class"],[data-testid="card-subject"]').forEach((n) => n.remove());
+  // Unduhan PNG menyertakan semua detail kartu (kelas untuk siswa, mapel untuk guru).
+  // hideFields hanya dipakai cetak massal untuk menyembunyikan baris Kelas.
+  if (hideFields) clone.querySelectorAll('[data-testid="card-class"]').forEach((n) => n.remove());
   slot.appendChild(clone); host.appendChild(slot); document.body.appendChild(host);
   try {
     if (document.fonts?.ready) await document.fonts.ready;
