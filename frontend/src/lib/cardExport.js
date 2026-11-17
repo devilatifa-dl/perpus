@@ -107,8 +107,8 @@ export async function renderCardPng(cardEl, { dpi = DEFAULT_DPI, hideFields = fa
   const slot = document.createElement("div"); slot.className = `print-slot card-export-slot${portrait ? " portrait" : ""}`;
   const clone = cardEl.cloneNode(true);
   clone.removeAttribute("id"); clone.style.width = `${d.w}px`; clone.style.height = `${d.h}px`;
-  // Unduhan PNG menyertakan semua detail kartu (kelas untuk siswa, mapel untuk guru).
-  // hideFields hanya dipakai cetak massal untuk menyembunyikan baris Kelas.
+  // Baris Mapel (kartu guru) tidak ikut diunduh; baris Kelas (kartu siswa) tetap disertakan.
+  clone.querySelectorAll('[data-testid="card-subject"]').forEach((n) => n.remove());
   if (hideFields) clone.querySelectorAll('[data-testid="card-class"]').forEach((n) => n.remove());
   slot.appendChild(clone); host.appendChild(slot); document.body.appendChild(host);
   try {

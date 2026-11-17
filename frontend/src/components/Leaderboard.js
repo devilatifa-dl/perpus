@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PrintButton } from "./ReportPrint";
-import { Award, BookOpen, Crown, Download, DoorOpen, FileSpreadsheet, GraduationCap, Image as ImageIcon, Medal, Smartphone, Trophy, UserRound, Users } from "lucide-react";
+import { Award, BookOpen, Crown, Download, DoorOpen, FileSpreadsheet, GraduationCap, Image as ImageIcon, Medal, Trophy, UserRound, Users } from "lucide-react";
 import { api } from "../lib";
 import { loanLeaderboard, visitLeaderboard } from "../lib/rankAudience";
 import { downloadPoster } from "../lib/posterExport";
@@ -141,7 +141,6 @@ export function Leaderboard({ mode = "admin", kind = "kunjungan", meId = "", dow
         <select data-testid="leaderboard-month-select" value={month} onChange={(e) => setMonth(e.target.value)}>{lb.months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select>
         {mode === "admin" && download && <div className="download-row"><PrintButton/><button className="secondary" data-testid="leaderboard-download-pdf" disabled={!!downloading} onClick={() => download("pdf", K.exportType, lb.month, { audience })}><Download size={16}/> {downloading === "pdf" ? "Menyiapkan..." : "PDF"}</button><button className="secondary" data-testid="leaderboard-download-xlsx" disabled={!!downloading} onClick={() => download("xlsx", K.exportType, lb.month, { audience })}><FileSpreadsheet size={16}/> {downloading === "xlsx" ? "Menyiapkan..." : "Excel"}</button>{(() => { const none = lb.students.length === 0; const tip = (f) => none ? "Belum ada data peringkat untuk dibuat poster" : f; return <>
           <button className="secondary lb-poster-btn" data-testid="leaderboard-download-poster" disabled={!!poster.busy || none} title={tip("Unduh poster A4 (PNG 300 DPI) untuk dicetak")} onClick={() => makePoster("a4")}><ImageIcon size={16}/> {poster.busy === "a4" ? "Membuat poster..." : "Unduh Poster"}</button>
-          <button className="secondary lb-poster-btn" data-testid="leaderboard-download-poster-story" disabled={!!poster.busy || none} title={tip("Unduh poster 9:16 untuk Story Instagram / status WhatsApp")} onClick={() => makePoster("story")}><Smartphone size={16}/> {poster.busy === "story" ? "Membuat poster..." : "Poster Story 9:16"}</button>
         </>; })()}</div>}
         {poster.msg && <span className={`lb-poster-msg ${poster.ok ? "ok" : "fail"}`} data-testid="leaderboard-poster-status" role="status">{poster.msg}</span>}
       </div>

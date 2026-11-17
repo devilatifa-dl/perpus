@@ -121,6 +121,12 @@
   .pct-list li{grid-template-columns:minmax(56px,1fr) minmax(40px,1.4fr) auto;gap:7px;font-size:11px}
   .report-tabs{gap:6px}
   .report-tabs button{padding:7px 10px;font-size:12px}
+  /* Tombol aksi laporan (Cetak, PDF, Excel, Hapus) tersusun rapi 2 kolom di HP */
+  .app-frame .table-panel .panel-title{flex-direction:column;align-items:stretch;gap:10px}
+  .app-frame .table-panel .panel-title .download-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;justify-content:stretch}
+  .app-frame .table-panel .panel-title .download-row>button{width:100%;min-width:0;height:40px;padding:0 10px;font-size:12px;justify-content:center;gap:6px}
+  .app-frame .table-panel .panel-title .download-row>button svg{flex:0 0 auto}
+  .app-frame .table-panel .panel-title .download-row>button:last-child:nth-child(odd){grid-column:1/-1}
 }
 @media(max-width:380px){
   .stat-grid,.stat-grid.five,.stat-grid.three{grid-template-columns:1fr}
