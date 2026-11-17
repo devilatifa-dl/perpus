@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { PrintButton } from "./ReportPrint";
-import { Award, BookOpen, Crown, Download, DoorOpen, FileSpreadsheet, GraduationCap, Medal, Trophy, UserRound, Users } from "lucide-react";
+import { Award, BookOpen, Crown, Download, DoorOpen, FileSpreadsheet, GraduationCap, Image as ImageIcon, Medal, Smartphone, Trophy, UserRound, Users } from "lucide-react";
 import { api } from "../lib";
 import { loanLeaderboard, visitLeaderboard } from "../lib/rankAudience";
+import { downloadPoster } from "../lib/posterExport";
 
 const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const monthLabel = (k) => { const [y, m] = k.split("-"); return `${MONTHS[Number(m) - 1]} ${y}`; };
@@ -78,6 +79,18 @@ export function Leaderboard({ mode = "admin", kind = "kunjungan", meId = "", dow
   const base = KINDS[kind] || KINDS.kunjungan;
   const K = guru ? { ...base, ...GURU_TEXT[kind === "pinjam" ? "pinjam" : "kunjungan"], eyebrow: `${base.eyebrow} · GURU` } : { ...base, eyebrow: `${base.eyebrow} · SISWA` };
   const [month, setMonth] = useState(""); const [lb, setLb] = useState(null); const [err, setErr] = useState("");
+  const [poster, setPoster] = useState({ busy: "", msg: "", ok: true });
+  // Poster PNG dibuat dari data peringkat yang sedang tampil (jenis, bulan & siswa/guru yang dipilih)
+  const makePoster = async (format = "a4") => {
+    if (!lb || poster.busy) return;
+    setPoster({ busy: format, msg: "", ok: true });
+    try {
+      const settings = await api.get("/settings").then((r) => r.data).catch(() => ({}));
+      await downloadPoster(lb, settings, { audience, kind, format });
+      setPoster({ busy: "", msg: `Poster ${format === "story" ? "Story 9:16" : "A4"} ${lb.label} berhasil diunduh`, ok: true });
+    } catch (e) { setPoster({ busy: "", msg: "Poster gagal dibuat, coba lagi", ok: false }); }
+    setTimeout(() => setPoster((p) => (p.busy ? p : { ...p, msg: "" })), 8000);
+  };
   useEffect(() => { setLb(null); setMonth(""); }, [kind]);
   useEffect(() => { setLb(null); }, [audience]);
   useEffect(() => {
@@ -126,7 +139,11 @@ export function Leaderboard({ mode = "admin", kind = "kunjungan", meId = "", dow
       <div className="lb-hero-text"><p className="eyebrow light">{K.eyebrow}</p><h2 data-testid="leaderboard-title">{K.title(lb.label)}</h2><p>{K.intro(lb)}</p></div>
       <div className="lb-hero-actions">
         <select data-testid="leaderboard-month-select" value={month} onChange={(e) => setMonth(e.target.value)}>{lb.months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select>
-        {mode === "admin" && download && <div className="download-row"><PrintButton/><button className="secondary" data-testid="leaderboard-download-pdf" disabled={!!downloading} onClick={() => download("pdf", K.exportType, lb.month, { audience })}><Download size={16}/> {downloading === "pdf" ? "Menyiapkan..." : "PDF"}</button><button className="secondary" data-testid="leaderboard-download-xlsx" disabled={!!downloading} onClick={() => download("xlsx", K.exportType, lb.month, { audience })}><FileSpreadsheet size={16}/> {downloading === "xlsx" ? "Menyiapkan..." : "Excel"}</button></div>}
+        {mode === "admin" && download && <div className="download-row"><PrintButton/><button className="secondary" data-testid="leaderboard-download-pdf" disabled={!!downloading} onClick={() => download("pdf", K.exportType, lb.month, { audience })}><Download size={16}/> {downloading === "pdf" ? "Menyiapkan..." : "PDF"}</button><button className="secondary" data-testid="leaderboard-download-xlsx" disabled={!!downloading} onClick={() => download("xlsx", K.exportType, lb.month, { audience })}><FileSpreadsheet size={16}/> {downloading === "xlsx" ? "Menyiapkan..." : "Excel"}</button>{(() => { const none = lb.students.length === 0; const tip = (f) => none ? "Belum ada data peringkat untuk dibuat poster" : f; return <>
+          <button className="secondary lb-poster-btn" data-testid="leaderboard-download-poster" disabled={!!poster.busy || none} title={tip("Unduh poster A4 (PNG 300 DPI) untuk dicetak")} onClick={() => makePoster("a4")}><ImageIcon size={16}/> {poster.busy === "a4" ? "Membuat poster..." : "Unduh Poster"}</button>
+          <button className="secondary lb-poster-btn" data-testid="leaderboard-download-poster-story" disabled={!!poster.busy || none} title={tip("Unduh poster 9:16 untuk Story Instagram / status WhatsApp")} onClick={() => makePoster("story")}><Smartphone size={16}/> {poster.busy === "story" ? "Membuat poster..." : "Poster Story 9:16"}</button>
+        </>; })()}</div>}
+        {poster.msg && <span className={`lb-poster-msg ${poster.ok ? "ok" : "fail"}`} data-testid="leaderboard-poster-status" role="status">{poster.msg}</span>}
       </div>
     </div>
     {mode === "siswa" && meId && (!guru || me) && <div className={`lb-me ${me ? "in" : ""}`} data-testid="leaderboard-me">{me ? <><Award size={18}/> {K.me(me)}</> : <><Trophy size={18}/> {K.notMe}</>}</div>}

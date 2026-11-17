@@ -8,6 +8,8 @@ backend/test_*.py
 frontend/node_modules
 frontend/build
 frontend/.cache
+backup
+test_reports
 .git
 *.zip
 *.log

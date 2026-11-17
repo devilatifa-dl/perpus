@@ -209,6 +209,22 @@ def staff_only(user):
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
+async def drop_member_photos(photos):
+    """Hapus berkas foto milik anggota yang baru dihapus agar tidak menumpuk jadi foto yatim
+    (foto yatim ikut terbawa ke cadangan dan membuat berkas cadangan membengkak)."""
+    paths = []
+    for p in photos or []:
+        if isinstance(p, str) and p.startswith("/api/files/"):
+            paths.append(p[len("/api/files/"):])
+    if not paths:
+        return 0
+    # Jangan hapus bila masih dipakai anggota lain (mis. foto yang sama dipakai ulang).
+    still = {m.get("photo") for m in await db.members.find({"photo": {"$in": ["/api/files/" + x for x in paths]}}, {"_id": 0, "photo": 1}).to_list(None)}
+    paths = [x for x in paths if "/api/files/" + x not in still]
+    if not paths:
+        return 0
+    return (await db.files.delete_many({"storage_path": {"$in": paths}})).deleted_count
+
 def public(doc):
     doc = dict(doc)
     doc.pop("_id", None)
@@ -249,10 +265,15 @@ def real_cover(value):
     """Nilai sampul dari formulir: URL sampul kita sendiri berarti 'tidak berubah'."""
     return "" if is_cover_ref(value) else (value or "")
 
+def is_file_ref(value):
+    return isinstance(value, str) and value.startswith("/api/files/")
+
 def slim_book(b):
     b = dict(b)
     c = b.get("cover") or ""
     if isinstance(c, str) and c.startswith("data:"):
+        b["cover"] = cover_ref(b["id"], _cover_version(len(c), c[-48:]))
+    elif is_file_ref(c):
         b["cover"] = cover_ref(b["id"], _cover_version(len(c), c[-48:]))
     return b
 
@@ -271,8 +292,37 @@ async def list_books_slim(match=None, limit=500):
         b.pop("_id", None)
         if b.pop("_dc", False):
             b["cover"] = cover_ref(b["id"], _cover_version(b.get("_len", 0), b.get("_tail", "")))
+        elif is_file_ref(b.get("cover")):
+            b["cover"] = cover_ref(b["id"], _cover_version(len(b["cover"]), b["cover"][-48:]))
         b.pop("_len", None); b.pop("_tail", None)
     return rows
+
+async def save_cover_file(book_id, data_url):
+    """Sampul base64 dipindah ke koleksi `files` agar dokumen `books` tetap ringan
+    (membaca base64 besar dari Atlas butuh puluhan detik dan membuat cadangan melewati batas waktu Vercel)."""
+    if not isinstance(data_url, str) or not data_url.startswith("data:image") or ";base64," not in data_url:
+        return data_url or ""
+    head, _, b64 = data_url.partition(",")
+    try:
+        raw = base64.b64decode(b64)
+    except Exception:
+        return ""
+    mime = head[5:].split(";")[0] or "image/jpeg"
+    ext = "png" if "png" in mime else "jpg"
+    path = f"perpus-smansa/covers/{uuid.uuid4()}.{ext}"
+    await db.files.insert_one({
+        "id": str(uuid.uuid4()), "storage_path": path, "data": raw,
+        "original_filename": f"cover-{book_id}.{ext}", "original_size": len(raw),
+        "content_type": mime, "size": len(raw), "width": 0, "height": 0,
+        "uploaded_by": "sampul", "is_deleted": False, "created_at": now_iso(),
+    })
+    return f"/api/files/{path}"
+
+async def drop_cover_file(cover):
+    """Hapus berkas sampul saat buku dihapus atau sampul diganti agar tidak jadi berkas yatim."""
+    if not is_file_ref(cover):
+        return 0
+    return (await db.files.delete_many({"storage_path": cover[len("/api/files/"):]})).deleted_count
 
 _cover_cache = OrderedDict()
 _COVER_CACHE_MAX = 400
@@ -283,6 +333,9 @@ def _render_cover(data_url, size):
     mime = head[5:].split(";")[0] or "image/jpeg"
     if size == "full":
         return raw, mime
+    return _render_cover_bytes(raw, mime)
+
+def _render_cover_bytes(raw, mime):
     from PIL import Image
     im = Image.open(io.BytesIO(raw))
     im.thumbnail((300, 440))
@@ -736,12 +789,26 @@ async def book_cover(book_id: str, v: str = "", s: str = "thumb"):
     if not hit:
         doc = await db.books.find_one({"id": book_id}, {"_id": 0, "cover": 1})
         c = (doc or {}).get("cover") or ""
-        if not isinstance(c, str) or not c.startswith("data:"):
+        if is_file_ref(c):
+            rec = await db.files.find_one({"storage_path": c[len("/api/files/"):], "is_deleted": False}, {"_id": 0, "data": 1, "content_type": 1})
+            if not rec or not rec.get("data"):
+                raise HTTPException(404, "Sampul tidak ditemukan")
+            raw = bytes(rec["data"])
+            mime = rec.get("content_type") or "image/jpeg"
+            if size == "full":
+                hit = (raw, mime)
+            else:
+                try:
+                    hit = await asyncio.to_thread(_render_cover_bytes, raw, mime)
+                except Exception:
+                    raise HTTPException(404, "Sampul tidak dapat dibaca")
+        elif isinstance(c, str) and c.startswith("data:"):
+            try:
+                hit = await asyncio.to_thread(_render_cover, c, size)
+            except Exception:
+                raise HTTPException(404, "Sampul tidak dapat dibaca")
+        else:
             raise HTTPException(404, "Sampul tidak ditemukan")
-        try:
-            hit = await asyncio.to_thread(_render_cover, c, size)
-        except Exception:
-            raise HTTPException(404, "Sampul tidak dapat dibaca")
         if v:
             _cover_cache[key] = hit
             while len(_cover_cache) > _COVER_CACHE_MAX: _cover_cache.popitem(last=False)
@@ -757,9 +824,13 @@ async def add_book(data: BookInput, user=Depends(current_user)):
     data.cover = await asyncio.to_thread(shrink_data_url, real_cover(data.cover))
     same = await find_same_book(data.title, data.author)
     if same:
-        await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.stock}, **({"$set": {"cover": data.cover}} if data.cover and not same.get("cover") else {})})
+        new_cover = ""
+        if data.cover and not same.get("cover"):
+            new_cover = await save_cover_file(same["id"], data.cover)
+        await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.stock}, **({"$set": {"cover": new_cover}} if new_cover else {})})
         return {**(await refresh_book(same["id"])), "merged": True, "added": data.stock}
     doc = data.model_dump(); doc.update({"id":"BK-"+str(uuid.uuid4())[:8].upper(),"created_at":now_iso(),"borrowed":0,"lost":0}); doc.update(compute_state(doc))
+    doc["cover"] = await save_cover_file(doc["id"], doc.get("cover") or "")
     await db.books.insert_one(doc); return {**slim_book(public(doc)), "merged": False, "added": data.stock}
 
 @api.put("/books/{book_id}")
@@ -772,7 +843,12 @@ async def update_book(book_id: str, data: BookUpdate, user=Depends(current_user)
     same = await find_same_book(title, author)
     if same and same["id"] != book_id: raise HTTPException(400, f"Judul & penulis ini sudah ada ({same['id']}). Gunakan Atur stok untuk menambah eksemplar.")
     upd = {"title": title, "author": author, "category": data.category.strip() or "Umum", "shelf": data.shelf, "isbn": data.isbn.strip(), "updated_at": now_iso()}
-    if not is_cover_ref(data.cover): upd["cover"] = await asyncio.to_thread(shrink_data_url, data.cover or "")  # URL sampul kita sendiri = sampul tidak diubah
+    old_cover = book.get("cover") or ""
+    if not is_cover_ref(data.cover):
+        new_cover = await asyncio.to_thread(shrink_data_url, data.cover or "")
+        upd["cover"] = await save_cover_file(book_id, new_cover)
+        if old_cover and old_cover != upd["cover"]:
+            await drop_cover_file(old_cover)
     await db.books.update_one({"id": book_id}, {"$set": upd})
     if title != book["title"]:
         await db.transactions.update_many({"book_id": book_id}, {"$set": {"book_title": title}})
@@ -794,8 +870,10 @@ async def set_book_stock(book_id: str, data: StockInput, user=Depends(current_us
 @api.delete("/books/{book_id}")
 async def delete_book(book_id: str, user=Depends(current_user)):
     staff_only(user)
+    book = await db.books.find_one({"id": book_id}, {"_id": 0, "cover": 1})
     result = await db.books.delete_one({"id":book_id})
     if result.deleted_count == 0: raise HTTPException(404, "Buku tidak ditemukan")
+    if book: await drop_cover_file(book.get("cover") or "")
     return {"ok":True}
 
 @api.patch("/books/{book_id}/status")
@@ -874,11 +952,15 @@ async def add_incoming(data: IncomingInput, user=Depends(current_user)):
     data.cover = await asyncio.to_thread(shrink_data_url, real_cover(data.cover))
     same = await find_same_book(data.title, data.author)
     if same:
-        await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.quantity}, **({"$set": {"cover": data.cover}} if data.cover and not same.get("cover") else {})})
+        new_cover = ""
+        if data.cover and not same.get("cover"):
+            new_cover = await save_cover_file(same["id"], data.cover)
+        await db.books.update_one({"id": same["id"]}, {"$inc": {"stock": data.quantity}, **({"$set": {"cover": new_cover}} if new_cover else {})})
         book = await refresh_book(same["id"]); merged = True
     else:
         base = data.model_dump(exclude={"quantity","date","source"})
         book = {**base, "id":"BK-"+str(uuid.uuid4())[:8].upper(), "stock": data.quantity, "borrowed": 0, "lost": 0, "created_at":now_iso()}; book.update(compute_state(book))
+        book["cover"] = await save_cover_file(book["id"], book.get("cover") or "")
         await db.books.insert_one(book); merged = False
     doc = {"id":"IN-"+str(uuid.uuid4())[:8].upper(),"title":data.title,"author":data.author,"category":data.category,"shelf":data.shelf,"quantity":data.quantity,"detail":f"{data.quantity} eksemplar","source":data.source,"date":date,"status":"Tersimpan","book_ids":[book["id"]],"book_id":book["id"],"merged":merged,"stock_after":book["stock"],"recorded_by":user["name"],"created_at":now_iso()}
     await db.incoming.insert_one(doc); return public(doc)
@@ -1126,21 +1208,24 @@ async def promote_members(data: PromoteInput, user=Depends(current_user)):
 @api.post("/members/bulk-delete")
 async def bulk_delete_members(data: BulkDeleteInput, user=Depends(current_user)):
     staff_only(user)
-    members = await db.members.find({"class_name": data.class_name}, {"_id":0,"id":1}).to_list(None)
+    members = await db.members.find({"class_name": data.class_name}, {"_id":0,"id":1,"photo":1}).to_list(None)
     ids = [m["id"] for m in members]
     if not ids: raise HTTPException(404, "Tidak ada anggota pada kelas tersebut")
     await db.reservations.update_many({"member_id": {"$in": ids}, "status": "Menunggu"}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
     result = await db.members.delete_many({"id": {"$in": ids}})
     await db.users.delete_many({"member_id": {"$in": ids}, "role": "siswa"})
+    await drop_member_photos([m.get("photo") for m in members])
     return {"ok": True, "deleted": result.deleted_count, "class_name": data.class_name}
 
 @api.delete("/members/{member_id}")
 async def delete_member(member_id: str, user=Depends(current_user)):
     staff_only(user)
+    member = await db.members.find_one({"id": member_id}, {"_id": 0, "photo": 1})
     result = await db.members.delete_one({"id": member_id})
     if result.deleted_count == 0: raise HTTPException(404, "Anggota tidak ditemukan")
     await db.users.delete_many({"member_id": member_id, "role": "siswa"})
     await db.reservations.update_many({"member_id": member_id, "status": "Menunggu"}, {"$set": {"status":"Dibatalkan","processed_at":now_iso(),"processed_by":user["name"]}})
+    await drop_member_photos([(member or {}).get("photo")])
     return {"ok": True}
 
 @api.post("/admin/reset-data")
@@ -1163,18 +1248,57 @@ async def reset_data(data: ResetInput, user=Depends(current_user)):
         books = 0
         await db.books.update_many({}, [{"$set": {"stock": {"$add": [{"$ifNull": ["$stock", 0]}, {"$ifNull": ["$lost", 0]}]}, "lost": 0, "borrowed": 0}}, {"$set": {"available": "$stock", "status": {"$cond": [{"$gt": ["$stock", 0]}, "Tersedia", "Habis"]}}}])
     await db.visits.delete_many({})
+    # Foto anggota tersimpan di koleksi `files`; tanpa ini foto yatim menumpuk dan ikut terbawa ke cadangan.
+    files = (await db.files.delete_many({})).deleted_count
     await db.meta.update_one({"id": "seed"}, {"$set": {"id": "seed", "done": True}}, upsert=True)
-    return {"ok": True, "deleted": {"members": members, "transactions": transactions, "incoming": incoming, "missing": missing, "reservations": reservations, "stocktake": stocktake, "books": books}, "books_deleted": data.include_books}
+    return {"ok": True, "deleted": {"members": members, "transactions": transactions, "incoming": incoming, "missing": missing, "reservations": reservations, "stocktake": stocktake, "books": books, "files": files}, "books_deleted": data.include_books}
 
-BACKUP_COLLECTIONS = ["books", "members", "transactions", "incoming", "missing", "reservations", "stocktake", "shelves", "settings", "visits"]
+BACKUP_COLLECTIONS = ["books", "members", "transactions", "incoming", "missing", "reservations", "stocktake", "shelves", "settings", "visits", "files"]
+
+def _encode_binary(value):
+    """Field biner (isi foto di koleksi `files`) diubah ke base64 agar aman di JSON cadangan."""
+    if isinstance(value, (bytes, bytearray)):
+        return {"__b64__": base64.b64encode(bytes(value)).decode()}
+    if isinstance(value, dict):
+        return {k: _encode_binary(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_encode_binary(v) for v in value]
+    return value
+
+async def prune_orphan_photos():
+    """Hapus berkas di koleksi `files` yang tidak lagi dipakai anggota maupun buku.
+    Berkas yatim hanya membengkakkan berkas cadangan tanpa manfaat."""
+    used = set()
+    async for m in db.members.find({"photo": {"$nin": ["", None]}}, {"_id": 0, "photo": 1}):
+        p = m.get("photo") or ""
+        if p.startswith("/api/files/"):
+            used.add(p[len("/api/files/"):])
+    async for b in db.books.find({"cover": {"$regex": "^/api/files/"}}, {"_id": 0, "cover": 1}):
+        used.add((b.get("cover") or "")[len("/api/files/"):])
+    return (await db.files.delete_many({"storage_path": {"$nin": list(used)}})).deleted_count
+
+@api.post("/admin/prune-photos")
+async def prune_photos(user=Depends(current_user)):
+    if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat membersihkan foto")
+    removed = await prune_orphan_photos()
+    return {"ok": True, "removed": removed, "remaining": await db.files.count_documents({})}
 
 @api.get("/admin/backup")
 async def backup_data(user=Depends(current_user)):
     if user["role"] != "admin": raise HTTPException(403, "Hanya admin yang dapat mengunduh cadangan data")
+    # Bersihkan foto & sampul yatim lebih dulu agar cadangan tidak membengkak oleh berkas tak terpakai.
+    await prune_orphan_photos()
     dump = {}
     for name in BACKUP_COLLECTIONS:
-        dump[name] = await db[name].find({}, {"_id": 0}).to_list(100000)
-    return {"app": "perpustakaan-sma1-abung-tengah", "version": 1, "generated_at": now_iso(), "collections": dump}
+        if name == "files":
+            # Hanya foto anggota yang dicadangkan. Sampul buku (rata-rata 170 KB × 88 judul ≈ 15 MB)
+            # membuat unduhan melewati batas waktu Vercel (60 detik); sampul bisa diunggah ulang.
+            rows = await db.files.find({"storage_path": {"$regex": "^perpus-smansa/photos/"}}, {"_id": 0}).to_list(100000)
+            # Foto tersimpan sebagai biner; tanpa base64 isinya rusak saat dipulihkan.
+            dump[name] = [_encode_binary(r) for r in rows]
+        else:
+            dump[name] = await db[name].find({}, {"_id": 0}).to_list(100000)
+    return {"app": "perpustakaan-sma1-abung-tengah", "version": 2, "generated_at": now_iso(), "collections": dump}
 
 BACKUP_REPORTS = [("transaksi", "01-Laporan-Transaksi"), ("masuk", "02-Laporan-Buku-Masuk"), ("hilang", "03-Laporan-Buku-Hilang"), ("kunjungan", "04-Laporan-Pengunjung")]
 
@@ -1214,7 +1338,8 @@ async def backup_zip(user=Depends(current_user)):
     def build():
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            z.writestr("data-cadangan.json", json.dumps(payload, ensure_ascii=False, indent=2, default=str))
+            # Tanpa indentasi: berkas jauh lebih kecil & cepat dibuat (tetap JSON valid untuk dipulihkan).
+            z.writestr("data-cadangan.json", json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str))
             for path, kind, period, rows, settings, count in jobs:
                 for ext, render in (("xlsx", render_report_xlsx), ("pdf", render_report_pdf)):
                     try:
@@ -1229,6 +1354,8 @@ async def backup_zip(user=Depends(current_user)):
                 f"Dibuat: {fmt_long(now, True)} WIB oleh {user['name']}",
                 "",
                 "data-cadangan.json  -> berkas untuk menu 'Pulihkan data' (boleh juga unggah ZIP ini langsung).",
+                "                       Isinya juga memuat foto anggota (koleksi 'files', dikodekan base64),",
+                "                       sehingga foto tidak hilang atau rusak saat dipulihkan.",
                 "laporan/            -> laporan siap baca (Excel & PDF), semua periode:",
                 *notes,
             ]

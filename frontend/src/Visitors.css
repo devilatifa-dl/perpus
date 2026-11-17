@@ -289,3 +289,9 @@ html[data-theme="dark"] .lb-switch.lb-audience>button:not(.active):hover{backgro
 html[data-theme="dark"] .lb-audience-bar>span{color:#94a3b8}
 .lb-grid.single{grid-template-columns:minmax(0,1fr)}
 @media print{.lb-audience-bar{display:none!important}body.report-print .lb-grid.single{grid-template-columns:minmax(0,1fr)!important}}
+/* Tombol & status Unduh Poster (peringkat rajin berkunjung) */
+.lb-hero-actions .download-row>button.lb-poster-btn,html .app-frame .lb-hero-actions .download-row>button.lb-poster-btn{background:linear-gradient(135deg,#f7dc84,#d4a537)!important;border:1px solid #b8891f!important;color:#0b1d45!important;box-shadow:0 6px 16px rgba(212,165,55,.35)}
+.lb-hero-actions .download-row>button.lb-poster-btn:hover:not(:disabled),html .app-frame .lb-hero-actions .download-row>button.lb-poster-btn:hover:not(:disabled){background:linear-gradient(135deg,#ffe9a3,#e0b244)!important;transform:translateY(-1px)}
+.lb-hero-actions .lb-poster-btn:disabled{opacity:.6;cursor:not-allowed}
+.lb-poster-msg{flex-basis:100%;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;background:#ecfdf5;color:#047857}
+.lb-poster-msg.fail{background:#fef2f2;color:#b91c1c}

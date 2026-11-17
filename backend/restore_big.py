@@ -13,7 +13,7 @@ jadi cadangan yang rusak tidak menghapus data yang ada.
 
 Alur lama (start/chunk/finish/status) tetap tersedia untuk kompatibilitas dan pemakaian di server biasa.
 """
-import asyncio, io, logging, mmap, os, struct, tempfile, uuid, zipfile, zlib
+import asyncio, base64, io, logging, mmap, os, struct, tempfile, uuid, zipfile, zlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -78,6 +78,20 @@ class _AsyncReader:
 
 def _now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _decode_binary(value):
+    """Kembalikan field biner yang di-encode base64 saat cadangan dibuat (isi foto di koleksi `files`)."""
+    if isinstance(value, dict):
+        if set(value.keys()) == {"__b64__"} and isinstance(value["__b64__"], str):
+            try:
+                return Binary(base64.b64decode(value["__b64__"]))
+            except Exception:
+                return b""
+        return {k: _decode_binary(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_decode_binary(v) for v in value]
+    return value
 
 
 def _is_json_member(name):
@@ -258,6 +272,7 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
                         if not isinstance(item, dict):
                             continue
                         item.pop("_id", None)
+                        item = _decode_binary(item)
                         batch.append(item)
                         if len(batch) >= BATCH:
                             await db[tmp].insert_many(batch, ordered=False)
@@ -273,11 +288,18 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
 
             # 3) Semua berhasil dibaca -> ganti data lama (indeks koleksi tetap dipertahankan oleh $out)
             await report(stage="mengganti", collection="", inserted=sum(staged.values()))
+            # Sampul buku tidak ikut dicadangkan (terlalu besar), jadi simpan dulu agar tidak hilang saat `files` diganti.
+            kept_covers = []
+            if "files" in staged:
+                async for c in db.files.find({"storage_path": {"$regex": "^perpus-smansa/covers/"}}, {"_id": 0}):
+                    kept_covers.append(c)
             for name, count in staged.items():
                 if count:
                     await db[f"_restore_tmp_{name}"].aggregate([{"$match": {}}, {"$out": name}]).to_list(None)
                 else:
                     await db[name].delete_many({})
+            if kept_covers:
+                await db.files.insert_many(kept_covers, ordered=False)
         finally:
             for name in todo:
                 await db[f"_restore_tmp_{name}"].drop()
@@ -373,7 +395,7 @@ def build_router(db, current_user, verify_reset_code, normalize_books, collectio
         for item in data.items:
             if isinstance(item, dict):
                 item.pop("_id", None)
-                docs.append(item)
+                docs.append(_decode_binary(item))
         if docs:
             await db[_tmp(name)].insert_many(docs, ordered=False)
         counts = dict(job.get("counts") or {})
