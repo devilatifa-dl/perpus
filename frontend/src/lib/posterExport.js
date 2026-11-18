@@ -51,6 +51,7 @@ const KINDS = {
   kunjungan: {
     title2: "BERKUNJUNG", file: "berkunjung", total: "total_visits", icon: "clock",
     pill: (s) => fmtDuration(s.minutes),
+    days: (s) => `${num(s.days)} hari datang`,
     colHead: "TOTAL WAKTU", col: (s) => fmtDuration(s.minutes, true),
     statTotal: "TOTAL PENGUNJUNG", statClass: "KELAS TERAKTIF", statPct: "PENGUNJUNG KELAS TERAKTIF",
     guruSum: (list) => ({ label: "TOTAL WAKTU 10 BESAR", value: fmtDuration(list.reduce((a, s) => a + (Number(s.minutes) || 0), 0), true) }),
@@ -58,6 +59,7 @@ const KINDS = {
   pinjam: {
     title2: "MEMINJAM", file: "meminjam", total: "total_loans", icon: "book",
     pill: (s) => `${num(s.loans)} buku · ${num(s.books)} judul`,
+    days: (s) => `${num(s.days)} hari meminjam`,
     colHead: "BUKU DIPINJAM", col: (s) => `${num(s.loans)} buku`,
     statTotal: "TOTAL PEMINJAMAN", statClass: "KELAS TERAJIN", statPct: "PEMINJAMAN KELAS TERAJIN",
     guruSum: (list) => ({ label: "BUKU DIPINJAM 10 BESAR", value: `${num(list.reduce((a, s) => a + (Number(s.loans) || 0), 0))} buku` }),
@@ -302,31 +304,35 @@ function drawPodium(ctx, d, L) {
     const s = d.students[i]; const m = MEDALS[i]; const h = L.ph[i]; const r = L.ar[i]; const pt = base - h;
     drawPedestal(ctx, cx, pt, base, w, i + 1, m);
     // kartu info
-    const cardW = w - 10, cardH = 130, cardY = pt - 8 - cardH, cardX = cx - cardW / 2;
+    const cardW = w - 10, cardH = 152, cardY = pt - 8 - cardH, cardX = cx - cardW / 2;
     ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 14;
     rr(ctx, cardX, cardY, cardW, cardH, 14); ctx.fillStyle = "rgba(6,17,46,.92)"; ctx.fill(); ctx.restore();
     rr(ctx, cardX, cardY, cardW, cardH, 14); ctx.lineWidth = 1.4; ctx.strokeStyle = m.b; ctx.stroke();
     const name = s ? s.name : "Belum ada";
     const lines = nameLines(ctx, name, cardW - 24, i === 0 ? 25 : 23);
     ctx.textAlign = "center"; ctx.fillStyle = C.white; font(ctx, lines.size, 900, HEAD);
-    if (lines.rows.length === 1) ctx.fillText(lines.rows[0], cx, cardY + 54);
-    else { ctx.fillText(lines.rows[0], cx, cardY + 38); ctx.fillText(lines.rows[1], cx, cardY + 38 + lines.size + 1); }
-    const clsY = lines.rows.length === 1 ? cardY + 78 : cardY + 83;
+    if (lines.rows.length === 1) ctx.fillText(lines.rows[0], cx, cardY + 50);
+    else { ctx.fillText(lines.rows[0], cx, cardY + 36); ctx.fillText(lines.rows[1], cx, cardY + 36 + lines.size + 1); }
+    const clsY = lines.rows.length === 1 ? cardY + 72 : cardY + 78;
     ctx.fillStyle = C.soft; fitFont(ctx, s ? (s.class_name || "-") : "—", cardW - 30, 15, 600, BODY, 11);
     ctx.fillText(s ? (s.class_name || "-") : "—", cx, clsY);
+    // hari datang / hari meminjam
+    const daysTxt = s ? d.K.days(s) : "—";
+    ctx.fillStyle = m.a; fitFont(ctx, daysTxt, cardW - 26, 14, 800, BODY, 10);
+    ctx.fillText(daysTxt, cx, clsY + 20);
     // pil nilai (waktu / buku)
     const pill = s ? d.K.pill(s) : "—";
     const pillMax = cardW - 22;
     fitFont(ctx, pill, pillMax - 46, 15, 800, BODY, 11);
     const tw = ctx.measureText(pill).width; const pw = Math.min(pillMax, tw + 46);
-    const py = cardY + 95;
+    const py = cardY + 117;
     rr(ctx, cx - pw / 2, py, pw, 26, 13); ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = m.b; ctx.stroke();
     const startX = cx - (tw + 22) / 2;
     if (s) drawIconGlyph(ctx, d.K.icon, startX + 8, py + 13, m.a, 0.95);
     ctx.textAlign = "left"; ctx.fillStyle = m.a; ctx.fillText(pill, startX + (s ? 22 : 11), py + 18.5);
-    // avatar + medali di atas kartu
-    const medalR = 20, medalCy = cardY;
-    const cy = medalCy - 10 - r;
+    // avatar + medali di atas kartu (medali juara 1, 2, 3 berukuran sama)
+    const medalR = 24, medalCy = cardY;
+    const cy = medalCy - 12 - r;
     if (i === 0) drawCrown(ctx, cx, cy - r - 46);
     drawAvatar(ctx, s, d.photos[i], cx, cy, r, m);
     drawMedal(ctx, cx, medalCy, medalR, m, i + 1);
@@ -340,13 +346,13 @@ function drawTable(ctx, d, L) {
   rr(ctx, x, y, w, h, 16); ctx.lineWidth = 1.2; ctx.strokeStyle = "rgba(212,165,55,.55)"; ctx.stroke();
   ctx.textAlign = "left"; ctx.fillStyle = C.goldL; font(ctx, 17, 900, HEAD); tracked(ctx, "PERINGKAT 4 – 10", x + 22, y + 30, 2.4, "left");
   ctx.textAlign = "right"; ctx.fillStyle = C.muted; font(ctx, 12, 600, BODY); ctx.fillText(d.note, x + w - 22, y + 29);
-  const cols = { rank: x + 74, name: x + 140, cls: x + 590, time: x + w - 100 };
+  const cols = { rank: x + 74, name: x + 140, cls: x + 500, days: x + 672, time: x + w - 96 };
   const hy = y + 44;
   rr(ctx, x + 14, hy, w - 28, 38, 9); ctx.fillStyle = goldGrad(ctx, x, hy, x + w, hy + 38); ctx.fill();
-  ctx.fillStyle = C.navy; font(ctx, 14, 900, BODY);
-  ctx.textAlign = "center"; tracked(ctx, "PERINGKAT", cols.rank, hy + 25, 1.6);
-  ctx.textAlign = "left"; tracked(ctx, d.guru ? "NAMA GURU" : "NAMA SISWA", cols.name, hy + 25, 1.6, "left");
-  ctx.textAlign = "center"; tracked(ctx, "KELAS", cols.cls, hy + 25, 1.6); tracked(ctx, d.K.colHead, cols.time, hy + 25, 1.6);
+  ctx.fillStyle = C.navy; font(ctx, 13, 900, BODY);
+  ctx.textAlign = "center"; tracked(ctx, "PERINGKAT", cols.rank, hy + 25, 1.4);
+  ctx.textAlign = "left"; tracked(ctx, d.guru ? "NAMA GURU" : "NAMA SISWA", cols.name, hy + 25, 1.4, "left");
+  ctx.textAlign = "center"; tracked(ctx, "KELAS", cols.cls, hy + 25, 1.4); tracked(ctx, "HARI DATANG", cols.days, hy + 25, 1.2); tracked(ctx, d.K.colHead, cols.time, hy + 25, 1.2);
   const rows = d.students.slice(3, 10);
   for (let k = 0; k < 7; k += 1) {
     const ry = hy + 44 + k * rh; const s = rows[k];
@@ -357,12 +363,13 @@ function drawTable(ctx, d, L) {
     ctx.textAlign = "center"; ctx.fillStyle = s ? C.goldL : C.muted; font(ctx, 15, 900, HEAD); ctx.fillText(String(k + 4), cols.rank, mid + 5.5);
     ctx.textAlign = "left";
     if (s) {
-      ctx.fillStyle = C.white; font(ctx, 18, 700, BODY); ctx.fillText(ellipsis(ctx, s.name, cols.cls - cols.name - 90), cols.name, mid + 6.5);
-      ctx.textAlign = "center"; ctx.fillStyle = C.soft; fitFont(ctx, s.class_name || "-", 150, 16, 600, BODY); ctx.fillText(s.class_name || "-", cols.cls, mid + 6);
-      ctx.fillStyle = C.goldL; fitFont(ctx, d.K.col(s), 170, 17, 800, BODY, 11); ctx.fillText(d.K.col(s), cols.time, mid + 6);
+      ctx.fillStyle = C.white; font(ctx, 18, 700, BODY); ctx.fillText(ellipsis(ctx, s.name, cols.cls - cols.name - 80), cols.name, mid + 6.5);
+      ctx.textAlign = "center"; ctx.fillStyle = C.soft; fitFont(ctx, s.class_name || "-", 130, 16, 600, BODY); ctx.fillText(s.class_name || "-", cols.cls, mid + 6);
+      ctx.fillStyle = C.soft; fitFont(ctx, `${num(s.days)} hari`, 120, 16, 700, BODY); ctx.fillText(`${num(s.days)} hari`, cols.days, mid + 6);
+      ctx.fillStyle = C.goldL; fitFont(ctx, d.K.col(s), 160, 17, 800, BODY, 11); ctx.fillText(d.K.col(s), cols.time, mid + 6);
     } else {
       ctx.fillStyle = "rgba(207,217,236,.4)"; font(ctx, 16, 600, BODY); ctx.fillText("—", cols.name, mid + 6);
-      ctx.textAlign = "center"; ctx.fillText("—", cols.cls, mid + 6); ctx.fillText("—", cols.time, mid + 6);
+      ctx.textAlign = "center"; ctx.fillText("—", cols.cls, mid + 6); ctx.fillText("—", cols.days, mid + 6); ctx.fillText("—", cols.time, mid + 6);
     }
   }
 }
