@@ -355,11 +355,12 @@ function drawPodium(ctx, d, L) {
     const name = s ? s.name : "Belum ada";
     const lines = nameLines(ctx, name, cardW - 26, i === 0 ? 23 : 21);
     ctx.textAlign = "center"; ctx.fillStyle = C.white; font(ctx, lines.size, 900, HEAD);
-    // Nama digeser turun agar tidak mepet tepi atas kartu dan seimbang dengan baris di bawahnya
+    // Semua podium memakai tinggi nama 2 baris agar kelas & hari datang sejajar rata.
     const nameTop = cardY + 38;
+    const row2 = nameTop + lines.size + 2;
     if (lines.rows.length === 1) ctx.fillText(lines.rows[0], cx, nameTop + lines.size * 0.36);
-    else { ctx.fillText(lines.rows[0], cx, nameTop); ctx.fillText(lines.rows[1], cx, nameTop + lines.size + 2); }
-    const clsY = lines.rows.length === 1 ? nameTop + lines.size * 0.36 + 24 : nameTop + lines.size * 2 + 22;
+    else { ctx.fillText(lines.rows[0], cx, nameTop); ctx.fillText(lines.rows[1], cx, row2); }
+    const clsY = row2 + lines.size * 0.36 + 20;
     ctx.fillStyle = C.soft; fitFont(ctx, s ? (s.class_name || "-") : "—", cardW - 30, 15, 600, BODY, 11);
     ctx.fillText(s ? (s.class_name || "-") : "—", cx, clsY);
     // hari datang / hari meminjam
