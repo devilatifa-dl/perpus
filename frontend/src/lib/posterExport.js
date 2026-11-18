@@ -355,7 +355,8 @@ function drawPodium(ctx, d, L) {
     const name = s ? s.name : "Belum ada";
     const lines = nameLines(ctx, name, cardW - 26, i === 0 ? 23 : 21);
     ctx.textAlign = "center"; ctx.fillStyle = C.white; font(ctx, lines.size, 900, HEAD);
-    const nameTop = cardY + 30;
+    // Nama digeser turun agar tidak mepet tepi atas kartu dan seimbang dengan baris di bawahnya
+    const nameTop = cardY + 38;
     if (lines.rows.length === 1) ctx.fillText(lines.rows[0], cx, nameTop + lines.size * 0.36);
     else { ctx.fillText(lines.rows[0], cx, nameTop); ctx.fillText(lines.rows[1], cx, nameTop + lines.size + 2); }
     const clsY = lines.rows.length === 1 ? nameTop + lines.size * 0.36 + 24 : nameTop + lines.size * 2 + 22;
@@ -375,14 +376,11 @@ function drawPodium(ctx, d, L) {
     const startX = cx - (tw + 20) / 2;
     if (s) drawIconGlyph(ctx, d.K.icon, startX + 7, py + 12.5, m.a, 0.9);
     ctx.textAlign = "left"; ctx.fillStyle = m.a; ctx.fillText(pill, startX + (s ? 20 : 10), py + 17.5);
-    // avatar + medali di atas kartu (medali juara 1, 2, 3 berukuran sama)
-    const medalR = 24, medalCy = cardY;
-    const cy = medalCy - 12 - r;
+    // avatar + trofi/mahkota di atas kartu (medali angka dihapus agar tidak menutupi nama)
+    const cy = cardY - 12 - r;
     if (i === 0) drawCrown(ctx, cx, cy - r - 40);
     else drawTrophy(ctx, cx, cy - r - 46, 1.35, m);
     drawAvatar(ctx, s, d.photos[i], cx, cy, r, m);
-    drawMedalRibbon(ctx, cx, medalCy, medalR, m);
-    drawMedal(ctx, cx, medalCy, medalR, m, i + 1);
   });
 }
 
