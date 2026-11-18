@@ -70,20 +70,21 @@ GURU_CLASS = "Guru"
 
 def normalize_member(doc: dict) -> dict:
     """Siswa: NIS + kelas. Guru: tanpa NIS/kelas, wajib mapel; kelas diisi "Guru"
-    supaya daftar per kelas, cetak massal per kelas & laporan otomatis mengelompokkan guru."""
+    supaya daftar per kelas, cetak massal per kelas & laporan otomatis mengelompokkan guru.
+    Nama, kelas, dan mapel selalu disimpan dalam HURUF KAPITAL agar tampilan seragam."""
     t = (doc.get("member_type") or "siswa").strip().lower()
     if t not in ("siswa", "guru"): raise HTTPException(400, "Tipe anggota harus Siswa atau Guru")
     doc["member_type"] = t
-    doc["name"] = (doc.get("name") or "").strip()
+    doc["name"] = " ".join((doc.get("name") or "").split()).upper()
     if not doc["name"]: raise HTTPException(400, "Nama lengkap wajib diisi")
     if t == "guru":
-        doc["subject"] = (doc.get("subject") or "").strip()
+        doc["subject"] = " ".join((doc.get("subject") or "").split()).upper()
         if not doc["subject"]: raise HTTPException(400, "Mata pelajaran guru wajib diisi")
         doc["student_id"] = ""; doc["class_name"] = GURU_CLASS
     else:
         doc["subject"] = ""
         doc["student_id"] = (doc.get("student_id") or "").strip()
-        doc["class_name"] = (doc.get("class_name") or "").strip()
+        doc["class_name"] = " ".join((doc.get("class_name") or "").split()).upper()
         if not doc["class_name"]: raise HTTPException(400, "Kelas siswa wajib diisi")
         if doc["class_name"].lower() == GURU_CLASS.lower(): raise HTTPException(400, 'Kelas "Guru" khusus untuk anggota tipe Guru')
     return doc
@@ -981,6 +982,7 @@ async def add_member(data: MemberInput, user=Depends(current_user)):
     if user["role"] == "siswa": raise HTTPException(403,"Siswa tidak dapat menambah anggota")
     doc=normalize_member(data.model_dump())
     await ensure_unique_nis(doc["student_id"])
+    await ensure_unique_name(doc["name"])
     doc.update({"id":"MB-"+str(uuid.uuid4())[:8].upper()}); await db.members.insert_one(doc); return public(doc)
 
 async def ensure_unique_nis(sid: str, exclude_id: str = None):
@@ -989,6 +991,17 @@ async def ensure_unique_nis(sid: str, exclude_id: str = None):
     if exclude_id: q["id"] = {"$ne": exclude_id}
     other = await db.members.find_one(q, {"_id": 0, "name": 1, "class_name": 1})
     if other: raise HTTPException(400, f"NIS {sid} sudah dipakai {other.get('name','anggota lain')} ({other.get('class_name','-')})")
+
+async def ensure_unique_name(name: str, exclude_id: str = None):
+    """Nama anggota tidak boleh ganda (dibandingkan tanpa membedakan huruf besar/kecil)."""
+    key = " ".join((name or "").split()).upper()
+    if not key: return
+    q = {"$expr": {"$eq": [{"$toUpper": {"$trim": {"input": {"$ifNull": ["$name", ""]}}}}, key]}}
+    if exclude_id: q["id"] = {"$ne": exclude_id}
+    other = await db.members.find_one(q, {"_id": 0, "name": 1, "class_name": 1, "student_id": 1})
+    if other:
+        detail = other.get("student_id") or other.get("class_name") or "-"
+        raise HTTPException(400, f"Nama {other.get('name', name)} sudah terdaftar ({detail}). Nama anggota tidak boleh ganda.")
 
 def _cell_text(c):
     if c is None:
@@ -1094,27 +1107,37 @@ async def import_members(file: UploadFile = File(...), user=Depends(current_user
         raise HTTPException(400, "Maksimal 2000 baris per impor")
     all_members = await db.members.find({"member_type": {"$ne": "guru"}}, {"_id": 0, "id": 1, "name": 1, "student_id": 1, "class_name": 1}).to_list(None)
     by_nis = {}
+    by_name = {}
     for m in all_members:
         sid = (m.get("student_id") or "").strip()
         if sid:
             by_nis.setdefault(sid, []).append(m)
-    seen, matched_ids = set(), set()
+        nm = " ".join((m.get("name") or "").split()).upper()
+        if nm:
+            by_name.setdefault(nm, []).append(m)
+    seen, seen_names, matched_ids = set(), set(), set()
     to_insert, updates, errors, skipped, unchanged = [], [], [], 0, 0
     for idx, d in enumerate(rows, start=2):
-        name = _pick(d, "nama", "name", "nama lengkap", "nama_lengkap").strip()
+        name = " ".join(_pick(d, "nama", "name", "nama lengkap", "nama_lengkap").split()).upper()
         sid = _pick(d, "nis", "student_id", "nomor induk", "no induk", "nomor_induk", "no_induk").strip()
-        cls = _pick(d, "kelas", "class_name", "class", "rombel").strip()
+        cls = " ".join(_pick(d, "kelas", "class_name", "class", "rombel").split()).upper()
         reason = None
         if not cls or (not name and sid not in by_nis):
             reason = "Nama atau kelas kosong"
         elif sid and sid in seen:
             reason = f"NIS {sid} ganda di dalam berkas"
+        elif name and name in seen_names:
+            reason = f"Nama {name} ganda di dalam berkas"
+        elif name and name in by_name and sid not in by_nis:
+            reason = f"Nama {name} sudah terdaftar ({by_name[name][0].get('student_id') or by_name[name][0].get('class_name') or '-'})"
         if reason:
             skipped += 1
             errors.append({"row": idx, "nama": name, "nis": sid, "kelas": cls, "alasan": reason})
             continue
         if sid:
             seen.add(sid)
+        if name:
+            seen_names.add(name)
         if sid and sid in by_nis:
             # Sudah terdaftar: ID anggota (dan QR kartu) tetap, hanya kelas yang disesuaikan
             for m in by_nis[sid]:
@@ -1168,6 +1191,7 @@ async def update_member(member_id: str, data: MemberInput, user=Depends(current_
     if user["role"] != "admin" and member.get("photo") and (upd.get("photo") or "") != member.get("photo"):
         raise HTTPException(403, "Foto anggota sudah ada. Hanya admin yang dapat mengganti foto")
     await ensure_unique_nis(upd["student_id"], member_id)
+    await ensure_unique_name(upd["name"], member_id)
     if (member.get("class_name") or "") != upd["class_name"]:
         await freeze_old_class([member_id], member.get("class_name", ""))
         await db.users.update_many({"member_id": member_id, "role": "siswa"}, {"$set": {"class_name": upd["class_name"]}})
