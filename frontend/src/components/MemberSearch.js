@@ -20,7 +20,7 @@ export function MemberSearch({ members, value, onChange, testId = "circulation-m
   };
 
   if (selected) return <div className="member-picked" data-testid={`${testId}-selected`}>
-    <div className="avatar">{selected.name[0]}</div>
+    <div className="avatar">{selected.photo ? <img src={selected.photo} alt={selected.name}/> : selected.name[0]}</div>
     <div><b>{selected.name}</b><small>{[selected.student_id, selected.class_name, selected.subject].filter(Boolean).join(" · ") || "-"}</small></div>
     <button type="button" className="icon-button" data-testid={`${testId}-clear`} onClick={() => onChange("")} aria-label="Ganti anggota"><X size={16}/></button>
   </div>;
@@ -31,7 +31,7 @@ export function MemberSearch({ members, value, onChange, testId = "circulation-m
     {open && q.trim() && <div className="member-results" data-testid={`${testId}-results`}>
       {results.length === 0 ? <div className="member-empty">Anggota tidak ditemukan</div> :
         results.map((m, i) => <button type="button" key={m.id} className={i === hi ? "active" : ""} data-testid={`${testId}-option-${m.id}`} onMouseDown={(e) => { e.preventDefault(); pick(m); }} onMouseEnter={() => setHi(i)}>
-          <div className="avatar">{m.name[0]}</div><div><b>{m.name}</b><small>{[m.student_id, m.class_name, m.subject].filter(Boolean).join(" · ") || "-"}</small></div>
+          <div className="avatar">{m.photo ? <img src={m.photo} alt={m.name}/> : m.name[0]}</div><div><b>{m.name}</b><small>{[m.student_id, m.class_name, m.subject].filter(Boolean).join(" · ") || "-"}</small></div>
         </button>)}
     </div>}
   </div>;
