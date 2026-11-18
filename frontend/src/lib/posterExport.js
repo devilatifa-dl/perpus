@@ -348,23 +348,23 @@ function drawPodium(ctx, d, L) {
     const s = d.students[i]; const m = MEDALS[i]; const h = L.ph[i]; const r = L.ar[i]; const pt = base - h;
     drawPedestal(ctx, cx, pt, base, w, i + 1, m);
     // kartu info — susunan tetap: nama (1-2 baris) · kelas · hari · pil nilai
-    const cardW = w - 10, cardH = 152, cardY = pt - 8 - cardH, cardX = cx - cardW / 2;
+    const cardW = w - 10, cardH = 156, cardY = pt - 8 - cardH, cardX = cx - cardW / 2;
     ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 14;
     rr(ctx, cardX, cardY, cardW, cardH, 14); ctx.fillStyle = "rgba(6,17,46,.92)"; ctx.fill(); ctx.restore();
     rr(ctx, cardX, cardY, cardW, cardH, 14); ctx.lineWidth = 1.4; ctx.strokeStyle = m.b; ctx.stroke();
     const name = s ? s.name : "Belum ada";
     const lines = nameLines(ctx, name, cardW - 26, i === 0 ? 23 : 21);
     ctx.textAlign = "center"; ctx.fillStyle = C.white; font(ctx, lines.size, 900, HEAD);
-    const nameTop = cardY + 32;
+    const nameTop = cardY + 30;
     if (lines.rows.length === 1) ctx.fillText(lines.rows[0], cx, nameTop + lines.size * 0.36);
     else { ctx.fillText(lines.rows[0], cx, nameTop); ctx.fillText(lines.rows[1], cx, nameTop + lines.size + 2); }
-    const clsY = lines.rows.length === 1 ? nameTop + lines.size * 0.36 + 24 : nameTop + lines.size * 2 + 26;
+    const clsY = lines.rows.length === 1 ? nameTop + lines.size * 0.36 + 24 : nameTop + lines.size * 2 + 22;
     ctx.fillStyle = C.soft; fitFont(ctx, s ? (s.class_name || "-") : "—", cardW - 30, 15, 600, BODY, 11);
     ctx.fillText(s ? (s.class_name || "-") : "—", cx, clsY);
     // hari datang / hari meminjam
     const daysTxt = s ? d.K.days(s) : "—";
     ctx.fillStyle = m.a; fitFont(ctx, daysTxt, cardW - 26, 14, 800, BODY, 10);
-    ctx.fillText(daysTxt, cx, clsY + 20);
+    ctx.fillText(daysTxt, cx, clsY + 19);
     // pil nilai (waktu / buku)
     const pill = s ? d.K.pill(s) : "—";
     const pillMax = cardW - 22;
