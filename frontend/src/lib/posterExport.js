@@ -25,13 +25,13 @@ const MEDALS = [
 export const POSTER_FORMATS = {
   a4: {
     id: "a4", label: "A4", H: 1414, scale: 2.48, dpi: 300, suffix: "a4",
-    hy: 82, logoR: 50, ty: 200, t1: 74, t2: 104,
+    hy: 82, logoR: 50, ty: 196, t1: 64, t2: 90,
     pb: 886, ph: [126, 104, 90], ar: [66, 56, 56], colW: 250,
     tbY: 898, rowH: 35.5, sY: 1246, sH: 86, bY: 1354,
   },
   story: {
     id: "story", label: "Story 9:16", H: 1778, scale: 2.16, dpi: 300, suffix: "story",
-    hy: 112, logoR: 56, ty: 244, t1: 80, t2: 112,
+    hy: 112, logoR: 56, ty: 240, t1: 70, t2: 98,
     pb: 1052, ph: [156, 116, 88], ar: [78, 66, 66], colW: 262,
     tbY: 1078, rowH: 48, sY: 1518, sH: 110, bY: 1648,
   },
@@ -214,18 +214,18 @@ function drawHeader(ctx, d, L) {
 function drawTitle(ctx, d, L) {
   const y = L.ty;
   ctx.textAlign = "center";
-  ctx.fillStyle = C.goldL; font(ctx, 16, 800, BODY); tracked(ctx, d.eyebrow, 500, y, 4.5);
+  ctx.fillStyle = C.goldL; font(ctx, 15, 800, BODY); tracked(ctx, d.eyebrow, 500, y, 4.2);
   ctx.save(); ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 16; ctx.shadowOffsetY = 5;
-  ctx.fillStyle = C.white; fitFont(ctx, "PERINGKAT RAJIN", 820, L.t1, 900, HEAD); ctx.fillText("PERINGKAT RAJIN", 500, y + 68);
-  fitFont(ctx, d.K.title2, 880, L.t2, 900, HEAD); ctx.fillStyle = goldGrad(ctx, 160, y + 76, 840, y + 158); ctx.fillText(d.K.title2, 500, y + 68 + L.t2 * 0.87);
+  ctx.fillStyle = C.white; fitFont(ctx, "PERINGKAT RAJIN", 780, L.t1, 900, HEAD); ctx.fillText("PERINGKAT RAJIN", 500, y + 62);
+  fitFont(ctx, d.K.title2, 820, L.t2, 900, HEAD); ctx.fillStyle = goldGrad(ctx, 160, y + 70, 840, y + 148); ctx.fillText(d.K.title2, 500, y + 62 + L.t2 * 0.87);
   ctx.restore();
-  const text = `PERIODE  ·  ${d.period.toUpperCase()}`; font(ctx, 21, 800, BODY);
-  const tw = [...text].reduce((a, ch) => a + ctx.measureText(ch).width, 0) + 2.6 * (text.length - 1);
-  const pw = tw + 84, px = 500 - pw / 2, py = y + 68 + L.t2 * 0.87 + 20;
+  const text = `PERIODE  ·  ${d.period.toUpperCase()}`; font(ctx, 19, 800, BODY);
+  const tw = [...text].reduce((a, ch) => a + ctx.measureText(ch).width, 0) + 2.4 * (text.length - 1);
+  const pw = tw + 76, px = 500 - pw / 2, py = y + 62 + L.t2 * 0.87 + 12;
   ctx.save(); ctx.shadowColor = "rgba(0,0,0,.4)"; ctx.shadowBlur = 10;
-  rr(ctx, px, py, pw, 42, 21); ctx.fillStyle = goldGrad(ctx, px, py, px + pw, py + 42); ctx.fill(); ctx.restore();
-  rr(ctx, px + 4, py + 4, pw - 8, 34, 17); ctx.fillStyle = C.navy; ctx.fill();
-  ctx.fillStyle = C.goldL; tracked(ctx, text, 500, py + 28, 2.6);
+  rr(ctx, px, py, pw, 38, 19); ctx.fillStyle = goldGrad(ctx, px, py, px + pw, py + 38); ctx.fill(); ctx.restore();
+  rr(ctx, px + 4, py + 4, pw - 8, 30, 15); ctx.fillStyle = C.navy; ctx.fill();
+  ctx.fillStyle = C.goldL; tracked(ctx, text, 500, py + 25, 2.4);
 }
 
 function drawCrown(ctx, cx, top) {
@@ -378,8 +378,8 @@ function drawPodium(ctx, d, L) {
     // avatar + medali di atas kartu (medali juara 1, 2, 3 berukuran sama)
     const medalR = 24, medalCy = cardY;
     const cy = medalCy - 12 - r;
-    if (i === 0) drawCrown(ctx, cx, cy - r - 46);
-    else drawTrophy(ctx, cx, cy - r - 52, 1.35, m);
+    if (i === 0) drawCrown(ctx, cx, cy - r - 40);
+    else drawTrophy(ctx, cx, cy - r - 46, 1.35, m);
     drawAvatar(ctx, s, d.photos[i], cx, cy, r, m);
     drawMedalRibbon(ctx, cx, medalCy, medalR, m);
     drawMedal(ctx, cx, medalCy, medalR, m, i + 1);
