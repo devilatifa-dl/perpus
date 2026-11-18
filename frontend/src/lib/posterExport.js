@@ -103,8 +103,10 @@ async function ensureFonts() {
 // ===== Helper gambar =====
 const font = (ctx, size, weight = 700, family = BODY) => { ctx.font = `${weight} ${size}px ${family}`; };
 function fitFont(ctx, text, maxW, size, weight, family, min = 10) {
+  // Batas bawah tidak boleh melebihi ukuran awal, agar teks pendek tidak ikut mengecil.
+  const floor = Math.min(min, size);
   let s = size; font(ctx, s, weight, family);
-  while (s > min && ctx.measureText(text).width > maxW) { s -= 0.5; font(ctx, s, weight, family); }
+  while (s > floor && ctx.measureText(text).width > maxW) { s -= 0.5; font(ctx, s, weight, family); }
   return s;
 }
 function ellipsis(ctx, text, maxW) {
@@ -258,6 +260,48 @@ function drawMedal(ctx, cx, cy, r, m, rank) {
   ctx.fillStyle = C.navy; ctx.textAlign = "center"; ctx.textBaseline = "middle"; font(ctx, r * 1.05, 900, HEAD); ctx.fillText(String(rank), cx, cy + 1.5); ctx.textBaseline = "alphabetic";
 }
 
+// Pita medali (dua pita menyilang) di atas koin medali — dipakai juara 1, 2, dan 3.
+function drawMedalRibbon(ctx, cx, cy, r, m) {
+  const top = cy - r * 1.02, len = r * 1.15, halfW = r * 0.34;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+  [[-1, m.b], [1, m.c]].forEach(([dir, col]) => {
+    ctx.beginPath();
+    ctx.moveTo(cx + dir * halfW * 0.15, top + len);
+    ctx.lineTo(cx + dir * halfW * 1.5, top + len * 0.15);
+    ctx.lineTo(cx + dir * halfW * 0.55, top);
+    ctx.lineTo(cx - dir * halfW * 0.35, top + len * 0.72);
+    ctx.closePath();
+    ctx.fillStyle = col; ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.stroke();
+  });
+  ctx.restore();
+}
+
+// Trofi kecil di atas avatar juara 2 & 3 (juara 1 memakai mahkota).
+function drawTrophy(ctx, cx, top, s, m) {
+  ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 8;
+  const g = ctx.createLinearGradient(cx - 20 * s, top, cx + 20 * s, top + 40 * s);
+  g.addColorStop(0, m.a); g.addColorStop(0.5, m.b); g.addColorStop(1, m.c);
+  ctx.fillStyle = g;
+  // cangkir
+  ctx.beginPath();
+  ctx.moveTo(cx - 15 * s, top + 4 * s);
+  ctx.lineTo(cx + 15 * s, top + 4 * s);
+  ctx.quadraticCurveTo(cx + 14 * s, top + 24 * s, cx, top + 26 * s);
+  ctx.quadraticCurveTo(cx - 14 * s, top + 24 * s, cx - 15 * s, top + 4 * s);
+  ctx.closePath(); ctx.fill();
+  // pegangan
+  ctx.lineWidth = 3 * s; ctx.strokeStyle = m.b;
+  ctx.beginPath(); ctx.arc(cx - 16 * s, top + 11 * s, 6 * s, Math.PI * 0.45, Math.PI * 1.55); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx + 16 * s, top + 11 * s, 6 * s, -Math.PI * 0.55, Math.PI * 0.55); ctx.stroke();
+  // batang & alas
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - 3 * s, top + 26 * s, 6 * s, 8 * s);
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - 11 * s, top + 33 * s, 22 * s, 6 * s, 2 * s) : ctx.rect(cx - 11 * s, top + 33 * s, 22 * s, 6 * s); ctx.fill();
+  ctx.restore();
+}
+
 function drawPedestal(ctx, cx, top, base, w, rank, m) {
   const x = cx - w / 2, depth = 16;
   ctx.save(); ctx.shadowColor = "rgba(0,0,0,.55)"; ctx.shadowBlur = 20; ctx.shadowOffsetY = 8;
@@ -269,19 +313,19 @@ function drawPedestal(ctx, cx, top, base, w, rank, m) {
   ctx.fillStyle = C.gold; ctx.fillRect(x, top + depth, w, 2);
   const faceH = base - top - depth;
   const label = `JUARA ${rank} · ${m.label}`;
-  const showLabel = faceH >= 56;
-  // Angka ditaruh di tengah area di atas label (tidak berdempetan dengan tulisan "JUARA ...")
-  const areaTop = top + depth + 7, areaBottom = showLabel ? base - 26 : base - 7;
-  const numSize = Math.min(72, (areaBottom - areaTop) / 0.74);
+  const showLabel = faceH >= 52;
+  // Angka & label diperkecil agar tidak saling menimpa di alas yang pendek (juara 2 & 3).
+  const areaTop = top + depth + 6, areaBottom = showLabel ? base - 22 : base - 6;
+  const numSize = Math.min(46, (areaBottom - areaTop) / 0.78);
   const numY = (areaTop + areaBottom) / 2 + numSize * 0.36;
   // Angka juara: gradasi terang + bayangan & garis tepi gelap agar tetap jelas di alas biru (terutama perunggu)
   ctx.save(); ctx.textAlign = "center"; font(ctx, numSize, 900, HEAD);
   const ng = ctx.createLinearGradient(0, numY - numSize * 0.75, 0, numY); ng.addColorStop(0, "#ffffff"); ng.addColorStop(0.35, m.a); ng.addColorStop(1, m.b);
-  ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
-  ctx.lineWidth = 3; ctx.strokeStyle = "rgba(5,15,41,.85)"; ctx.lineJoin = "round"; ctx.strokeText(String(rank), cx, numY);
+  ctx.shadowColor = "rgba(0,0,0,.6)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+  ctx.lineWidth = 2.4; ctx.strokeStyle = "rgba(5,15,41,.85)"; ctx.lineJoin = "round"; ctx.strokeText(String(rank), cx, numY);
   ctx.shadowColor = "transparent"; ctx.fillStyle = ng; ctx.fillText(String(rank), cx, numY);
   ctx.restore();
-  if (showLabel) { font(ctx, 12, 800, BODY); ctx.fillStyle = m.a; ctx.textAlign = "center"; tracked(ctx, label, cx, base - 10, 2); }
+  if (showLabel) { font(ctx, 10.5, 800, BODY); ctx.fillStyle = m.a; ctx.textAlign = "center"; tracked(ctx, label, cx, base - 8, 1.6); }
 }
 
 function drawIconGlyph(ctx, kind, cx, cy, color, s = 1) {
@@ -303,17 +347,18 @@ function drawPodium(ctx, d, L) {
   spots.forEach(({ i, cx }) => {
     const s = d.students[i]; const m = MEDALS[i]; const h = L.ph[i]; const r = L.ar[i]; const pt = base - h;
     drawPedestal(ctx, cx, pt, base, w, i + 1, m);
-    // kartu info
+    // kartu info — susunan tetap: nama (1-2 baris) · kelas · hari · pil nilai
     const cardW = w - 10, cardH = 152, cardY = pt - 8 - cardH, cardX = cx - cardW / 2;
     ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 14;
     rr(ctx, cardX, cardY, cardW, cardH, 14); ctx.fillStyle = "rgba(6,17,46,.92)"; ctx.fill(); ctx.restore();
     rr(ctx, cardX, cardY, cardW, cardH, 14); ctx.lineWidth = 1.4; ctx.strokeStyle = m.b; ctx.stroke();
     const name = s ? s.name : "Belum ada";
-    const lines = nameLines(ctx, name, cardW - 24, i === 0 ? 25 : 23);
+    const lines = nameLines(ctx, name, cardW - 26, i === 0 ? 23 : 21);
     ctx.textAlign = "center"; ctx.fillStyle = C.white; font(ctx, lines.size, 900, HEAD);
-    if (lines.rows.length === 1) ctx.fillText(lines.rows[0], cx, cardY + 50);
-    else { ctx.fillText(lines.rows[0], cx, cardY + 36); ctx.fillText(lines.rows[1], cx, cardY + 36 + lines.size + 1); }
-    const clsY = lines.rows.length === 1 ? cardY + 72 : cardY + 78;
+    const nameTop = cardY + 32;
+    if (lines.rows.length === 1) ctx.fillText(lines.rows[0], cx, nameTop + lines.size * 0.36);
+    else { ctx.fillText(lines.rows[0], cx, nameTop); ctx.fillText(lines.rows[1], cx, nameTop + lines.size + 2); }
+    const clsY = lines.rows.length === 1 ? nameTop + lines.size * 0.36 + 24 : nameTop + lines.size * 2 + 26;
     ctx.fillStyle = C.soft; fitFont(ctx, s ? (s.class_name || "-") : "—", cardW - 30, 15, 600, BODY, 11);
     ctx.fillText(s ? (s.class_name || "-") : "—", cx, clsY);
     // hari datang / hari meminjam
@@ -323,18 +368,20 @@ function drawPodium(ctx, d, L) {
     // pil nilai (waktu / buku)
     const pill = s ? d.K.pill(s) : "—";
     const pillMax = cardW - 22;
-    fitFont(ctx, pill, pillMax - 46, 15, 800, BODY, 11);
-    const tw = ctx.measureText(pill).width; const pw = Math.min(pillMax, tw + 46);
-    const py = cardY + 117;
-    rr(ctx, cx - pw / 2, py, pw, 26, 13); ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = m.b; ctx.stroke();
-    const startX = cx - (tw + 22) / 2;
-    if (s) drawIconGlyph(ctx, d.K.icon, startX + 8, py + 13, m.a, 0.95);
-    ctx.textAlign = "left"; ctx.fillStyle = m.a; ctx.fillText(pill, startX + (s ? 22 : 11), py + 18.5);
+    fitFont(ctx, pill, pillMax - 44, 14, 800, BODY, 10);
+    const tw = ctx.measureText(pill).width; const pw = Math.min(pillMax, tw + 44);
+    const py = cardY + cardH - 34;
+    rr(ctx, cx - pw / 2, py, pw, 25, 12.5); ctx.fillStyle = "rgba(255,255,255,.07)"; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = m.b; ctx.stroke();
+    const startX = cx - (tw + 20) / 2;
+    if (s) drawIconGlyph(ctx, d.K.icon, startX + 7, py + 12.5, m.a, 0.9);
+    ctx.textAlign = "left"; ctx.fillStyle = m.a; ctx.fillText(pill, startX + (s ? 20 : 10), py + 17.5);
     // avatar + medali di atas kartu (medali juara 1, 2, 3 berukuran sama)
     const medalR = 24, medalCy = cardY;
     const cy = medalCy - 12 - r;
     if (i === 0) drawCrown(ctx, cx, cy - r - 46);
+    else drawTrophy(ctx, cx, cy - r - 52, 1.35, m);
     drawAvatar(ctx, s, d.photos[i], cx, cy, r, m);
+    drawMedalRibbon(ctx, cx, medalCy, medalR, m);
     drawMedal(ctx, cx, medalCy, medalR, m, i + 1);
   });
 }
